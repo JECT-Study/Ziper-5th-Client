@@ -1,5 +1,13 @@
 {
   "name": "ziper",
   "private": true,
+  "scripts": {
+    "lint": "vp lint",
+    "fmt": "vp fmt",
+    "check": "vp check"
+  },
+  "devDependencies": {
+    "vite-plus": "^1.5.0"
+  },
   "packageManager": "pnpm@10.32.0"
 }
