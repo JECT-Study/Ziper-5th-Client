@@ -1,0 +1,54 @@
+name: Update agent skills
+
+on:
+  schedule:
+    - cron: "30 21 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-agent-skills
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    env:
+      DISABLE_TELEMETRY: "1"
+      npm_config_ignore_scripts: "true"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+
+      - name: Update all selected skill sources
+        run: npx --yes --package=skills@1.7.6 skills update --project --yes
+
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/update-agent-skills
+          delete-branch: true
+          commit-message: "chore: update external agent skills"
+          title: "chore: update external agent skills"
+          body: |
+            ## Summary
+            Updates the agent skills and their content hashes.
+
+            - Review skill and lockfile changes before merging.
+            - No custom validation or automerge.
+          add-paths: |
+            .agents/skills/
+            .claude/skills/
+            skills-lock.json
