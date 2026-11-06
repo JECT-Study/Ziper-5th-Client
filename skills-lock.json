@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "60a9cbe5af176150582c019e16e5d3703a41bb02d88438e881349876120d7944"
+    },
+    "expo-dev-client": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-dev-client/SKILL.md",
+      "computedHash": "3e38e9402acd8430b98a887de86b1b346a9fb4873b046585e6c20cf78a91cc49"
+    },
+    "expo-overview": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-overview/SKILL.md",
+      "computedHash": "55fa500c2637fbcc25bc933e3b8efea2b96a2568243d05d6728aee7a651a9246"
+    },
+    "expo-router": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-router/SKILL.md",
+      "computedHash": "8cd1a4358b14380b259b79e22c4170016a077ec316dc36a09f810efd8120ece3"
+    },
+    "expo-upgrade": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-upgrade/SKILL.md",
+      "computedHash": "1a7b83fc0a5b7aa3552a194c57e1f046d85541e77130f3add7c358868f43f4e2"
+    },
+    "ponytail": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail/SKILL.md",
+      "computedHash": "061f887d9e3e735f85db3be3655a8936a00f24d5fb65ac4ab74a968a770fe342"
+    },
+    "ponytail-review": {
+      "source": "DietrichGebert/ponytail",
+      "sourceType": "github",
+      "skillPath": "skills/ponytail-review/SKILL.md",
+      "computedHash": "800dc0c86402978e12359f701b9e0c81ba4607a0cd0027f4596d0f835a67eadc"
+    }
+  }
+}
