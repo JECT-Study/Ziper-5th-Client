@@ -3,7 +3,7 @@
 WebView 기반으로 웹과 네이티브를 분리하는 pnpm 모노레포입니다.
 
 - `apps/ziper-mobile/`: Expo, React Native, Unistyles 기반의 모바일 앱입니다.
-- `apps/ziper-web/`: 추가 예정인 웹 앱입니다.
+- `apps/ziper-web/`: TanStack Start, TanStack Router, Vanilla Extract 기반의 웹 앱입니다.
 
 ## 개발
 

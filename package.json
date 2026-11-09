@@ -2,12 +2,16 @@
   "name": "ziper",
   "private": true,
   "scripts": {
+    "dev:web": "pnpm --filter ziper-web dev",
+    "build:web": "pnpm --filter ziper-web build",
+    "typecheck:web": "pnpm --filter ziper-web typecheck",
     "lint": "vp lint",
     "fmt": "vp fmt",
     "check": "vp check"
   },
   "devDependencies": {
-    "vite-plus": "^1.5.0"
+    "@types/node": "^24.0.0",
+    "vite-plus": "1.5.0"
   },
   "packageManager": "pnpm@10.32.0"
 }
