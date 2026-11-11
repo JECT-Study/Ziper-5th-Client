@@ -5,6 +5,10 @@
     "dev:web": "pnpm --filter ziper-web dev",
     "build:web": "pnpm --filter ziper-web build",
     "typecheck:web": "pnpm --filter ziper-web typecheck",
+    "dev:mobile": "pnpm --filter ziper-mobile start",
+    "ios:mobile": "pnpm --filter ziper-mobile ios",
+    "android:mobile": "pnpm --filter ziper-mobile android",
+    "typecheck:mobile": "pnpm --filter ziper-mobile typecheck",
     "lint": "vp lint",
     "fmt": "vp fmt",
     "check": "vp check"
