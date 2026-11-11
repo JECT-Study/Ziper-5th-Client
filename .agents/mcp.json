@@ -1,5 +1,12 @@
 {
   "mcpServers": {
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "oauth": {
+        "clientName": "Claude Code"
+      }
+    },
     "linear": {
       "type": "http",
       "url": "https://mcp.linear.app/mcp"
