@@ -1,4 +1,5 @@
 import { globalStyle } from '@vanilla-extract/css';
+import { vars } from './theme.css';
 
 globalStyle('*, *::before, *::after', {
   boxSizing: 'border-box',
@@ -6,7 +7,7 @@ globalStyle('*, *::before, *::after', {
 
 globalStyle('body', {
   margin: 0,
-  backgroundColor: '#f8fafc',
-  color: '#0f172a',
-  fontFamily: 'system-ui, sans-serif',
+  backgroundColor: vars.color.background,
+  color: vars.color.text.strong,
+  fontFamily: vars.font.family,
 });

@@ -9,6 +9,12 @@ export const Route = createRootRoute({
       { title: 'Ziper' },
       { name: 'description', content: 'Ziper 웹 스타터' },
     ],
+    links: [
+      {
+        rel: 'stylesheet',
+        href: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css',
+      },
+    ],
   }),
   component: RootComponent,
 });
