@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     "./contract": "./src/contract.ts",
-    "./native": "./src/native.ts"
+    "./native": "./src/native.ts",
+    "./runtime": "./src/runtime.ts"
   },
   "scripts": {
     "test": "vp test run"

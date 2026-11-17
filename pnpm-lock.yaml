@@ -87,6 +87,9 @@ importers:
       '@vanilla-extract/css':
         specifier: ^1.21.3
         version: 1.21.3
+      '@ziper/bridge':
+        specifier: workspace:*
+        version: link:../../packages/bridge
       react:
         specifier: 19.3.0
         version: 19.3.0
