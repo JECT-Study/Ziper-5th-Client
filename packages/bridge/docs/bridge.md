@@ -55,4 +55,4 @@ v1 입력은 엄격하게 고정한다. 새 입력 필드는 버전이나 기능
 
 `patches/`와 `pnpm-workspace.yaml`의 `@webview-bridge/{web,utils,react-native}@1.9.0`을 함께 사용한다. 패치는 요청, 타이머, 구독을 정리하고 메시지 검증, 안전한 주입, 문서 간 응답 격리를 제공한다. Upstream 그대로의 API가 아니므로 **패치된 웹과 네이티브를 한 쌍으로 사용**한다. identity가 없는 이전 클라이언트와의 호환은 가정하지 않는다. 버전 변경 시 프로토콜 회귀 테스트를 실행하고 dev server의 dependency cache를 재시작한다.
 
-[루트 README](../../../README.md#검증)의 테스트는 패치된 브릿지의 CommonJS 배포 코드와 운영 handler를 검증하지만 네이티브 경계는 모킹한다. 이 테스트는 Metro가 선택하는 React Native 소스나 실제 WebView를 직접 검증하지 않는다. Metro export도 네이티브 컴파일이 아니다. 실제 백엔드, 세션 HTTP 구현, 기기의 뒤로 가기 및 제스처, OAuth, SecureStore, 운영 쿠키 보안은 검증되지 않았다.
+[루트 README](../../../README.md#검증)의 테스트는 패치된 브릿지의 CommonJS 배포 코드, 운영 handler와 Expo Router JavaScript를 검증하지만 네이티브 경계는 모킹한다. 이 테스트는 Metro가 선택하는 React Native 소스나 실제 WebView를 직접 검증하지 않는다. Metro export도 네이티브 컴파일이 아니다. 실제 백엔드, 세션 HTTP 구현, 기기의 뒤로 가기 및 제스처, OAuth, SecureStore, 운영 쿠키 보안은 검증되지 않았다.
