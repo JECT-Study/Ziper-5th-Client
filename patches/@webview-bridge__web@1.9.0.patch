@@ -1,0 +1,492 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 9b18cd62556d7cbd6c9d00916ec5493ef49b4cdb..3422ca3ce54347fa1224a7f8dcf6eb99a4401247 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -86,7 +86,7 @@ const linkBridgeStore = (emitter, initialState = {}) => {
+ 		state = _newState;
+ 		emitChange(state, prevState);
+ 	};
+-	emitter.on("bridgeStateChange", (data) => {
++	const unbindState = emitter.on("bridgeStateChange", (data) => {
+ 		setState(data);
+ 	});
+ 	let state = _objectSpread2({}, initialState);
+@@ -108,7 +108,8 @@ const linkBridgeStore = (emitter, initialState = {}) => {
+ 			getState,
+ 			subscribe
+ 		},
+-		merge
++		merge,
++		dispose() { unbindState(); listeners.clear(); }
+ 	};
+ };
+ // src/internal/mockStore.ts
+@@ -135,6 +136,10 @@ var BridgeInstance = class {
+ 		_defineProperty(this, "_mergeIntoStore", void 0);
+ 		_defineProperty(this, "_nativeBridgeMethodCount", 0);
+ 		_defineProperty(this, "loose", createPromiseProxy());
++		this._documentId = window.__webviewBridgeDocumentId ??= (0, _webview_bridge_utils.createRandomId)();
++		this._disposed = false;
++		this._pending = new Set();
++		this._cleanups = new Set();
+ 		this._hydrate(_bridgeMethods, _nativeInitialState);
+ 	}
+ 	get isReactNativeWebView() {
+@@ -149,74 +154,98 @@ var BridgeInstance = class {
+ 		return this._nativeBridgeMethodCount > 0;
+ 	}
+ 	get isWebViewBridgeAvailable() {
+-		return this._bridgeMethods.length > 0;
++		return !this._disposed && this._bridgeMethods.length > 0;
+ 	}
+ 	isNativeMethodAvailable(methodName) {
+-		return typeof methodName === "string" && this._bridgeMethods.includes(methodName);
++		return !this._disposed && typeof methodName === "string" && this._bridgeMethods.includes(methodName);
+ 	}
+ 	addEventListener(eventName, listener) {
+-		return this._emitter.on(`postMessage/${String(eventName)}`, listener);
++		if (this._disposed) return () => {};
++		const unbind = this._emitter.on(`postMessage/${String(eventName)}`, listener);
++		const cleanup = () => { unbind(); this._cleanups.delete(cleanup); };
++		this._cleanups.add(cleanup);
++		return cleanup;
+ 	}
+ 	/** @internal */
+ 	_postMessage(type, body) {
++		if (this._disposed) return;
+ 		var _window$ReactNativeWe;
+ 		(_window$ReactNativeWe = window.ReactNativeWebView) === null || _window$ReactNativeWe === void 0 || _window$ReactNativeWe.postMessage(JSON.stringify(body ? {
+ 			type,
+ 			body,
+-			bridgeId: this._bridgeId
++			bridgeId: this._bridgeId,
++			documentId: this._documentId
+ 		} : {
+ 			type,
+-			bridgeId: this._bridgeId
++			bridgeId: this._bridgeId,
++			documentId: this._documentId
+ 		}));
+ 	}
+-	_createNativeMethod(methodName, throwOnError, timeoutMs, onFallback) {
+-		return (...args) => {
+-			const eventId = (0, _webview_bridge_utils.createRandomId)();
+-			return new Promise((resolve, reject) => {
+-				let settled = false;
+-				let timer;
+-				const unbindAck = this._emitter.on((0, _webview_bridge_utils.nativeCallAckEventName)(methodName, eventId), () => {
+-					unbindAck();
+-					clearTimeout(timer);
+-				});
+-				const settle = () => {
+-					settled = true;
+-					unbindAck();
+-					clearTimeout(timer);
+-				};
+-				if (timeoutMs > 0) timer = setTimeout(() => {
+-					if (settled) return;
+-					settle();
+-					if (throwOnError) reject(/* @__PURE__ */ new Error("Timeout"));
+-					else resolve(void 0);
+-				}, timeoutMs);
+-				(0, _webview_bridge_utils.createResolver)({
+-					emitter: this._emitter,
+-					methodName,
+-					eventId,
+-					evaluate: () => {
+-						this._postMessage("bridge", {
+-							method: methodName,
+-							eventId,
+-							args
+-						});
+-					},
+-					onFallback: () => {
+-						onFallback === null || onFallback === void 0 || onFallback(methodName, args);
+-					},
+-					failHandler: throwOnError && new _webview_bridge_utils.NativeMethodError(methodName)
+-				}).then((value) => {
+-					if (settled) return;
+-					settle();
+-					resolve(value);
+-				}, (error) => {
+-					if (settled) return;
+-					settle();
+-					reject(error);
+-				});
+-			});
+-		};
+-	}
++	_createNativeMethod(methodName, throwOnError, timeoutMs, onFallback, signal) {
++    return (...args) => {
++      if (this._disposed) return Promise.reject(new Error("BRIDGE_CLOSED"));
++      const eventId = (0, _webview_bridge_utils.createRandomId)();
++      return new Promise((resolve, reject) => {
++        let settled = false;
++        let timer;
++        const controller = new AbortController();
++        const unbindAck = this._emitter.on((0, _webview_bridge_utils.nativeCallAckEventName)(methodName, eventId), () => {
++          unbindAck();
++          clearTimeout(timer);
++        });
++        const finish = (failed, value) => {
++          if (settled) return;
++          settled = true;
++          unbindAck();
++          clearTimeout(timer);
++          signal?.removeEventListener("abort", onAbort);
++          this._pending.delete(cancel);
++          if (failed) reject(value); else resolve(value);
++        };
++        const cancel = (reason) => {
++          finish(true, reason);
++          controller.abort(reason);
++        };
++        const onAbort = () => cancel(signal.reason ?? new Error("Aborted"));
++        this._pending.add(cancel);
++        if (signal?.aborted) { onAbort(); return; }
++        signal?.addEventListener("abort", onAbort, { once: true });
++        if (timeoutMs > 0) timer = setTimeout(() => {
++          const error = new Error("Timeout");
++          finish(throwOnError, throwOnError ? error : undefined);
++          controller.abort(error);
++        }, timeoutMs);
++        (0, _webview_bridge_utils.createResolver)({
++          emitter: this._emitter, methodName, eventId,
++          signal: controller.signal,
++          evaluate: () => this._postMessage("bridge", { method: methodName, eventId, args }),
++          onFallback: () => onFallback?.(methodName, args),
++          failHandler: throwOnError && new _webview_bridge_utils.NativeMethodError(methodName),
++        }).then(value => finish(false, value), error => finish(true, error));
++      });
++    };
++  }
++  callNative(methodName, args = [], options = {}) {
++    if (this._disposed) return Promise.reject(new Error("BRIDGE_CLOSED"));
++    if (!this.isReactNativeWebView || (this._hasNativeBridgeMethods && !this.isNativeMethodAvailable(methodName))) {
++      return Promise.reject(new MethodNotFoundError(methodName));
++    }
++    return this._createNativeMethod(methodName, true,
++      this._options.timeout ?? this._defaultTimeoutMs,
++      this._options.onFallback, options.signal)(...args);
++  }
++  dispose() {
++    if (this._disposed) return;
++    this._disposed = true;
++    for (const cancel of this._pending) cancel(new Error("BRIDGE_CLOSED"));
++    for (const cleanup of this._cleanups) cleanup();
++    this._cleanups.clear();
++    this._disposeStore?.();
++    this._mergeIntoStore = undefined;
++    this._emitter.events = {};
++    if (window.nativeEmitterMap?.[this._bridgeId] === this._emitter) delete window.nativeEmitterMap[this._bridgeId];
++    if (window.nativeEmitter === this._emitter) delete window.nativeEmitter;
++  }
+ 	/**
+ 	* A function that sends `methodName` to native, regardless of whether native
+ 	* has announced it or `initialBridge` defines it.
+@@ -239,6 +268,7 @@ var BridgeInstance = class {
+ 		} });
+ 	}
+ 	_hydrate(bridgeMethods, nativeInitialState = {}) {
++		if (this._disposed) return false;
+ 		const { timeout: timeoutMs = this._defaultTimeoutMs, onFallback, initialBridge = {} } = this._options;
+ 		const initialMethods = Object.entries(initialBridge).filter(([_, bridge]) => typeof bridge === "function");
+ 		const initialBridgeMethodNames = initialMethods.map(([methodName]) => methodName);
+@@ -264,7 +294,8 @@ var BridgeInstance = class {
+ 		const hydratedState = _objectSpread2(_objectSpread2({}, nativeMethods), nativeInitialState);
+ 		if (this._mergeIntoStore) this._mergeIntoStore(hydratedState);
+ 		else {
+-			const { store, merge } = linkBridgeStore(this._emitter, hydratedState);
++			const { store, merge, dispose } = linkBridgeStore(this._emitter, hydratedState);
++			this._disposeStore = dispose;
+ 			this.store = store;
+ 			this._mergeIntoStore = merge;
+ 		}
+@@ -273,6 +304,7 @@ var BridgeInstance = class {
+ 				if (document.visibilityState === "visible") this._postMessage("getBridgeState");
+ 			};
+ 			document.addEventListener("visibilitychange", handleVisibilityChange);
++			this._cleanups.add(() => document.removeEventListener("visibilitychange", handleVisibilityChange));
+ 			this._isListenerRegistered = true;
+ 		}
+ 		this._postMessage("getBridgeState");
+@@ -322,6 +354,8 @@ const linkBridge = (options = {
+ 		return {
+ 			addEventListener: (_eventName, _listener) => () => {},
+ 			loose: {},
++			dispose: () => {},
++			callNative: (methodName) => Promise.reject(new MethodNotFoundError(methodName)),
+ 			isWebViewBridgeAvailable: initialBridgeMethodNames.length > 0,
+ 			isNativeMethodAvailable: (method) => initialBridgeMethodNames.includes(method),
+ 			store: mockStore(options === null || options === void 0 ? void 0 : options.initialBridge)
+@@ -340,8 +374,10 @@ const linkBridge = (options = {
+ 	if (bridgeMethods.length === 0) {
+ 		const unsubscribe = emitter.on("hydrate", ({ bridgeMethods, nativeInitialState, initialState }) => {
+ 			unsubscribe();
++			instance._cleanups.delete(unsubscribe);
+ 			instance._hydrate(bridgeMethods, nativeInitialState !== null && nativeInitialState !== void 0 ? nativeInitialState : initialState);
+ 		});
++		instance._cleanups.add(unsubscribe);
+ 	}
+ 	instance._flushBatchedEvents();
+ 	if (!instance._hasNativeBridgeMethods && instance.isReactNativeWebView) instance._requestHydrate();
+diff --git a/dist/index.d.cts b/dist/index.d.cts
+index 036417d34447f75e296dea5498a4b0da32fce463..c094104f0ed149a89978c3b2d81c15d88a36ddb1 100644
+--- a/dist/index.d.cts
++++ b/dist/index.d.cts
+@@ -6,6 +6,9 @@ export declare class MethodNotFoundError extends Error {
+ type WebBridge = Record<string, AsyncFunction>;
+ type LinkBridge<T, U, V extends ParserSchema<any>> = {
+   isWebViewBridgeAvailable: boolean;
++  /** Local lifecycle extension. Aborting rejects/cleans local pending state, not native effects. */
++  callNative<K extends keyof T>(method: K, args: T[K] extends (...args: infer A) => any ? A : never, options?: { signal?: AbortSignal }): T[K] extends (...args: any[]) => infer R ? R : never;
++  dispose(): void;
+   isNativeMethodAvailable(method: keyof T): boolean;
+   isNativeMethodAvailable(method: string): boolean;
+   store: U;
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 036417d34447f75e296dea5498a4b0da32fce463..c094104f0ed149a89978c3b2d81c15d88a36ddb1 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -6,6 +6,9 @@ export declare class MethodNotFoundError extends Error {
+ type WebBridge = Record<string, AsyncFunction>;
+ type LinkBridge<T, U, V extends ParserSchema<any>> = {
+   isWebViewBridgeAvailable: boolean;
++  /** Local lifecycle extension. Aborting rejects/cleans local pending state, not native effects. */
++  callNative<K extends keyof T>(method: K, args: T[K] extends (...args: infer A) => any ? A : never, options?: { signal?: AbortSignal }): T[K] extends (...args: any[]) => infer R ? R : never;
++  dispose(): void;
+   isNativeMethodAvailable(method: keyof T): boolean;
+   isNativeMethodAvailable(method: string): boolean;
+   store: U;
+diff --git a/dist/index.js b/dist/index.js
+index bf8cb3edab37b16b30f09c6f56f7ee9c772f9928..07ea9f547c7864b6ae625068678091b18a715a12 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -85,7 +85,7 @@ const linkBridgeStore = (emitter, initialState = {}) => {
+ 		state = _newState;
+ 		emitChange(state, prevState);
+ 	};
+-	emitter.on("bridgeStateChange", (data) => {
++	const unbindState = emitter.on("bridgeStateChange", (data) => {
+ 		setState(data);
+ 	});
+ 	let state = _objectSpread2({}, initialState);
+@@ -107,7 +107,8 @@ const linkBridgeStore = (emitter, initialState = {}) => {
+ 			getState,
+ 			subscribe
+ 		},
+-		merge
++		merge,
++		dispose() { unbindState(); listeners.clear(); }
+ 	};
+ };
+ // src/internal/mockStore.ts
+@@ -134,6 +135,10 @@ var BridgeInstance = class {
+ 		_defineProperty(this, "_mergeIntoStore", void 0);
+ 		_defineProperty(this, "_nativeBridgeMethodCount", 0);
+ 		_defineProperty(this, "loose", createPromiseProxy());
++		this._documentId = window.__webviewBridgeDocumentId ??= createRandomId();
++		this._disposed = false;
++		this._pending = new Set();
++		this._cleanups = new Set();
+ 		this._hydrate(_bridgeMethods, _nativeInitialState);
+ 	}
+ 	get isReactNativeWebView() {
+@@ -148,74 +153,98 @@ var BridgeInstance = class {
+ 		return this._nativeBridgeMethodCount > 0;
+ 	}
+ 	get isWebViewBridgeAvailable() {
+-		return this._bridgeMethods.length > 0;
++		return !this._disposed && this._bridgeMethods.length > 0;
+ 	}
+ 	isNativeMethodAvailable(methodName) {
+-		return typeof methodName === "string" && this._bridgeMethods.includes(methodName);
++		return !this._disposed && typeof methodName === "string" && this._bridgeMethods.includes(methodName);
+ 	}
+ 	addEventListener(eventName, listener) {
+-		return this._emitter.on(`postMessage/${String(eventName)}`, listener);
++		if (this._disposed) return () => {};
++		const unbind = this._emitter.on(`postMessage/${String(eventName)}`, listener);
++		const cleanup = () => { unbind(); this._cleanups.delete(cleanup); };
++		this._cleanups.add(cleanup);
++		return cleanup;
+ 	}
+ 	/** @internal */
+ 	_postMessage(type, body) {
++		if (this._disposed) return;
+ 		var _window$ReactNativeWe;
+ 		(_window$ReactNativeWe = window.ReactNativeWebView) === null || _window$ReactNativeWe === void 0 || _window$ReactNativeWe.postMessage(JSON.stringify(body ? {
+ 			type,
+ 			body,
+-			bridgeId: this._bridgeId
++			bridgeId: this._bridgeId,
++			documentId: this._documentId
+ 		} : {
+ 			type,
+-			bridgeId: this._bridgeId
++			bridgeId: this._bridgeId,
++			documentId: this._documentId
+ 		}));
+ 	}
+-	_createNativeMethod(methodName, throwOnError, timeoutMs, onFallback) {
+-		return (...args) => {
+-			const eventId = createRandomId();
+-			return new Promise((resolve, reject) => {
+-				let settled = false;
+-				let timer;
+-				const unbindAck = this._emitter.on(nativeCallAckEventName(methodName, eventId), () => {
+-					unbindAck();
+-					clearTimeout(timer);
+-				});
+-				const settle = () => {
+-					settled = true;
+-					unbindAck();
+-					clearTimeout(timer);
+-				};
+-				if (timeoutMs > 0) timer = setTimeout(() => {
+-					if (settled) return;
+-					settle();
+-					if (throwOnError) reject(/* @__PURE__ */ new Error("Timeout"));
+-					else resolve(void 0);
+-				}, timeoutMs);
+-				createResolver({
+-					emitter: this._emitter,
+-					methodName,
+-					eventId,
+-					evaluate: () => {
+-						this._postMessage("bridge", {
+-							method: methodName,
+-							eventId,
+-							args
+-						});
+-					},
+-					onFallback: () => {
+-						onFallback === null || onFallback === void 0 || onFallback(methodName, args);
+-					},
+-					failHandler: throwOnError && new NativeMethodError(methodName)
+-				}).then((value) => {
+-					if (settled) return;
+-					settle();
+-					resolve(value);
+-				}, (error) => {
+-					if (settled) return;
+-					settle();
+-					reject(error);
+-				});
+-			});
+-		};
+-	}
++	_createNativeMethod(methodName, throwOnError, timeoutMs, onFallback, signal) {
++    return (...args) => {
++      if (this._disposed) return Promise.reject(new Error("BRIDGE_CLOSED"));
++      const eventId = createRandomId();
++      return new Promise((resolve, reject) => {
++        let settled = false;
++        let timer;
++        const controller = new AbortController();
++        const unbindAck = this._emitter.on(nativeCallAckEventName(methodName, eventId), () => {
++          unbindAck();
++          clearTimeout(timer);
++        });
++        const finish = (failed, value) => {
++          if (settled) return;
++          settled = true;
++          unbindAck();
++          clearTimeout(timer);
++          signal?.removeEventListener("abort", onAbort);
++          this._pending.delete(cancel);
++          if (failed) reject(value); else resolve(value);
++        };
++        const cancel = (reason) => {
++          finish(true, reason);
++          controller.abort(reason);
++        };
++        const onAbort = () => cancel(signal.reason ?? new Error("Aborted"));
++        this._pending.add(cancel);
++        if (signal?.aborted) { onAbort(); return; }
++        signal?.addEventListener("abort", onAbort, { once: true });
++        if (timeoutMs > 0) timer = setTimeout(() => {
++          const error = new Error("Timeout");
++          finish(throwOnError, throwOnError ? error : undefined);
++          controller.abort(error);
++        }, timeoutMs);
++        createResolver({
++          emitter: this._emitter, methodName, eventId,
++          signal: controller.signal,
++          evaluate: () => this._postMessage("bridge", { method: methodName, eventId, args }),
++          onFallback: () => onFallback?.(methodName, args),
++          failHandler: throwOnError && new NativeMethodError(methodName),
++        }).then(value => finish(false, value), error => finish(true, error));
++      });
++    };
++  }
++  callNative(methodName, args = [], options = {}) {
++    if (this._disposed) return Promise.reject(new Error("BRIDGE_CLOSED"));
++    if (!this.isReactNativeWebView || (this._hasNativeBridgeMethods && !this.isNativeMethodAvailable(methodName))) {
++      return Promise.reject(new MethodNotFoundError(methodName));
++    }
++    return this._createNativeMethod(methodName, true,
++      this._options.timeout ?? this._defaultTimeoutMs,
++      this._options.onFallback, options.signal)(...args);
++  }
++  dispose() {
++    if (this._disposed) return;
++    this._disposed = true;
++    for (const cancel of this._pending) cancel(new Error("BRIDGE_CLOSED"));
++    for (const cleanup of this._cleanups) cleanup();
++    this._cleanups.clear();
++    this._disposeStore?.();
++    this._mergeIntoStore = undefined;
++    this._emitter.events = {};
++    if (window.nativeEmitterMap?.[this._bridgeId] === this._emitter) delete window.nativeEmitterMap[this._bridgeId];
++    if (window.nativeEmitter === this._emitter) delete window.nativeEmitter;
++  }
+ 	/**
+ 	* A function that sends `methodName` to native, regardless of whether native
+ 	* has announced it or `initialBridge` defines it.
+@@ -238,6 +267,7 @@ var BridgeInstance = class {
+ 		} });
+ 	}
+ 	_hydrate(bridgeMethods, nativeInitialState = {}) {
++		if (this._disposed) return false;
+ 		const { timeout: timeoutMs = this._defaultTimeoutMs, onFallback, initialBridge = {} } = this._options;
+ 		const initialMethods = Object.entries(initialBridge).filter(([_, bridge]) => typeof bridge === "function");
+ 		const initialBridgeMethodNames = initialMethods.map(([methodName]) => methodName);
+@@ -263,7 +293,8 @@ var BridgeInstance = class {
+ 		const hydratedState = _objectSpread2(_objectSpread2({}, nativeMethods), nativeInitialState);
+ 		if (this._mergeIntoStore) this._mergeIntoStore(hydratedState);
+ 		else {
+-			const { store, merge } = linkBridgeStore(this._emitter, hydratedState);
++			const { store, merge, dispose } = linkBridgeStore(this._emitter, hydratedState);
++			this._disposeStore = dispose;
+ 			this.store = store;
+ 			this._mergeIntoStore = merge;
+ 		}
+@@ -272,6 +303,7 @@ var BridgeInstance = class {
+ 				if (document.visibilityState === "visible") this._postMessage("getBridgeState");
+ 			};
+ 			document.addEventListener("visibilitychange", handleVisibilityChange);
++			this._cleanups.add(() => document.removeEventListener("visibilitychange", handleVisibilityChange));
+ 			this._isListenerRegistered = true;
+ 		}
+ 		this._postMessage("getBridgeState");
+@@ -321,6 +353,8 @@ const linkBridge = (options = {
+ 		return {
+ 			addEventListener: (_eventName, _listener) => () => {},
+ 			loose: {},
++			dispose: () => {},
++			callNative: (methodName) => Promise.reject(new MethodNotFoundError(methodName)),
+ 			isWebViewBridgeAvailable: initialBridgeMethodNames.length > 0,
+ 			isNativeMethodAvailable: (method) => initialBridgeMethodNames.includes(method),
+ 			store: mockStore(options === null || options === void 0 ? void 0 : options.initialBridge)
+@@ -339,8 +373,10 @@ const linkBridge = (options = {
+ 	if (bridgeMethods.length === 0) {
+ 		const unsubscribe = emitter.on("hydrate", ({ bridgeMethods, nativeInitialState, initialState }) => {
+ 			unsubscribe();
++			instance._cleanups.delete(unsubscribe);
+ 			instance._hydrate(bridgeMethods, nativeInitialState !== null && nativeInitialState !== void 0 ? nativeInitialState : initialState);
+ 		});
++		instance._cleanups.add(unsubscribe);
+ 	}
+ 	instance._flushBatchedEvents();
+ 	if (!instance._hasNativeBridgeMethods && instance.isReactNativeWebView) instance._requestHydrate();

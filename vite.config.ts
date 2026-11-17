@@ -2,6 +2,7 @@ import { defineConfig } from 'vite-plus';
 
 const ignores = [
   '**/.expo/**',
+  '**/.direnv/**',
   '**/ios/**',
   '**/android/**',
   '**/dist/**',
@@ -14,6 +15,6 @@ export default defineConfig({
   fmt: {
     semi: true,
     singleQuote: true,
-    ignorePatterns: [...ignores, 'pnpm-lock.yaml'],
+    ignorePatterns: [...ignores, 'pnpm-lock.yaml', '.agents/**', '.github/**'],
   },
 });

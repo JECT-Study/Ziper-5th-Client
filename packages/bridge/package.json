@@ -1,0 +1,31 @@
+{
+  "name": "@ziper/bridge",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contract": "./src/contract.ts",
+    "./native": "./src/native.ts"
+  },
+  "scripts": {
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@webview-bridge/react-native": "1.9.0",
+    "@webview-bridge/web": "1.9.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "@types/react-dom": "~19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-native-webview": "14.0.1"
+  },
+  "peerDependenciesMeta": {
+    "react-native-webview": {
+      "optional": true
+    }
+  }
+}

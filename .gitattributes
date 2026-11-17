@@ -1,0 +1,2 @@
+# Unified patch context prefixes can precede upstream tab indentation.
+patches/*.patch -whitespace

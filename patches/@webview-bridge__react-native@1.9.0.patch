@@ -1,0 +1,602 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 65648b12bf9e12afe32a3f91c7c28752b4e895b1..b4d0f1a5e7e0c82915a73f7e2a1c9d73c81b057d 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -274,7 +274,7 @@ const handleBridge = function() {
+ 			const serializedError = error ? serializeError(error) : true;
+ 			webview.injectJavaScript(SAFE_NATIVE_EMITTER_THROW_BY_BRIDGE_ID(bridgeId, `${method}-${eventId}`, serializedError));
+ 		};
+-		if (!(method in _bridge)) {
++		if (!Object.hasOwn(_bridge, method)) {
+ 			handleThrow();
+ 			return;
+ 		}
+@@ -346,57 +346,44 @@ const INJECT_BRIDGE_STATE = (initialState) => `
+     })();
+ `;
+ const SAFE_NATIVE_EMITTER_EMIT = (eventName, data) => {
+-	const dataString = JSON.stringify(data);
+-	return `
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(data);
++  return `
+     (function() {
+-        if (window.nativeEmitterMap && Object.keys(window.nativeEmitterMap).length > 0) {
+-            for (const [_, emitter] of Object.entries(window.nativeEmitterMap)) {
+-                emitter.emit('${eventName}', ${dataString});
+-            }
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', ${dataString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', ${dataString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      if (window.nativeEmitterMap && Object.keys(window.nativeEmitterMap).length > 0) {
++        for (const emitter of Object.values(window.nativeEmitterMap)) emitter.emit(${event}, ${value});
++      } else if (window.nativeEmitter) {
++        window.nativeEmitter.emit(${event}, ${value});
++      } else {
++        window.nativeBatchedEvents = window.nativeBatchedEvents || [];
++        window.nativeBatchedEvents.push([${event}, ${value}]);
++      }
++      return true;
++    })();`;
+ };
++
+ const SAFE_NATIVE_EMITTER_EMIT_BY_BRIDGE_ID = (bridgeId, eventName, data) => {
+-	const dataString = JSON.stringify(data);
+-	return `
++  const id = JSON.stringify(bridgeId);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(data);
++  return `
+     (function() {
+-        if (window.nativeEmitterMap && window.nativeEmitterMap['${bridgeId}']) {
+-            window.nativeEmitterMap['${bridgeId}'].emit('${eventName}', ${dataString});
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', ${dataString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', ${dataString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      const emitter = window.nativeEmitterMap && window.nativeEmitterMap[${id}];
++      if (emitter) emitter.emit(${event}, ${value});
++      return true;
++    })();`;
+ };
++
+ const SAFE_NATIVE_EMITTER_THROW_BY_BRIDGE_ID = (bridgeId, eventName, serializedError) => {
+-	const serializedErrorString = JSON.stringify(serializedError);
+-	return `
++  const id = JSON.stringify(bridgeId);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(serializedError);
++  return `
+     (function() {
+-        if (window.nativeEmitterMap && window.nativeEmitterMap['${bridgeId}']) {
+-            window.nativeEmitterMap['${bridgeId}'].emit('${eventName}', {}, ${serializedErrorString});
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', {}, ${serializedErrorString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', {}, ${serializedErrorString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      const emitter = window.nativeEmitterMap && window.nativeEmitterMap[${id}];
++      if (emitter) emitter.emit(${event}, {}, ${value});
++      return true;
++    })();`;
+ };
+ // src/integrations/console.ts
+ const INJECT_DEBUG = (uniqueId) => `
+@@ -520,6 +507,44 @@ function _objectWithoutProperties(e, t) {
+ 	return i;
+ }
+ // src/createWebView.tsx
++const bridgeRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
++const bridgeIdentifier = (value) => typeof value === "string" && /^[A-Za-z0-9]{21}$/.test(value);
++const bridgeMethodName = (value) => typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(value);
++const parseBridgeMessage = (data) => {
++  if (typeof data !== "string" || data.length > 262144) return;
++  let message;
++  try { message = JSON.parse(data); } catch { return; }
++  if (!bridgeRecord(message) || typeof message.type !== "string") return;
++  const type = message.type;
++  const body = message.body;
++  if (message.bridgeId !== undefined && !bridgeIdentifier(message.bridgeId)) return;
++  if (["bridge", "requestHydrate", "getBridgeState"].includes(type) && (!bridgeIdentifier(message.bridgeId) || !bridgeIdentifier(message.documentId))) return;
++  switch (type) {
++    case "bridge":
++      if (!bridgeRecord(body) || !bridgeMethodName(body.method) || !bridgeIdentifier(body.eventId) || !Array.isArray(body.args) || body.args.length > 64) return;
++      break;
++    case "requestHydrate":
++    case "getBridgeState": break;
++    case "fallback":
++      if (!bridgeRecord(body) || !bridgeMethodName(body.method)) return;
++      break;
++    case "registerWebMethod":
++      if (!bridgeRecord(body) || !Array.isArray(body.bridgeNames) || body.bridgeNames.length > 100 || !body.bridgeNames.every(bridgeMethodName)) return;
++      break;
++    case "webMethodResponse":
++    case "webMethodError":
++      if (!bridgeRecord(body) || !bridgeIdentifier(body.eventId) || !bridgeMethodName(body.funcName)) return;
++      break;
++    case "log":
++      if (!bridgeRecord(body) || !["log", "warn", "error"].includes(String(body.method)) || typeof body.args !== "string") return;
++      try { if (!Array.isArray(JSON.parse(body.args))) return; } catch { return; }
++      break;
++    default: return;
++  }
++  return { type, body, bridgeId: typeof message.bridgeId === "string" ? message.bridgeId : "", documentId: typeof message.documentId === "string" ? message.documentId : undefined };
++};
++
++
+ const _excluded = ["delegate"];
+ /**
+ * Create a WebView component that can communicate with the bridge.
+@@ -582,6 +607,8 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 		WebView: (0, react.forwardRef)((allProps, ref) => {
+ 			const _ref = allProps, { delegate: delegateImpl } = _ref, props = _objectWithoutProperties(_ref, _excluded);
+ 			const webviewRef = (0, react.useRef)(null);
++            const documentGeneration = (0, react.useRef)(0);
++            const activeDocument = (0, react.useRef)();
+ 			(0, react.useLayoutEffect)(() => {
+ 				webviewRefList.push(webviewRef);
+ 				return () => {
+@@ -599,9 +626,20 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 				var _ref2 = _asyncToGenerator(function* (event) {
+ 					var _props$onMessage;
+ 					const { data, url } = event.nativeEvent;
+-					(_props$onMessage = props.onMessage) === null || _props$onMessage === void 0 || _props$onMessage.call(props, event);
+-					if (!webviewRef.current) return;
+-					const { type, body, bridgeId } = JSON.parse(data);
++          const message = parseBridgeMessage(data);
++          if (!message || !webviewRef.current) return;
++        if ((message.type === "getBridgeState" || message.type === "requestHydrate") && activeDocument.current !== message.documentId) {
++          activeDocument.current = message.documentId;
++          documentGeneration.current++;
++        }
++        if (message.documentId && message.documentId !== activeDocument.current) return;
++        (_props$onMessage = props.onMessage)?.call(props, event);
++        const { type, body, bridgeId } = message;
++          const generation = documentGeneration.current;
++          const respondingWebView = Object.create(webviewRef.current);
++          respondingWebView.injectJavaScript = (script) => {
++            if (generation === documentGeneration.current) webviewRef.current?.injectJavaScript(script);
++          };
+ 					switch (type) {
+ 						case "log": {
+ 							const { method, args } = body;
+@@ -616,7 +654,7 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 								method,
+ 								args,
+ 								eventId,
+-								webview: webviewRef.current,
++								webview: respondingWebView,
+ 								url,
+ 								delegate: delegateImpl
+ 							});
+@@ -664,6 +702,7 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react_native_webview.default, _objectSpread2(_objectSpread2({}, props), {}, {
+ 				ref: webviewRef,
+ 				onMessage: handleMessage,
++
+ 				injectedJavaScriptBeforeContentLoaded: [
+ 					INJECT_BRIDGE_METHODS(initData.bridgeMethods),
+ 					INJECT_BRIDGE_STATE(initData.nativeInitialState),
+diff --git a/dist/index.js b/dist/index.js
+index 75ad8f635fb48bda10f33a0475bba8908376945e..8cc0f90c824d2f5f4a128affd835ba24f7367c31 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -251,7 +251,7 @@ const handleBridge = function() {
+ 			const serializedError = error ? serializeError(error) : true;
+ 			webview.injectJavaScript(SAFE_NATIVE_EMITTER_THROW_BY_BRIDGE_ID(bridgeId, `${method}-${eventId}`, serializedError));
+ 		};
+-		if (!(method in _bridge)) {
++		if (!Object.hasOwn(_bridge, method)) {
+ 			handleThrow();
+ 			return;
+ 		}
+@@ -323,57 +323,44 @@ const INJECT_BRIDGE_STATE = (initialState) => `
+     })();
+ `;
+ const SAFE_NATIVE_EMITTER_EMIT = (eventName, data) => {
+-	const dataString = JSON.stringify(data);
+-	return `
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(data);
++  return `
+     (function() {
+-        if (window.nativeEmitterMap && Object.keys(window.nativeEmitterMap).length > 0) {
+-            for (const [_, emitter] of Object.entries(window.nativeEmitterMap)) {
+-                emitter.emit('${eventName}', ${dataString});
+-            }
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', ${dataString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', ${dataString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      if (window.nativeEmitterMap && Object.keys(window.nativeEmitterMap).length > 0) {
++        for (const emitter of Object.values(window.nativeEmitterMap)) emitter.emit(${event}, ${value});
++      } else if (window.nativeEmitter) {
++        window.nativeEmitter.emit(${event}, ${value});
++      } else {
++        window.nativeBatchedEvents = window.nativeBatchedEvents || [];
++        window.nativeBatchedEvents.push([${event}, ${value}]);
++      }
++      return true;
++    })();`;
+ };
++
+ const SAFE_NATIVE_EMITTER_EMIT_BY_BRIDGE_ID = (bridgeId, eventName, data) => {
+-	const dataString = JSON.stringify(data);
+-	return `
++  const id = JSON.stringify(bridgeId);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(data);
++  return `
+     (function() {
+-        if (window.nativeEmitterMap && window.nativeEmitterMap['${bridgeId}']) {
+-            window.nativeEmitterMap['${bridgeId}'].emit('${eventName}', ${dataString});
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', ${dataString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', ${dataString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      const emitter = window.nativeEmitterMap && window.nativeEmitterMap[${id}];
++      if (emitter) emitter.emit(${event}, ${value});
++      return true;
++    })();`;
+ };
++
+ const SAFE_NATIVE_EMITTER_THROW_BY_BRIDGE_ID = (bridgeId, eventName, serializedError) => {
+-	const serializedErrorString = JSON.stringify(serializedError);
+-	return `
++  const id = JSON.stringify(bridgeId);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(serializedError);
++  return `
+     (function() {
+-        if (window.nativeEmitterMap && window.nativeEmitterMap['${bridgeId}']) {
+-            window.nativeEmitterMap['${bridgeId}'].emit('${eventName}', {}, ${serializedErrorString});
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', {}, ${serializedErrorString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', {}, ${serializedErrorString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      const emitter = window.nativeEmitterMap && window.nativeEmitterMap[${id}];
++      if (emitter) emitter.emit(${event}, {}, ${value});
++      return true;
++    })();`;
+ };
+ // src/integrations/console.ts
+ const INJECT_DEBUG = (uniqueId) => `
+@@ -497,6 +484,44 @@ function _objectWithoutProperties(e, t) {
+ 	return i;
+ }
+ // src/createWebView.tsx
++const bridgeRecord = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
++const bridgeIdentifier = (value) => typeof value === "string" && /^[A-Za-z0-9]{21}$/.test(value);
++const bridgeMethodName = (value) => typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(value);
++const parseBridgeMessage = (data) => {
++  if (typeof data !== "string" || data.length > 262144) return;
++  let message;
++  try { message = JSON.parse(data); } catch { return; }
++  if (!bridgeRecord(message) || typeof message.type !== "string") return;
++  const type = message.type;
++  const body = message.body;
++  if (message.bridgeId !== undefined && !bridgeIdentifier(message.bridgeId)) return;
++  if (["bridge", "requestHydrate", "getBridgeState"].includes(type) && (!bridgeIdentifier(message.bridgeId) || !bridgeIdentifier(message.documentId))) return;
++  switch (type) {
++    case "bridge":
++      if (!bridgeRecord(body) || !bridgeMethodName(body.method) || !bridgeIdentifier(body.eventId) || !Array.isArray(body.args) || body.args.length > 64) return;
++      break;
++    case "requestHydrate":
++    case "getBridgeState": break;
++    case "fallback":
++      if (!bridgeRecord(body) || !bridgeMethodName(body.method)) return;
++      break;
++    case "registerWebMethod":
++      if (!bridgeRecord(body) || !Array.isArray(body.bridgeNames) || body.bridgeNames.length > 100 || !body.bridgeNames.every(bridgeMethodName)) return;
++      break;
++    case "webMethodResponse":
++    case "webMethodError":
++      if (!bridgeRecord(body) || !bridgeIdentifier(body.eventId) || !bridgeMethodName(body.funcName)) return;
++      break;
++    case "log":
++      if (!bridgeRecord(body) || !["log", "warn", "error"].includes(String(body.method)) || typeof body.args !== "string") return;
++      try { if (!Array.isArray(JSON.parse(body.args))) return; } catch { return; }
++      break;
++    default: return;
++  }
++  return { type, body, bridgeId: typeof message.bridgeId === "string" ? message.bridgeId : "", documentId: typeof message.documentId === "string" ? message.documentId : undefined };
++};
++
++
+ const _excluded = ["delegate"];
+ /**
+ * Create a WebView component that can communicate with the bridge.
+@@ -559,6 +584,8 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 		WebView: forwardRef((allProps, ref) => {
+ 			const _ref = allProps, { delegate: delegateImpl } = _ref, props = _objectWithoutProperties(_ref, _excluded);
+ 			const webviewRef = useRef(null);
++            const documentGeneration = useRef(0);
++            const activeDocument = useRef();
+ 			useLayoutEffect(() => {
+ 				webviewRefList.push(webviewRef);
+ 				return () => {
+@@ -576,9 +603,20 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 				var _ref2 = _asyncToGenerator(function* (event) {
+ 					var _props$onMessage;
+ 					const { data, url } = event.nativeEvent;
+-					(_props$onMessage = props.onMessage) === null || _props$onMessage === void 0 || _props$onMessage.call(props, event);
+-					if (!webviewRef.current) return;
+-					const { type, body, bridgeId } = JSON.parse(data);
++          const message = parseBridgeMessage(data);
++          if (!message || !webviewRef.current) return;
++        if ((message.type === "getBridgeState" || message.type === "requestHydrate") && activeDocument.current !== message.documentId) {
++          activeDocument.current = message.documentId;
++          documentGeneration.current++;
++        }
++        if (message.documentId && message.documentId !== activeDocument.current) return;
++        (_props$onMessage = props.onMessage)?.call(props, event);
++        const { type, body, bridgeId } = message;
++          const generation = documentGeneration.current;
++          const respondingWebView = Object.create(webviewRef.current);
++          respondingWebView.injectJavaScript = (script) => {
++            if (generation === documentGeneration.current) webviewRef.current?.injectJavaScript(script);
++          };
+ 					switch (type) {
+ 						case "log": {
+ 							const { method, args } = body;
+@@ -593,7 +631,7 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 								method,
+ 								args,
+ 								eventId,
+-								webview: webviewRef.current,
++								webview: respondingWebView,
+ 								url,
+ 								delegate: delegateImpl
+ 							});
+@@ -641,6 +679,7 @@ const createWebView = ({ bridge, debug, responseTimeout = 2e3, postMessageSchema
+ 			return /* @__PURE__ */ jsx(WebView, _objectSpread2(_objectSpread2({}, props), {}, {
+ 				ref: webviewRef,
+ 				onMessage: handleMessage,
++
+ 				injectedJavaScriptBeforeContentLoaded: [
+ 					INJECT_BRIDGE_METHODS(initData.bridgeMethods),
+ 					INJECT_BRIDGE_STATE(initData.nativeInitialState),
+diff --git a/src/createWebView.tsx b/src/createWebView.tsx
+index 0c9281cd2040bc61a1934e6bce285e89726fc79f..a1269b8b9543f190ad162d2c068616bb6a89a59a 100644
+--- a/src/createWebView.tsx
++++ b/src/createWebView.tsx
+@@ -147,6 +147,44 @@ export type WebMethod<T> = T & {
+       debug: true, // Enable console.log visibility in the native WebView
+     });
+  */
++
++const bridgeRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
++const bridgeIdentifier = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9]{21}$/.test(value);
++const bridgeMethodName = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(value);
++const parseBridgeMessage = (data: unknown) => {
++  if (typeof data !== "string" || data.length > 262144) return;
++  let message: unknown;
++  try { message = JSON.parse(data); } catch { return; }
++  if (!bridgeRecord(message) || typeof message.type !== "string") return;
++  const type = message.type;
++  const body = message.body;
++  if (message.bridgeId !== undefined && !bridgeIdentifier(message.bridgeId)) return;
++  if (["bridge", "requestHydrate", "getBridgeState"].includes(type) && (!bridgeIdentifier(message.bridgeId) || !bridgeIdentifier(message.documentId))) return;
++  switch (type) {
++    case "bridge":
++      if (!bridgeRecord(body) || !bridgeMethodName(body.method) || !bridgeIdentifier(body.eventId) || !Array.isArray(body.args) || body.args.length > 64) return;
++      break;
++    case "requestHydrate":
++    case "getBridgeState": break;
++    case "fallback":
++      if (!bridgeRecord(body) || !bridgeMethodName(body.method)) return;
++      break;
++    case "registerWebMethod":
++      if (!bridgeRecord(body) || !Array.isArray(body.bridgeNames) || body.bridgeNames.length > 100 || !body.bridgeNames.every(bridgeMethodName)) return;
++      break;
++    case "webMethodResponse":
++    case "webMethodError":
++      if (!bridgeRecord(body) || !bridgeIdentifier(body.eventId) || !bridgeMethodName(body.funcName)) return;
++      break;
++    case "log":
++      if (!bridgeRecord(body) || !["log", "warn", "error"].includes(String(body.method)) || typeof body.args !== "string") return;
++      try { if (!Array.isArray(JSON.parse(body.args))) return; } catch { return; }
++      break;
++    default: return;
++  }
++  return { type, body, bridgeId: typeof message.bridgeId === "string" ? message.bridgeId : "", documentId: typeof message.documentId === "string" ? message.documentId : undefined };
++};
++
+ export const createWebView = <
+   BridgeObject extends Bridge,
+   PostMessageSchema extends ParserSchema<any>,
+@@ -226,6 +264,8 @@ export const createWebView = <
+         delegate?: Partial<Record<string, AsyncFunction>>;
+       };
+       const webviewRef = useRef<WebView>(null);
++      const documentGeneration = useRef(0);
++      const activeDocument = useRef<string | undefined>(undefined);
+ 
+       useLayoutEffect(() => {
+         webviewRefList.push(webviewRef);
+@@ -254,12 +294,20 @@ export const createWebView = <
+ 
+       const handleMessage = async (event: WebViewMessageEvent) => {
+         const { data, url } = event.nativeEvent;
+-        props.onMessage?.(event);
+-
+-        if (!webviewRef.current) {
+-          return;
++        const message = parseBridgeMessage(data);
++        if (!message || !webviewRef.current) return;
++        if ((message.type === "getBridgeState" || message.type === "requestHydrate") && activeDocument.current !== message.documentId) {
++          activeDocument.current = message.documentId;
++          documentGeneration.current++;
+         }
+-        const { type, body, bridgeId } = JSON.parse(data);
++        if (message.documentId && message.documentId !== activeDocument.current) return;
++        props.onMessage?.(event);
++        const { type, body, bridgeId } = message;
++        const generation = documentGeneration.current;
++        const respondingWebView: BridgeWebView = Object.create(webviewRef.current);
++        respondingWebView.injectJavaScript = (script: string) => {
++          if (generation === documentGeneration.current) webviewRef.current?.injectJavaScript(script);
++        };
+ 
+         switch (type) {
+           case "log": {
+@@ -283,7 +331,7 @@ export const createWebView = <
+               method,
+               args,
+               eventId,
+-              webview: webviewRef.current,
++              webview: respondingWebView,
+               url,
+               delegate: delegateImpl,
+             });
+@@ -366,6 +414,7 @@ export const createWebView = <
+           {...props}
+           ref={webviewRef}
+           onMessage={handleMessage}
++
+           injectedJavaScriptBeforeContentLoaded={[
+             INJECT_BRIDGE_METHODS(initData.bridgeMethods),
+             INJECT_BRIDGE_STATE(initData.nativeInitialState),
+diff --git a/src/integrations/bridge.ts b/src/integrations/bridge.ts
+index 8eb020ddf48f4880ef13a42f4b1c6a436ad1ab3a..3531308699eb564e7eac51201d1914edaa5be58c 100644
+--- a/src/integrations/bridge.ts
++++ b/src/integrations/bridge.ts
+@@ -323,7 +323,7 @@ export const handleBridge = async ({
+       ),
+     );
+   };
+-  if (!(method in _bridge)) {
++  if (!Object.hasOwn(_bridge, method)) {
+     handleThrow();
+     return;
+   }
+@@ -473,65 +473,42 @@ export const INJECT_BRIDGE_STATE = (
+ `;
+ 
+ export const SAFE_NATIVE_EMITTER_EMIT = (eventName: string, data: unknown) => {
+-  const dataString = JSON.stringify(data);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(data);
+   return `
+     (function() {
+-        if (window.nativeEmitterMap && Object.keys(window.nativeEmitterMap).length > 0) {
+-            for (const [_, emitter] of Object.entries(window.nativeEmitterMap)) {
+-                emitter.emit('${eventName}', ${dataString});
+-            }
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', ${dataString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', ${dataString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      if (window.nativeEmitterMap && Object.keys(window.nativeEmitterMap).length > 0) {
++        for (const emitter of Object.values(window.nativeEmitterMap)) emitter.emit(${event}, ${value});
++      } else if (window.nativeEmitter) {
++        window.nativeEmitter.emit(${event}, ${value});
++      } else {
++        window.nativeBatchedEvents = window.nativeBatchedEvents || [];
++        window.nativeBatchedEvents.push([${event}, ${value}]);
++      }
++      return true;
++    })();`;
+ };
+ 
+-export const SAFE_NATIVE_EMITTER_EMIT_BY_BRIDGE_ID = (
+-  bridgeId: string,
+-  eventName: string,
+-  data: unknown,
+-) => {
+-  const dataString = JSON.stringify(data);
++export const SAFE_NATIVE_EMITTER_EMIT_BY_BRIDGE_ID = (bridgeId: string, eventName: string, data: unknown) => {
++  const id = JSON.stringify(bridgeId);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(data);
+   return `
+     (function() {
+-        if (window.nativeEmitterMap && window.nativeEmitterMap['${bridgeId}']) {
+-            window.nativeEmitterMap['${bridgeId}'].emit('${eventName}', ${dataString});
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', ${dataString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', ${dataString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      const emitter = window.nativeEmitterMap && window.nativeEmitterMap[${id}];
++      if (emitter) emitter.emit(${event}, ${value});
++      return true;
++    })();`;
+ };
+ 
+-export const SAFE_NATIVE_EMITTER_THROW_BY_BRIDGE_ID = (
+-  bridgeId: string,
+-  eventName: string,
+-  serializedError: string | true,
+-) => {
+-  const serializedErrorString = JSON.stringify(serializedError);
++export const SAFE_NATIVE_EMITTER_THROW_BY_BRIDGE_ID = (bridgeId: string, eventName: string, serializedError: string | true) => {
++  const id = JSON.stringify(bridgeId);
++  const event = JSON.stringify(eventName);
++  const value = JSON.stringify(serializedError);
+   return `
+     (function() {
+-        if (window.nativeEmitterMap && window.nativeEmitterMap['${bridgeId}']) {
+-            window.nativeEmitterMap['${bridgeId}'].emit('${eventName}', {}, ${serializedErrorString});
+-        } else if (window.nativeEmitter) {
+-            // @deprecated This version is not used after 1.7.2
+-            window.nativeEmitter.emit('${eventName}', {}, ${serializedErrorString});
+-        } else {
+-            window.nativeBatchedEvents = window.nativeBatchedEvents || [];
+-            window.nativeBatchedEvents.push(['${eventName}', {}, ${serializedErrorString}]);
+-        }
+-        return true;
+-    })();
+-`;
++      const emitter = window.nativeEmitterMap && window.nativeEmitterMap[${id}];
++      if (emitter) emitter.emit(${event}, {}, ${value});
++      return true;
++    })();`;
+ };

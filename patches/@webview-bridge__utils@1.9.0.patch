@@ -1,0 +1,130 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index ed05c9ad336fdafe84c206a6cad895334134dc72..a341ee4790f945bb14079a14ae465f2c74097c18 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -50,20 +50,31 @@ const createEvents = () => ({
+ 		};
+ 	}
+ });
+-const createResolver = ({ emitter, evaluate, eventId, failHandler = false, methodName, onFallback }) => {
+-	return new Promise((resolve, reject) => {
+-		const unbind = emitter.on(`${methodName}-${eventId}`, (data, throwOccurred) => {
+-			unbind();
+-			if (throwOccurred) {
+-				if (failHandler instanceof NativeMethodError) {
+-					invokeCallback("onFallback", onFallback);
+-					reject(deserializeError(throwOccurred));
+-				} else if (failHandler instanceof Error) reject(failHandler);
+-				else resolve(void 0);
+-			} else resolve(data);
+-		});
+-		evaluate();
+-	});
++const createResolver = ({ emitter, evaluate, eventId, failHandler = false, methodName, onFallback, signal }) => {
++  return new Promise((resolve, reject) => {
++    let settled = false;
++    let unbind = () => {};
++    const finish = (failed, value) => {
++      if (settled) return;
++      settled = true;
++      unbind();
++      signal?.removeEventListener("abort", onAbort);
++      if (failed) reject(value); else resolve(value);
++    };
++    const onAbort = () => finish(true, signal.reason ?? new Error("Aborted"));
++    if (signal?.aborted) { onAbort(); return; }
++    unbind = emitter.on(`${methodName}-${eventId}`, (data, throwOccurred) => {
++      if (throwOccurred) {
++        if (failHandler instanceof NativeMethodError) {
++          invokeCallback("onFallback", onFallback);
++          finish(true, deserializeError(throwOccurred));
++        } else if (failHandler instanceof Error) finish(true, failHandler);
++        else finish(false, undefined);
++      } else finish(false, data);
++    });
++    signal?.addEventListener("abort", onAbort, { once: true });
++    try { evaluate(); } catch (error) { finish(true, error); }
++  });
+ };
+ // src/createRandomId.tsx
+ const TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+diff --git a/dist/index.d.cts b/dist/index.d.cts
+index 48b1a048fa8bd0896894e486625580f89955edf1..cb4aee3a7073ce039286f99871d5e95f1a15673a 100644
+--- a/dist/index.d.cts
++++ b/dist/index.d.cts
+@@ -18,8 +18,9 @@ export interface CreateResolverOptions {
+   failHandler?: Error | false;
+   methodName: string;
+   onFallback?: () => void;
++  signal?: AbortSignal;
+ }
+-export declare const createResolver: ({ emitter, evaluate, eventId, failHandler, methodName, onFallback }: CreateResolverOptions) => Promise<unknown>;
++export declare const createResolver: ({ emitter, evaluate, eventId, failHandler, methodName, onFallback, signal }: CreateResolverOptions) => Promise<unknown>;
+ export declare const createRandomId: (size?: number) => string;
+ export declare const equals: (a: any, b: any) => boolean;
+ export declare const noop: () => void;
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 48b1a048fa8bd0896894e486625580f89955edf1..cb4aee3a7073ce039286f99871d5e95f1a15673a 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -18,8 +18,9 @@ export interface CreateResolverOptions {
+   failHandler?: Error | false;
+   methodName: string;
+   onFallback?: () => void;
++  signal?: AbortSignal;
+ }
+-export declare const createResolver: ({ emitter, evaluate, eventId, failHandler, methodName, onFallback }: CreateResolverOptions) => Promise<unknown>;
++export declare const createResolver: ({ emitter, evaluate, eventId, failHandler, methodName, onFallback, signal }: CreateResolverOptions) => Promise<unknown>;
+ export declare const createRandomId: (size?: number) => string;
+ export declare const equals: (a: any, b: any) => boolean;
+ export declare const noop: () => void;
+diff --git a/dist/index.js b/dist/index.js
+index d813cecb3d8b5c3d2f8575b338c93c42db7c3ee4..a051e81f5c6166c07a9587dc9b6c13e51ce4b7a4 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -49,20 +49,31 @@ const createEvents = () => ({
+ 		};
+ 	}
+ });
+-const createResolver = ({ emitter, evaluate, eventId, failHandler = false, methodName, onFallback }) => {
+-	return new Promise((resolve, reject) => {
+-		const unbind = emitter.on(`${methodName}-${eventId}`, (data, throwOccurred) => {
+-			unbind();
+-			if (throwOccurred) {
+-				if (failHandler instanceof NativeMethodError) {
+-					invokeCallback("onFallback", onFallback);
+-					reject(deserializeError(throwOccurred));
+-				} else if (failHandler instanceof Error) reject(failHandler);
+-				else resolve(void 0);
+-			} else resolve(data);
+-		});
+-		evaluate();
+-	});
++const createResolver = ({ emitter, evaluate, eventId, failHandler = false, methodName, onFallback, signal }) => {
++  return new Promise((resolve, reject) => {
++    let settled = false;
++    let unbind = () => {};
++    const finish = (failed, value) => {
++      if (settled) return;
++      settled = true;
++      unbind();
++      signal?.removeEventListener("abort", onAbort);
++      if (failed) reject(value); else resolve(value);
++    };
++    const onAbort = () => finish(true, signal.reason ?? new Error("Aborted"));
++    if (signal?.aborted) { onAbort(); return; }
++    unbind = emitter.on(`${methodName}-${eventId}`, (data, throwOccurred) => {
++      if (throwOccurred) {
++        if (failHandler instanceof NativeMethodError) {
++          invokeCallback("onFallback", onFallback);
++          finish(true, deserializeError(throwOccurred));
++        } else if (failHandler instanceof Error) finish(true, failHandler);
++        else finish(false, undefined);
++      } else finish(false, data);
++    });
++    signal?.addEventListener("abort", onAbort, { once: true });
++    try { evaluate(); } catch (error) { finish(true, error); }
++  });
+ };
+ // src/createRandomId.tsx
+ const TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
