@@ -2,6 +2,8 @@
   "expo": {
     "name": "Ziper",
     "slug": "ziper-mobile",
+    "scheme": "ziper",
+    "plugins": ["expo-router"],
     "platforms": ["ios", "android"],
     "version": "1.0.0",
     "orientation": "portrait",
