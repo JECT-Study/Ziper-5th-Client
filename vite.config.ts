@@ -7,6 +7,7 @@ const ignores = [
   '**/android/**',
   '**/dist/**',
   '**/.tanstack/**',
+  '**/.astro/**',
   '**/routeTree.gen.ts',
 ];
 
