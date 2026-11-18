@@ -1,6 +1,8 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Platform, Text, View } from 'react-native';
 import type { NativeAuthService } from '@ziper/bridge/contract';
+import { createShareInbox, type ShareInbox } from '../share/inbox';
+import { useShareCapture } from '../share/use-share-capture';
 import { hostConfig, type HostConfig } from './security';
 
 export function configuredHost(): HostConfig {
@@ -11,7 +13,7 @@ export function configuredHost(): HostConfig {
   );
 }
 
-type Services = Readonly<{ config: HostConfig; auth?: NativeAuthService }>;
+type Services = Readonly<{ config: HostConfig; auth?: NativeAuthService; shareInbox: ShareInbox }>;
 
 const ServicesContext = createContext<Services | null>(null);
 
@@ -23,6 +25,8 @@ export function MobileServicesProvider({
   children: ReactNode;
   auth?: NativeAuthService;
 }) {
+  const [shareInbox] = useState(createShareInbox);
+  useShareCapture(shareInbox);
   const configuration = useMemo(() => {
     try {
       return { config: configuredHost() };
@@ -37,7 +41,7 @@ export function MobileServicesProvider({
       </View>
     );
   return (
-    <ServicesContext.Provider value={{ config: configuration.config, auth }}>
+    <ServicesContext.Provider value={{ config: configuration.config, auth, shareInbox }}>
       {children}
     </ServicesContext.Provider>
   );

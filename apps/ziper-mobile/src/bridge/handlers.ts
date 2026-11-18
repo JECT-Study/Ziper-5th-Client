@@ -13,6 +13,7 @@ import {
   type Output,
   type Result,
 } from '@ziper/bridge/contract';
+import type { ShareInbox } from '../share/inbox';
 import { OperationLedger } from './operations';
 import { serviceURL, type HostConfig } from './security';
 import { SheetSessions } from './sheets';
@@ -29,6 +30,7 @@ export type HostServices = Readonly<{
   back: () => boolean;
   setDepth: (depth: number) => void;
   sheets: SheetSessions;
+  shareInbox?: ShareInbox;
 }>;
 
 // Detect stripped extra properties as well as schema failures, including nested objects.
@@ -54,9 +56,11 @@ export function checkedResult<M extends Method>(method: M, value: unknown): Resu
 }
 
 export function validArguments(method: Method, args: unknown[]): boolean {
-  const noInput =
-    method === 'getBridgeInfoV1' || method === 'navigationBackV1' || method === 'authLogoutV1';
-  return args.length === (noInput ? 0 : 1) && methods[method].input.safeParse(args[0]).success;
+  const schema = methods[method].input;
+  return (
+    args.length === (schema.safeParse(undefined).success ? 0 : 1) &&
+    schema.safeParse(args[0]).success
+  );
 }
 
 export function bridgeInfo(host: HostServices): BridgeInfo {
@@ -75,6 +79,10 @@ export function bridgeInfo(host: HostServices): BridgeInfo {
     capability.history,
     capability.sheet,
   ];
+  if (host.shareInbox) {
+    names.push('shareReadV1', 'shareDismissV1');
+    capabilities.push(capability.incomingShare);
+  }
   const auth = host.auth;
   if (auth) {
     names.push('authLoginV1', 'authGetWebSessionV1', 'authAdoptWebSessionV1', 'authLogoutV1');
@@ -206,6 +214,15 @@ export function createHandlers(host: HostServices) {
           );
           break;
         }
+        case 'shareReadV1':
+          if (!host.shareInbox) return failure('UNSUPPORTED');
+          result = success(host.shareInbox.read());
+          break;
+        case 'shareDismissV1':
+          if (!host.shareInbox) return failure('UNSUPPORTED');
+          host.shareInbox.dismiss((input as Input<'shareDismissV1'>).id);
+          result = success({ done: true });
+          break;
         case 'sheetActionsV1': {
           const request = input as Input<'sheetActionsV1'>;
           result = await operations.run(

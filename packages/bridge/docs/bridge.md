@@ -26,6 +26,12 @@ RPC 기본 기한은 handshake 3초, 일반 호출 5초, 로그인과 시트 호
 
 v1 입력은 엄격하게 고정한다. 새 입력 필드는 버전이나 기능 협상 없이 보내지 않는다. 출력의 추가 필드는 이전 웹 클라이언트가 무시할 수 있다.
 
+## 외부 링크 공유
+
+- Expo의 공유 URL은 앱 진입 신호로만 사용한다. 네이티브가 원본을 읽고 앱 단위 인박스에 보관하며, 활성 WebView가 `share.incoming.v1` 협상 후 `shareReadV1`으로 조회한다.
+- 초기 handshake와 포커스/변경 시의 `ziper:incoming-share` 이벤트로 조회한다. 이벤트, 라우트, WebView 주소에는 공유 URL을 싣지 않는다. 완료/취소 시 `shareDismissV1`은 해당 ID만 제거하며 재호출해도 안전하다.
+- 인박스는 최대 8건을 순서대로 유지하며 실행 중에만 유효하다. 아직 대기 중인 같은 URL은 합친다. 브라우저나 공유 미지원 네이티브에서는 읽기 결과가 없고, 이 계약이 서버 저장의 중복 방지를 대신하지 않는다.
+
 ## 인증 연결
 
 - 웹 `BridgeProvider.config.auth`: `WebAuthService`의 웹 로그인 adapter와 `SessionClient`

@@ -21,6 +21,10 @@ EXPO_PUBLIC_WEB_URL=https://your-service.example pnpm ios:mobile
 
 네이티브 의존성을 변경하면 `ios` 또는 `android` 명령으로 다시 빌드하세요.
 
+## 외부 링크 공유 (JEC-17)
+
+새 개발 바이너리에서 브라우저나 쇼핑 앱의 공유 메뉴에서 Ziper를 선택하면, Expo Sharing이 전달한 URL/텍스트를 현재 WebView로 연결합니다. 공유 데이터는 앱 실행 중 메모리에만 남으며 앱을 완전히 종료하면 복구되지 않습니다. iOS에서는 Expo Sharing이 실험적인 방식으로 메인 앱을 여므로 실제 iOS 기기에서 동작과 배포 적합성을 확인해야 합니다.
+
 `pnpm --filter ziper-mobile test`는 단위 테스트와 iOS 및 Android 설정의 Expo Router 테스트를 실행합니다. Router와 React Native JavaScript는 실제 코드를 사용하지만 WebView와 네이티브 UI는 모킹하므로 시뮬레이터나 실기기 검증을 대신하지 않습니다.
 
 인증 어댑터, 보안 및 검증 범위는 [브릿지 문서](../../packages/bridge/docs/bridge.md)를 참고하세요. 전체 검증 명령은 [루트 README](../../README.md#검증)에 있습니다. 기본 앱에는 인증 SDK가 없으며 Metro export는 네이티브 컴파일이나 기기 검증을 대신하지 않습니다.

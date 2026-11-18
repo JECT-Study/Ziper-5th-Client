@@ -469,6 +469,17 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
         );
       },
     },
+    incomingShare: {
+      read() {
+        return fallback(
+          () => native(capability.incomingShare, 'shareReadV1', undefined),
+          async () => null,
+        );
+      },
+      dismiss(id: string) {
+        return native(capability.incomingShare, 'shareDismissV1', { id });
+      },
+    },
     sheets: {
       async actions(input: Omit<SheetInput, 'operationId'> & { operationId?: string }) {
         check();
