@@ -1,0 +1,8 @@
+{
+  "name": "@ziper/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./product-save": "./src/product-save.ts"
+  }
+}
