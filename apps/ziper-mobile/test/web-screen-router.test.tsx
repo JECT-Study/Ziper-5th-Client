@@ -176,6 +176,32 @@ it.each(['web close', 'native Back'])(
   },
 );
 
+it('returns through the in-app registration history without consuming a queued share', async () => {
+  sharing.payloads = [{ shareType: 'url', value: 'https://example.com/shared' }];
+  const rendered = await renderRouter(routes);
+  const home = mockWebView.delegate!;
+  await act(async () => {
+    expect(
+      await home.navigationPushV1({ path: '/register-product', operationId: 'register' }),
+    ).toEqual(success({ handled: true }));
+  });
+  const registration = mockWebView.delegate!;
+  expect(rendered.getSearchParams()).toEqual({ path: '/register-product' });
+  await act(async () => {
+    await registration.navigationSetWebHistoryV1({ depth: 1 });
+    expect(await registration.navigationBackV1()).toEqual(success({ handled: true }));
+  });
+  expect(rendered.getSearchParams()).toEqual({ path: '/register-product' });
+  await act(async () => {
+    await registration.navigationSetWebHistoryV1({ depth: 0 });
+    expect(await registration.navigationBackV1()).toEqual(success({ handled: true }));
+  });
+  expect(rendered.getPathname()).toBe('/');
+  expect(await home.shareReadV1()).toEqual(
+    success({ id: 'share-1', url: 'https://example.com/shared' }),
+  );
+});
+
 it('refuses an external path supplied through a deep link', async () => {
   await renderRouter(routes, { initialUrl: '/web?path=%2F%2Fevil.test' });
   expect(screen.getByText('Invalid service-relative page path.')).toBeTruthy();

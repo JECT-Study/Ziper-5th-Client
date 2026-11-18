@@ -4,21 +4,33 @@ import { useState } from 'react';
 import previewCard from '../../assets/product-save/preview-card.png';
 import { ProductSaveScreen } from './product-save-screen';
 
-export default function ProductSavePreview({ mode }: { mode: string }) {
+export default function ProductSavePreview({
+  mode,
+  url,
+  onClose,
+}: {
+  mode: string;
+  url?: string;
+  onClose?: () => void | Promise<unknown>;
+}) {
   const [api] = useState(() => createPreviewApi(mode));
   const navigate = useNavigate();
   return (
     <ProductSaveScreen
-      url="https://www.musinsa.com/products/1234567"
+      url={url ?? 'https://www.musinsa.com/products/1234567'}
       api={api}
-      onClose={() => navigate({ to: '/' })}
-      initialDraft={{
-        name: '오버핏 울 블렌드 니트 가디건',
-        memo: '가을용 가디건',
-        image: { kind: 'template', id: 'tops' },
-        tags: ['여름'],
-        boardIds: mode === 'manual' ? ['default'] : ['default', 'fall'],
-      }}
+      onClose={onClose ?? (() => navigate({ to: '/' }))}
+      initialDraft={
+        url
+          ? undefined
+          : {
+              name: '오버핏 울 블렌드 니트 가디건',
+              memo: '가을용 가디건',
+              image: { kind: 'template', id: 'tops' },
+              tags: ['여름'],
+              boardIds: mode === 'manual' ? ['default'] : ['default', 'fall'],
+            }
+      }
       savedMessage="프리뷰에서만 저장했어요."
     />
   );

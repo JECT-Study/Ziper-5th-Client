@@ -1,13 +1,20 @@
 import { style } from '@vanilla-extract/css';
+import { vars } from './theme.css';
 
 export const page = style({
-  minHeight: '100svh',
+  minHeight: '100dvh',
+  maxWidth: 480,
+  margin: '0 auto',
   display: 'flex',
   flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 16,
-  padding: 24,
+});
+
+export const content = style({
+  flex: 1,
+  display: 'grid',
+  placeContent: 'center',
+  gap: vars.space[16],
+  padding: vars.space[24],
   textAlign: 'center',
 });
 
@@ -19,15 +26,8 @@ export const title = style({
 
 export const description = style({
   margin: 0,
-  color: '#475569',
+  color: vars.color.text.default,
   lineHeight: 1.6,
 });
 
-export const link = style({
-  color: '#1d4ed8',
-  textUnderlineOffset: 4,
-  ':focus-visible': {
-    outline: '2px solid currentColor',
-    outlineOffset: 4,
-  },
-});
+export const error = style({ margin: 0, color: vars.color.status.negative });

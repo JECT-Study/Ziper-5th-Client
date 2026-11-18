@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignSystemRouteImport } from './routes/design-system'
+import { Route as RegisterProductRouteImport } from './routes/register-product'
 import { Route as ShareProductRouteImport } from './routes/share-product'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const DesignSystemRoute = DesignSystemRouteImport.update({
   path: '/design-system',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegisterProductRoute = RegisterProductRouteImport.update({
+  id: '/register-product',
+  path: '/register-product',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShareProductRoute = ShareProductRouteImport.update({
   id: '/share-product',
   path: '/share-product',
@@ -32,30 +38,35 @@ const ShareProductRoute = ShareProductRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRoute
+  '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRoute
+  '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRoute
+  '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design-system' | '/share-product'
+  fullPaths: '/' | '/design-system' | '/register-product' | '/share-product'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design-system' | '/share-product'
-  id: '__root__' | '/' | '/design-system' | '/share-product'
+  to: '/' | '/design-system' | '/register-product' | '/share-product'
+  id:
+    '__root__' | '/' | '/design-system' | '/register-product' | '/share-product'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DesignSystemRoute: typeof DesignSystemRoute
+  RegisterProductRoute: typeof RegisterProductRoute
   ShareProductRoute: typeof ShareProductRoute
 }
 
@@ -75,6 +86,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignSystemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register-product': {
+      id: '/register-product'
+      path: '/register-product'
+      fullPath: '/register-product'
+      preLoaderRoute: typeof RegisterProductRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/share-product': {
       id: '/share-product'
       path: '/share-product'
@@ -88,6 +106,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DesignSystemRoute: DesignSystemRoute,
+  RegisterProductRoute: RegisterProductRoute,
   ShareProductRoute: ShareProductRoute,
 }
 export const routeTree = rootRouteImport
