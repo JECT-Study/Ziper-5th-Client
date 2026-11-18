@@ -3,7 +3,14 @@ import type { ProductSaveApi } from '@ziper/api/product-save';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ProductSaveScreen } from './product-save-screen';
+import { parseWholeWon, ProductSaveScreen } from './product-save-screen';
+
+it('accepts whole won amounts without turning malformed input into a different price', () => {
+  expect(['0', ' 45,900 ', '9,999,999,999'].map(parseWholeWon)).toEqual([0, 45900, 9999999999]);
+  expect(['', '-12.50', '-5000', '1,2', '1e3', '10000000000'].map(parseWholeWon)).toEqual(
+    Array(6).fill(null),
+  );
+});
 
 it('blocks repeat submits when the save result is unknown', async () => {
   const url = 'https://example.com/product?ref=share!';

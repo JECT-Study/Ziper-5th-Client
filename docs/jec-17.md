@@ -17,7 +17,7 @@
 | `manual.png`         | `707:7398` 수동 입력      |
 | `boards.png`         | `837:10125` 보드 추가     |
 
-`agent-browser`에서 Figma 375px 시안을 상태바 44px·홈 인디케이터 34px를 제외한 웹 영역(375 × 893)과 비교했습니다. 자동 추출 화면의 좌우 16px 여백, 81px 상품 이미지, 48px 저장 버튼과 보드 목록 5행을 확인했습니다. 공유 원본 URL은 읽기 전용이라 시안의 지우기 버튼은 표시하지 않으며, 보드 이름 입력에는 취소 버튼을 유지합니다. 카드 도안과 상품 프리뷰 이미지는 Figma 화면에서 잘라 재사용했습니다.
+`agent-browser`에서 Figma 375px 시안을 상태바 44px·홈 인디케이터 34px를 제외한 웹 영역(375 × 893)과 비교했습니다. 자동 추출 화면의 좌우 16px 여백, 81px 상품 이미지, 48px 저장 버튼과 보드 목록 5행을 확인했습니다. 공유 원본 URL은 읽기 전용이라 시안의 지우기 버튼은 표시하지 않으며, 보드 이름 입력에는 취소 버튼을 유지합니다. 카드 도안은 Figma의 그래픽 소스 프레임에서 투명 PNG로 내보냈고, 상품 프리뷰 이미지는 자동 추출 화면에서 잘라 재사용했습니다.
 
 ### 반응형
 
@@ -31,6 +31,12 @@
 agent-browser session id --scope worktree --prefix jec17 > artifacts/jec-17/validation/browser-session.txt
 bash artifacts/jec-17/validation/browser-preview.sh
 ```
+
+### 인터랙션·디자인 시스템 점검
+
+414 × 896 휴대폰, 768 × 1024 태블릿, 1280 × 900 데스크톱에서 자동 추출·수동 입력·결과 불명 상태를 확인했습니다. `/design-system`에서는 모달·바텀시트의 키보드 포커스와 Escape, 바깥 클릭, 로딩 버튼의 접근 가능한 이름, 320px 하단 내비게이션을 검증했습니다.
+
+캡처·Figma 참조 PNG·검증 로그는 `artifacts/jec-17/validation/ui-audit/`에 있습니다. 개발 서버에서 `bash artifacts/jec-17/validation/ui-audit/check.sh`로 가격, 태그·보드 추가/취소, 이미지 업로드와 선택 복원, 모달·바텀시트 시나리오를 다시 확인할 수 있습니다.
 
 ## 남은 확인
 

@@ -144,16 +144,21 @@ export const boardList = style({
   padding: 0,
   margin: 0,
 });
-export const boardRow = style({
+export const boardRow = style({ display: 'flex' });
+export const boardCheck = style({ position: 'relative', minHeight: 34, width: '100%' });
+globalStyle(`${boardCheck} > span[aria-hidden]`, { width: 20, height: 20 });
+globalStyle(`${boardCheck} > span:last-child`, {
+  flex: 1,
   display: 'flex',
-  alignItems: 'center',
   justifyContent: 'space-between',
-  minHeight: 34,
+  alignItems: 'center',
   gap: vars.space[8],
 });
-export const boardCheck = style({ position: 'relative' });
-globalStyle(`${boardCheck} > span[aria-hidden]`, { width: 20, height: 20 });
-export const boardCount = style({ ...typography.caption2Medium, color: vars.color.text.default });
+export const boardCount = style({
+  flexShrink: 0,
+  ...typography.caption2Medium,
+  color: vars.color.text.default,
+});
 export const boardActions = style({
   borderTop: `1px solid ${vars.color.divider.strong}`,
   paddingTop: vars.space[8],
@@ -208,6 +213,13 @@ export const template = style({
   objectFit: 'contain',
   borderRadius: vars.radius.s,
 });
+export const uploadPreview = style({
+  display: 'flex',
+  alignItems: 'center',
+  gap: vars.space[12],
+  overflowWrap: 'anywhere',
+});
+
 export const feedback = style({
   margin: 0,
   ...typography.body2Medium,

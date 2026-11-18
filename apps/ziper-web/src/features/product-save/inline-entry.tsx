@@ -33,11 +33,20 @@ export function InlineEntry({
   };
 
   return (
-    <div className={styles.inline}>
+    <div
+      className={styles.inline}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !event.nativeEvent.isComposing && !loading) {
+          event.preventDefault();
+          onCancel();
+        }
+      }}
+    >
       <TextField
         className={styles.grow}
         variant="box"
         aria-label={label}
+        autoFocus
         value={value}
         maxLength={maxLength}
         showCounter

@@ -37,6 +37,13 @@ const imageModes = [
 ] as const;
 const won = new Intl.NumberFormat('ko-KR');
 
+export function parseWholeWon(value: string): number | null {
+  const amount = value.trim();
+  if (amount.length > 13 || !/^(?:\d+|\d{1,3}(?:,\d{3})+)$/u.test(amount)) return null;
+  const digits = amount.replaceAll(',', '');
+  return digits.length <= 10 ? Number(digits) : null;
+}
+
 type ScreenProps = {
   url: string | null;
   api?: ProductSaveApi;
@@ -244,6 +251,7 @@ function ProductForm({
   const [creating, setCreating] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const boardList = useRef<HTMLUListElement>(null);
+  const focusTrigger = useRef<'tag' | 'board' | null>(null);
   const busy = useRef(false);
   const tagName = tag?.trim();
   const newBoardName = boardName?.trim();
@@ -251,10 +259,10 @@ function ProductForm({
   const canCreateBoard = Boolean(
     newBoardName && !boards.some((board) => board.name === newBoardName),
   );
-  const numericPrice = product?.price ?? Number(price);
+  const manualPrice = parseWholeWon(price);
+  const numericPrice = product?.price ?? manualPrice ?? NaN;
   const canSave = Boolean(
     (product?.name ?? name.trim()) &&
-    (product || price) &&
     Number.isSafeInteger(numericPrice) &&
     numericPrice >= 0 &&
     image &&
@@ -270,11 +278,26 @@ function ProductForm({
       ? selection.filter((item) => item !== value)
       : [...selection, value];
   }
+  function closeTagEntry() {
+    focusTrigger.current = 'tag';
+    setTag(null);
+  }
+  function closeBoardEntry() {
+    focusTrigger.current = 'board';
+    setBoardError(false);
+    setBoardName(null);
+  }
+  function restoreTrigger(kind: 'tag' | 'board', button: HTMLButtonElement | null) {
+    if (button && focusTrigger.current === kind) {
+      focusTrigger.current = null;
+      button.focus();
+    }
+  }
   function addTag() {
     if (!tagName || !canAddTag) return;
     setTags([...tags, tagName]);
     setSelectedTags([...selectedTags, tagName]);
-    setTag(null);
+    closeTagEntry();
   }
   async function createBoard() {
     if (!newBoardName || !canCreateBoard || busy.current) return;
@@ -285,7 +308,7 @@ function ProductForm({
       const board = await api.createBoard(newBoardName);
       setBoards((list) => [board, ...list]);
       setSelectedBoards((list) => [...list, board.id]);
-      setBoardName(null);
+      closeBoardEntry();
       boardList.current?.scrollTo(0, 0);
     } catch {
       setBoardError(true);
@@ -368,12 +391,18 @@ function ProductForm({
               <TextField
                 label="가격"
                 variant="box"
-                value={price && won.format(Number(price))}
+                value={price}
                 inputMode="numeric"
                 placeholder="ex)10,000원"
-                onChange={(event) =>
-                  setPrice(event.target.value.replace(/[^0-9]/g, '').slice(0, 10))
+                error={
+                  Boolean(price.trim() && manualPrice === null) &&
+                  '가격은 0원 이상의 정수로 입력해 주세요.'
                 }
+                onChange={(event) => setPrice(event.target.value)}
+                onBlur={() => {
+                  if (manualPrice !== null) setPrice(won.format(manualPrice));
+                }}
+                onClear={() => setPrice('')}
               />
               <CardImagePicker image={image} setImage={setImage} />
             </>
@@ -407,6 +436,7 @@ function ProductForm({
               {tag === null && (
                 <ChipFilter
                   className={styles.addTag}
+                  ref={(button) => restoreTrigger('tag', button)}
                   aria-pressed={undefined}
                   onClick={() => setTag('')}
                 >
@@ -423,7 +453,7 @@ function ProductForm({
                 disabled={!canAddTag}
                 onChange={setTag}
                 onConfirm={addTag}
-                onCancel={() => setTag(null)}
+                onCancel={closeTagEntry}
               />
             )}
           </section>
@@ -448,8 +478,10 @@ function ProductForm({
                         onChange={() => setSelectedBoards(toggle(selectedBoards, board.id))}
                       >
                         {board.name}
+                        <span aria-hidden="true" className={styles.boardCount}>
+                          {board.productCount}개
+                        </span>
                       </Checkbox>
-                      <span className={styles.boardCount}>{board.productCount}개</span>
                     </li>
                   ))}
                 </ul>
@@ -461,6 +493,7 @@ function ProductForm({
                   <button
                     type="button"
                     className={styles.addBoard}
+                    ref={(button) => restoreTrigger('board', button)}
                     onClick={() => setBoardName('')}
                   >
                     <Icon name="plus-small-line" size={16} />새 보드 만들기
@@ -478,10 +511,7 @@ function ProductForm({
                     disabled={!canCreateBoard}
                     onChange={setBoardName}
                     onConfirm={() => void createBoard()}
-                    onCancel={() => {
-                      setBoardError(false);
-                      setBoardName(null);
-                    }}
+                    onCancel={closeBoardEntry}
                   />
                 )}
                 {boardError && (
@@ -515,7 +545,11 @@ function CardImagePicker({
   image: CardImage | null;
   setImage: (value: CardImage | null) => void;
 }) {
-  const [mode, setMode] = useState<'upload' | 'template'>('template');
+  const [mode, setMode] = useState<'upload' | 'template'>(
+    image?.kind === 'upload' ? 'upload' : 'template',
+  );
+  const previous = useRef<Partial<Record<typeof mode, CardImage | null>>>({});
+  const fileInput = useRef<HTMLInputElement>(null);
   const [previewURL, setPreviewURL] = useState<string | null>(null);
   const [invalidImage, setInvalidImage] = useState(false);
   const file = image?.kind === 'upload' ? image.file : null;
@@ -534,8 +568,9 @@ function CardImagePicker({
         value={mode}
         onChange={(next) => {
           if (next === mode) return;
+          previous.current[mode] = image;
           setMode(next);
-          setImage(null);
+          setImage(previous.current[next] ?? null);
           setInvalidImage(false);
         }}
       />
@@ -558,20 +593,33 @@ function CardImagePicker({
         <>
           <input
             type="file"
+            ref={fileInput}
+            hidden
             aria-label="카드 이미지 파일"
             accept="image/jpeg,image/png,image/webp"
             onChange={(event) => {
               const next = event.currentTarget.files?.[0];
-              const valid =
-                next &&
-                ['image/jpeg', 'image/png', 'image/webp'].includes(next.type) &&
-                next.size <= 10 * 1024 * 1024;
-              setInvalidImage(Boolean(next && !valid));
-              setImage(valid ? { kind: 'upload', file: next } : null);
+              if (!next) return;
+              event.currentTarget.value = '';
+              if (
+                !['image/jpeg', 'image/png', 'image/webp'].includes(next.type) ||
+                next.size > 10 * 1024 * 1024
+              ) {
+                setInvalidImage(true);
+                return;
+              }
+              setInvalidImage(false);
+              setImage({ kind: 'upload', file: next });
             }}
           />
+          <Button size="medium" variant="secondary" onClick={() => fileInput.current?.click()}>
+            {file ? '이미지 변경' : '이미지 선택'}
+          </Button>
           {file && previewURL && (
-            <img className={styles.productImage} src={previewURL} alt="카드 이미지 미리보기" />
+            <div className={styles.uploadPreview}>
+              <img className={styles.productImage} src={previewURL} alt="카드 이미지 미리보기" />
+              <span className={styles.feedback}>{file.name}</span>
+            </div>
           )}
           {invalidImage && (
             <p className={styles.error} role="alert">
