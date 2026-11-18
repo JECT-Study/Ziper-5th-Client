@@ -21,3 +21,8 @@ peerDependencyRules:
     'vitest@5.1.0>vite': '1.5.0'
     '@vitest/mocker@5.1.0>vite': '1.5.0'
     '@vitest/browser@5.1.0>vite': '1.5.0'
+
+patchedDependencies:
+  '@webview-bridge/react-native@1.9.0': patches/@webview-bridge__react-native@1.9.0.patch
+  '@webview-bridge/utils@1.9.0': patches/@webview-bridge__utils@1.9.0.patch
+  '@webview-bridge/web@1.9.0': patches/@webview-bridge__web@1.9.0.patch
