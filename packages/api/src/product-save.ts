@@ -4,7 +4,7 @@ export type BoardSummary = { id: string; name: string; productCount: number };
 export type ProductPreview = {
   shop: string;
   name: string;
-  price: number;
+  price: number | null;
   imageURL: string | null;
 };
 
@@ -20,8 +20,8 @@ export type CardImage =
 export type ProductSaveInput = {
   url: string;
   name: string;
-  price: number;
-  image: CardImage;
+  price: number | null;
+  image: CardImage | null;
   tags: readonly string[];
   memo: string;
   boardIds: readonly string[];

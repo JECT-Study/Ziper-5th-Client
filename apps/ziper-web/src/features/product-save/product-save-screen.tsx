@@ -56,10 +56,12 @@ export function ScreenShell({
   children,
   onClose,
   busy,
+  back,
 }: {
   children: ReactNode;
   onClose: ScreenProps['onClose'];
   busy?: boolean;
+  back?: boolean;
 }) {
   const [closeError, setCloseError] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -80,11 +82,11 @@ export function ScreenShell({
         <button
           className={styles.close}
           type="button"
-          aria-label="닫기"
+          aria-label={back ? '뒤로 가기' : '닫기'}
           disabled={busy || closing}
           onClick={() => void close()}
         >
-          <Icon name="xmark-line" />
+          <Icon name={back ? 'chevron-left-line' : 'xmark-line'} />
         </button>
         <h1 className={styles.title}>상품 저장</h1>
       </header>
@@ -115,7 +117,7 @@ const saveErrors: Partial<Record<SaveStatus, string>> = {
 type InitialDraft = {
   name?: string;
   memo: string;
-  image: CardImage;
+  image: CardImage | null;
   tags: string[];
   boardIds: string[];
 };
@@ -238,7 +240,7 @@ function ProductForm({
   const [name, setName] = useState(initialDraft?.name ?? '');
   const [price, setPrice] = useState('');
   const [image, setImage] = useState<CardImage | null>(
-    product ? { kind: 'linked-product' } : (initialDraft?.image ?? null),
+    product?.imageURL ? { kind: 'linked-product' } : (initialDraft?.image ?? null),
   );
   const [memo, setMemo] = useState(initialDraft?.memo ?? '');
   const [tags, setTags] = useState(initialTags);
@@ -260,13 +262,13 @@ function ProductForm({
     newBoardName && !boards.some((board) => board.name === newBoardName),
   );
   const manualPrice = parseWholeWon(price);
-  const numericPrice = product?.price ?? manualPrice ?? NaN;
+  const numericPrice = product ? product.price : manualPrice;
+  const invalidPrice = product
+    ? numericPrice !== null && (!Number.isSafeInteger(numericPrice) || numericPrice < 0)
+    : Boolean(price.trim() && manualPrice === null);
   const canSave = Boolean(
-    (product?.name ?? name.trim()) &&
-    Number.isSafeInteger(numericPrice) &&
-    numericPrice >= 0 &&
-    image &&
-    selectedTags.length &&
+    (product?.name ?? name).trim() &&
+    !invalidPrice &&
     selectedBoards.length &&
     saveStatus !== 'unknown' &&
     saveStatus !== 'auth-required',
@@ -319,14 +321,14 @@ function ProductForm({
   }
 
   async function save() {
-    if (!canSave || !image || busy.current || saveStatus === 'saved') return;
+    if (!canSave || busy.current || saveStatus === 'saved') return;
     busy.current = true;
     setSaveStatus('saving');
     try {
       setSaveStatus(
         await api.save({
           url,
-          name: product?.name ?? name.trim(),
+          name: (product?.name ?? name).trim(),
           price: numericPrice,
           image,
           tags: selectedTags,
@@ -375,7 +377,9 @@ function ProductForm({
               <div className={styles.productInfo}>
                 <span className={styles.shop}>{product.shop}</span>
                 <span className={styles.productName}>{product.name}</span>
-                <strong className={styles.price}>{won.format(product.price)}원</strong>
+                {product.price !== null && (
+                  <strong className={styles.price}>{won.format(product.price)}원</strong>
+                )}
               </div>
             </div>
           ) : (
@@ -394,10 +398,7 @@ function ProductForm({
                 value={price}
                 inputMode="numeric"
                 placeholder="ex)10,000원"
-                error={
-                  Boolean(price.trim() && manualPrice === null) &&
-                  '가격은 0원 이상의 정수로 입력해 주세요.'
-                }
+                error={invalidPrice && '가격은 0원 이상의 정수로 입력해 주세요.'}
                 onChange={(event) => setPrice(event.target.value)}
                 onBlur={() => {
                   if (manualPrice !== null) setPrice(won.format(manualPrice));

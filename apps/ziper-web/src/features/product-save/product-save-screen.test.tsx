@@ -12,6 +12,53 @@ it('accepts whole won amounts without turning malformed input into a different p
   );
 });
 
+it('requires a board but lets a manually entered product omit price, image and tags', async () => {
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue('saved');
+  const api: ProductSaveApi = {
+    lookup: async () => ({ status: 'manual' }),
+    listBoards: async () => [{ id: 'board-1', name: '기본 보드', productCount: 0 }],
+    createBoard: vi.fn(),
+    save,
+  };
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(
+        <ProductSaveScreen
+          url="https://shop.example/product"
+          api={api}
+          onClose={() => {}}
+          initialDraft={{ name: '니트', memo: '', image: null, tags: [], boardIds: [] }}
+        />,
+      );
+    });
+    const form = container.querySelector('form')!;
+    const submit = container.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    expect(submit.disabled).toBe(true);
+    await act(async () => {
+      container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
+    });
+    expect(submit.disabled).toBe(false);
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(save).toHaveBeenCalledExactlyOnceWith({
+      url: 'https://shop.example/product',
+      name: '니트',
+      price: null,
+      image: null,
+      tags: [],
+      memo: '',
+      boardIds: ['board-1'],
+    });
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
 it('blocks repeat submits when the save result is unknown', async () => {
   const url = 'https://example.com/product?ref=share!';
   const save = vi.fn<ProductSaveApi['save']>().mockRejectedValue(new Error('response lost'));

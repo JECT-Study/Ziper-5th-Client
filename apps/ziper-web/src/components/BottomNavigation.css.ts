@@ -30,13 +30,13 @@ export const tab = style({
   color: vars.color.icon.disabled,
   fontFamily: 'inherit',
   cursor: 'pointer',
+  ':disabled': { cursor: 'default' },
 });
 
 export const active = style({ color: vars.color.text.strong });
 
 export const label = style({ ...typography.caption2Bold, textAlign: 'center' });
 
-// 가운데 + 버튼은 바 위로 16px 튀어나온다.
 export const add = style({
   position: 'absolute',
   top: -16,
@@ -48,4 +48,5 @@ export const add = style({
   borderRadius: vars.radius.full,
   background: 'none',
   cursor: 'pointer',
+  ':disabled': { cursor: 'default' },
 });

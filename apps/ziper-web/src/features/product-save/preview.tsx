@@ -1,30 +1,41 @@
 import type { BoardSummary, ProductSaveApi } from '@ziper/api/product-save';
-import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import previewCard from '../../assets/product-save/preview-card.png';
+import type { PreviewMode } from './preview-config';
 import { ProductSaveScreen } from './product-save-screen';
 
-export default function ProductSavePreview({ mode }: { mode: string }) {
+export default function ProductSavePreview({
+  mode,
+  url,
+  onClose,
+}: {
+  mode: PreviewMode;
+  url?: string;
+  onClose: () => void | Promise<unknown>;
+}) {
   const [api] = useState(() => createPreviewApi(mode));
-  const navigate = useNavigate();
   return (
     <ProductSaveScreen
-      url="https://www.musinsa.com/products/1234567"
+      url={url ?? 'https://www.musinsa.com/products/1234567'}
       api={api}
-      onClose={() => navigate({ to: '/' })}
-      initialDraft={{
-        name: '오버핏 울 블렌드 니트 가디건',
-        memo: '가을용 가디건',
-        image: { kind: 'template', id: 'tops' },
-        tags: ['여름'],
-        boardIds: mode === 'manual' ? ['default'] : ['default', 'fall'],
-      }}
+      onClose={onClose}
+      initialDraft={
+        url
+          ? undefined
+          : {
+              name: '오버핏 울 블렌드 니트 가디건',
+              memo: '가을용 가디건',
+              image: { kind: 'template', id: 'tops' },
+              tags: ['여름'],
+              boardIds: mode === 'manual' ? ['default'] : ['default', 'fall'],
+            }
+      }
       savedMessage="프리뷰에서만 저장했어요."
     />
   );
 }
 
-function createPreviewApi(mode: string): ProductSaveApi {
+function createPreviewApi(mode: PreviewMode): ProductSaveApi {
   const boards: BoardSummary[] = [
     { id: 'default', name: '기본 보드', productCount: 3 },
     { id: 'fall', name: '가을 코디', productCount: 3 },

@@ -14,9 +14,8 @@ const TABS: { id: BottomTab; label: string; icon: IconName }[] = [
 
 type BottomNavigationProps = {
   active: BottomTab;
-  onSelect: (tab: BottomTab) => void;
-  /** 가운데 + 버튼(상품 추가) */
-  onAdd: () => void;
+  onSelect?: (tab: BottomTab) => void;
+  onAdd?: () => void;
   className?: string;
 };
 
@@ -27,7 +26,8 @@ export function BottomNavigation({ active, onSelect, onAdd, className }: BottomN
       type="button"
       className={cx(styles.tab, tab.id === active && styles.active)}
       aria-current={tab.id === active ? 'page' : undefined}
-      onClick={() => onSelect(tab.id)}
+      disabled={!onSelect}
+      onClick={() => onSelect?.(tab.id)}
     >
       <Icon name={tab.icon} />
       <span className={styles.label}>{tab.label}</span>
@@ -38,7 +38,13 @@ export function BottomNavigation({ active, onSelect, onAdd, className }: BottomN
     <nav className={cx(styles.root, className)}>
       <div className={styles.group}>{TABS.slice(0, 2).map(renderTab)}</div>
       <div className={styles.group}>{TABS.slice(2).map(renderTab)}</div>
-      <button type="button" className={styles.add} onClick={onAdd} aria-label="상품 추가">
+      <button
+        type="button"
+        className={styles.add}
+        onClick={onAdd}
+        disabled={!onAdd}
+        aria-label="상품 추가"
+      >
         <img src={addButton} alt="" width={50} height={50} />
       </button>
     </nav>
