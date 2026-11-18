@@ -46,7 +46,7 @@ import { typography, vars } from '../styles/theme.css';
 | header_main                                                                             | `HeaderMain`              | `right`                                                                                                        |
 | header_sub                                                                              | `HeaderSub`               | `title`, `onBack`, `right`                                                                                     |
 | footer (single, split, stack)                                                           | `Footer`, `ButtonGroup`   | `layout`                                                                                                       |
-| modal/default                                                                           | `Modal`                   | `open`, `title`, `description`, `actions`, `actionsLayout`                                                     |
+| modal/default                                                                           | `Modal`                   | `open`, `title`, `description`, `onClose`, `actions`, `actionsLayout`                                          |
 | bottomSheet                                                                             | `BottomSheet`             | `open`, `title`, `onClose`, `footer`                                                                           |
 | Toast                                                                                   | `Toast`                   | 문구(children)                                                                                                 |
 | bottom_navigation                                                                       | `BottomNavigation`        | `active`, `onSelect`, `onAdd`                                                                                  |
@@ -66,5 +66,5 @@ import { typography, vars } from '../styles/theme.css';
 - **Button Large Secondary Loading** 배경은 Figma에서 `#ebebeb`(tertiary)이지만, Color 표에 없는 토큰이라 Secondary 기본색으로 맞췄습니다.
 - **bottomSheet 손잡이 색** `#f3f4f6`, **카카오 노랑** `#fee500`, **네이버 테두리** `rgba(0,0,0,0.15)`는 Color 표에 없어 각 컴포넌트 스타일에만 적었습니다.
 - **status/positive**(`#5cd100`)는 Color 표에 없고 텍스트 필드 완료 도움말에서만 쓰여서 `vars.color.status.positive`로 추가했습니다.
-- **Toast, Modal, BottomSheet**는 모양만 옮겼습니다. 표시 위치, 자동으로 사라지는 시간, 애니메이션은 사용하는 화면에서 정합니다.
+- **Modal, BottomSheet**는 브라우저의 `<dialog>`에서 포커스를 관리합니다. Escape는 `onClose`를 호출하고, 바텀시트는 바깥을 클릭해도 닫힙니다. **Toast**의 표시 위치와 지속 시간은 사용하는 화면에서 정합니다.
 - Figma의 버튼 너비 335px는 화면 너비에 맞춘 값이라, Large와 Medium은 부모 너비를 채우도록 했습니다.

@@ -1,8 +1,8 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ComponentProps } from 'react';
 import { cx } from './cx';
 import * as styles from './ChipFilter.css';
 
-type ChipFilterProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ChipFilterProps = ComponentProps<'button'> & {
   selected?: boolean;
 };
 

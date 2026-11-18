@@ -6,9 +6,8 @@ const DISABLED = '&:disabled:not([aria-busy="true"])';
 const PRESSED = '&:active:not(:disabled)';
 
 export const base = style({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  display: 'inline-grid',
+  placeItems: 'center',
   border: 'none',
   color: vars.color.text.strong,
   fontFamily: 'inherit',
@@ -20,6 +19,17 @@ export const base = style({
   },
   ':focus-visible': { outline: `2px solid ${vars.palette.lime600}`, outlineOffset: 2 },
 });
+
+export const content = style({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'inherit',
+  gridArea: '1 / 1',
+  // Keep the accessible name and width when swapping the visible label for a spinner.
+  selectors: { [`${base}[aria-busy="true"] > &`]: { opacity: 0 } },
+});
+
+export const loadingIcon = style({ gridArea: '1 / 1' });
 
 export const variant = styleVariants({
   primary: {
