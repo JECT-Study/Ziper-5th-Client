@@ -8,4 +8,3 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
-/artifacts/jec-17/
