@@ -17,5 +17,7 @@ export function createDelegate(
     navigationBackV1: () => invoke('navigationBackV1'),
     navigationSetWebHistoryV1: (input) => invoke('navigationSetWebHistoryV1', input),
     sheetActionsV1: (input) => invoke('sheetActionsV1', input),
+    shareReadV1: () => invoke('shareReadV1'),
+    shareDismissV1: (input) => invoke('shareDismissV1', input),
   };
 }

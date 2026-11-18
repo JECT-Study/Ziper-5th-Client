@@ -33,6 +33,11 @@ export const nativeBridge = bridge({
     input: methods.navigationSetWebHistoryV1.input,
     output: resultSchema(methods.navigationSetWebHistoryV1.output),
   }),
+  shareReadV1: delegate({ output: resultSchema(methods.shareReadV1.output) }),
+  shareDismissV1: delegate({
+    input: methods.shareDismissV1.input,
+    output: resultSchema(methods.shareDismissV1.output),
+  }),
   sheetActionsV1: delegate({
     input: methods.sheetActionsV1.input,
     output: resultSchema(methods.sheetActionsV1.output),

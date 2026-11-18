@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Button, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import type { BridgeDelegate, BridgeWebView } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
-import { failure } from '@ziper/bridge/contract';
+import { failure, incomingShareEvent } from '@ziper/bridge/contract';
 import { ActiveScope } from '../bridge/active-scope';
 import { backTarget, interceptNativeBack } from '../bridge/back';
 import { createHandlers } from '../bridge/handlers';
@@ -23,7 +23,7 @@ type WebScope = ReturnType<typeof createHandlers> & {
 };
 
 export function WebScreen({ path }: { path: string }) {
-  const { config, auth } = useMobileServices();
+  const { config, auth, shareInbox } = useMobileServices();
   const router = useRouter();
   const navigation = useNavigation();
   const web = useRef<BridgeWebView>(null);
@@ -122,6 +122,7 @@ export function WebScreen({ path }: { path: string }) {
           active,
           back: scopeBack,
           sheets,
+          shareInbox,
           navigate: (kind, nextPath) => {
             if (kind === 'replace') {
               // SDK 58 requires BOTH the prop and imperative prevention state cleared.
@@ -149,7 +150,7 @@ export function WebScreen({ path }: { path: string }) {
         scopes.deactivate();
       }
     };
-  }, [uri, blocked, scopes]);
+  }, [uri, blocked, scopes, shareInbox]);
 
   const delegate = useMemo<BridgeDelegate<NativeBridge>>(() => {
     // Retained delegates resolve the active scope per call, never capture disposed handlers.
@@ -164,11 +165,21 @@ export function WebScreen({ path }: { path: string }) {
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', back);
+      const wakeWeb = () => {
+        if (live.current.uri !== uri || live.current.blocked || !navigation.isFocused()) return;
+        // Only the active document can read the payload through the guarded bridge.
+        web.current?.injectJavaScript?.(
+          'window.dispatchEvent(new Event("' + incomingShareEvent + '")); true;',
+        );
+      };
+      const unsubscribe = shareInbox.subscribe(wakeWeb);
+      if (shareInbox.read()) wakeWeb();
       return () => {
+        unsubscribe();
         subscription.remove();
         scopes.current?.suspend();
       };
-    }, [back, scopes]),
+    }, [back, navigation, scopes, shareInbox, uri]),
   );
   const blockDocument = () => {
     if (live.current.uri !== uri) return;

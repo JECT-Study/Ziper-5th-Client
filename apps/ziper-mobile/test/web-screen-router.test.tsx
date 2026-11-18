@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
-import { Platform } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import { afterEach, expect, it, vi } from 'vitest';
 import { success } from '@ziper/bridge/contract';
 import type { BridgeDelegate } from '@webview-bridge/react-native';
@@ -8,6 +8,19 @@ import type { NativeBridge } from '@ziper/bridge/native';
 import RootLayout from '../src/app/_layout';
 import HomeRoute from '../src/app/index';
 import WebRoute from '../src/app/web';
+import { redirectSystemPath } from '../src/app/+native-intent';
+
+const sharing = vi.hoisted(() => ({
+  payloads: [] as { shareType: 'url'; value: string }[],
+  clear: vi.fn(() => {
+    sharing.payloads = [];
+  }),
+  read: vi.fn(() => sharing.payloads),
+}));
+vi.mock('expo-sharing', () => ({
+  getSharedPayloads: sharing.read,
+  clearSharedPayloads: sharing.clear,
+}));
 
 const mockWebView = vi.hoisted(() => ({ delegate: null as BridgeDelegate<NativeBridge> | null }));
 vi.mock('../src/bridge/webview', async () => {
@@ -27,7 +40,42 @@ vi.mock('../src/bridge/webview', async () => {
 });
 vi.mock('@expo/ui', () => ({ BottomSheet: () => null }));
 
-const routes = { _layout: RootLayout, index: HomeRoute, web: WebRoute };
+const routes = {
+  _layout: RootLayout,
+  index: HomeRoute,
+  web: WebRoute,
+  '+native-intent': { redirectSystemPath },
+};
+
+it('reads a warm Expo share from the Linking wake signal', async () => {
+  await renderRouter(routes);
+  expect(redirectSystemPath({ path: 'ziper://expo-sharing', initial: false })).toBeNull();
+  const page = mockWebView.delegate!;
+  expect(await page.shareReadV1()).toEqual(success(null));
+  sharing.payloads = [{ shareType: 'url', value: 'https://example.com/warm' }];
+  await act(() => {
+    DeviceEventEmitter.emit('url', { url: 'ziper://expo-sharing' });
+  });
+  expect(await page.shareReadV1()).toEqual(
+    success({ id: 'share-1', url: 'https://example.com/warm' }),
+  );
+});
+
+it('keeps a cold-start share across native screens and only lets the focused screen dismiss it', async () => {
+  sharing.payloads = [{ shareType: 'url', value: 'https://example.com/product?x=1' }];
+  const rendered = await renderRouter(routes, { initialUrl: 'ziper://expo-sharing' });
+  expect(rendered.getPathname()).toBe('/');
+  const home = mockWebView.delegate!;
+  const share = { id: 'share-1', url: 'https://example.com/product?x=1' };
+  expect(await home.shareReadV1()).toEqual(success(share));
+  expect(sharing.payloads).toEqual([]);
+  await act(() => router.push({ pathname: '/web', params: { path: '/product' } }));
+  expect(await home.shareDismissV1({ id: share.id })).toMatchObject({ ok: false });
+  const product = mockWebView.delegate!;
+  expect(await product.shareReadV1()).toEqual(success(share));
+  expect(await product.shareDismissV1({ id: share.id })).toEqual(success({ done: true }));
+  expect(await product.shareReadV1()).toEqual(success(null));
+});
 
 afterEach(() => {
   mockWebView.delegate = null;

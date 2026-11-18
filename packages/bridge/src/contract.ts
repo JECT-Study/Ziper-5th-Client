@@ -15,6 +15,7 @@ export const capability = {
   back: 'navigation.back.v1',
   history: 'navigation.history.v1',
   sheet: 'sheet.actions.v1',
+  incomingShare: 'share.incoming.v1',
 } as const;
 
 export function isInternalPath(path: unknown): path is string {
@@ -136,6 +137,30 @@ const adoptInput = z.object({ handoffCode: z.string().min(1).max(2048) }).strict
 
 const done = z.object({ done: z.literal(true) });
 
+export const incomingShareEvent = 'ziper:incoming-share';
+
+export function isShareURL(value: string): boolean {
+  if (value.length > 4096 || /[\s\\]/u.test(value)) return false;
+  if ([...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
+    return false;
+  const scheme = /^https?:\/\//i.exec(value)?.[0];
+  if (!scheme) return false;
+  // Check userinfo in the authority only; the React Native URL implementation can match @ in the path.
+  const authority = value.slice(scheme.length).split(/[/?#]/, 1)[0];
+  if (!authority || authority.includes('@')) return false;
+  try {
+    return Boolean(new URL(scheme.toLowerCase() + value.slice(scheme.length)).hostname);
+  } catch {
+    return false;
+  }
+}
+
+const incomingShare = z.object({
+  id: idSchema,
+  url: z.string().refine(isShareURL).nullable(),
+});
+export type IncomingShare = z.infer<typeof incomingShare>;
+
 export const methods = {
   getBridgeInfoV1: { input: z.undefined(), output: infoSchema },
   authLoginV1: { input: authInput, output: loginSchema },
@@ -148,6 +173,8 @@ export const methods = {
   navigationBackV1: { input: z.undefined(), output: navigationOutput },
   navigationSetWebHistoryV1: { input: historyInput, output: done },
   sheetActionsV1: { input: sheetInputSchema, output: sheetResultSchema },
+  shareReadV1: { input: z.undefined(), output: incomingShare.nullable() },
+  shareDismissV1: { input: z.object({ id: idSchema }).strict(), output: done },
 };
 
 export type Method = keyof typeof methods;
