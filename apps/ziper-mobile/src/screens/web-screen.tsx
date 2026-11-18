@@ -40,7 +40,7 @@ export function WebScreen({ path }: { path: string }) {
   const [scopes] = useState(() => new ActiveScope<WebScope>());
   const uri = serviceURL(config, path);
   const shareScreen = path === '/share-product';
-  const productScreen = shareScreen || path === '/register-product';
+  const hasWebHeader = shareScreen || path.split(/[?#]/, 1)[0] === '/register-product';
   const openedShare = useRef(shareScreen ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
   const live = useRef({
@@ -111,7 +111,7 @@ export function WebScreen({ path }: { path: string }) {
               return true;
             case 'native':
             case 'root':
-              if (!productScreen && !canGoBack) return false;
+              if (!hasWebHeader && !canGoBack) return false;
               if (shareScreen) {
                 if (openedShare.current) shareInbox.dismiss(openedShare.current.id);
                 setShareClosing(true);
@@ -171,7 +171,7 @@ export function WebScreen({ path }: { path: string }) {
         scopes.deactivate();
       }
     };
-  }, [uri, blocked, scopes, shareInbox, shareScreen, productScreen]);
+  }, [uri, blocked, scopes, shareInbox, shareScreen, hasWebHeader]);
 
   const delegate = useMemo<BridgeDelegate<NativeBridge>>(() => {
     // Retained delegates resolve the active scope per call, never capture disposed handlers.
@@ -217,7 +217,7 @@ export function WebScreen({ path }: { path: string }) {
       <Stack.Screen
         options={{
           title: 'Ziper',
-          headerShown: !productScreen || blocked || uri === null,
+          headerShown: !hasWebHeader || blocked || uri === null,
           gestureEnabled: !intercept && !shareScreen,
           headerBackButtonMenuEnabled: false,
           headerBackVisible: !intercept,

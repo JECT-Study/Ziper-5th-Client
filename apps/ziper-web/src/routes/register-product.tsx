@@ -1,24 +1,21 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { isShareURL } from '@ziper/bridge/contract';
-import { lazy, Suspense, useState, type FormEvent } from 'react';
+import { Suspense, useState, type SubmitEvent } from 'react';
 import { usePlatform } from '../bridge/provider';
 import { Button, TextField } from '../components';
+import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
 import { ProductSaveScreen, ScreenShell } from '../features/product-save/product-save-screen';
 import * as saveStyles from '../features/product-save/product-save.css';
 import * as styles from '../features/product-save/register-product.css';
 
-const Preview = import.meta.env.DEV ? lazy(() => import('../features/product-save/preview')) : null;
-
 export const Route = createFileRoute('/register-product')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    step: search.step === 'details' ? ('details' as const) : undefined,
-    preview:
-      import.meta.env.DEV &&
-      typeof search.preview === 'string' &&
-      /^(auto|manual|offline|auth|duplicate|failed|unknown)$/.test(search.preview)
-        ? search.preview
-        : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const preview = parsePreviewMode(search.preview);
+    return {
+      step: search.step === 'details' ? ('details' as const) : undefined,
+      preview: preview === 'unsupported' ? undefined : preview,
+    };
+  },
   component: RegisterProduct,
 });
 
@@ -29,27 +26,37 @@ function RegisterProduct() {
   const { platform, status } = usePlatform();
   const [draft, setDraft] = useState('');
   const [submittedURL, setSubmittedURL] = useState<string | null>(null);
-  const [showError, setShowError] = useState(false);
-  const [navigationError, setNavigationError] = useState(false);
+  const [validationVisible, setValidationVisible] = useState(false);
+  const [transition, setTransition] = useState<'idle' | 'opening' | 'error'>('idle');
   const url = draft.trim();
+  const invalidURL = !isShareURL(url);
 
-  async function next(event: FormEvent<HTMLFormElement>) {
+  function updateDraft(value: string) {
+    setDraft(value);
+    setSubmittedURL(null);
+    setValidationVisible(false);
+    setTransition('idle');
+  }
+
+  async function next(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isShareURL(url)) {
-      setShowError(true);
+    if (transition === 'opening') return;
+    if (invalidURL) {
+      setValidationVisible(true);
       return;
     }
 
-    setNavigationError(false);
+    setTransition('opening');
     try {
-      // A reload or direct URL has no in-memory draft; recreate the entry before advancing.
+      // A stale details URL needs an input entry to return to.
       if (step === 'details') {
         await navigate({ search: { step: undefined, preview }, replace: true });
       }
       setSubmittedURL(url);
       await navigate({ search: { step: 'details', preview } });
+      setTransition('idle');
     } catch {
-      setNavigationError(true);
+      setTransition('error');
     }
   }
 
@@ -64,7 +71,7 @@ function RegisterProduct() {
   }
 
   if (step === 'details' && submittedURL) {
-    return Preview && preview ? (
+    return ProductSavePreview && preview ? (
       <Suspense
         fallback={
           <ScreenShell onClose={close}>
@@ -72,7 +79,7 @@ function RegisterProduct() {
           </ScreenShell>
         }
       >
-        <Preview mode={preview} url={submittedURL} onClose={close} />
+        <ProductSavePreview key={preview} mode={preview} url={submittedURL} onClose={close} />
       </Suspense>
     ) : (
       <ProductSaveScreen url={submittedURL} onClose={close} />
@@ -80,7 +87,7 @@ function RegisterProduct() {
   }
 
   return (
-    <ScreenShell onClose={close} back>
+    <ScreenShell onClose={close} back busy={transition === 'opening'}>
       <form className={saveStyles.form} noValidate onSubmit={(event) => void next(event)}>
         <div className={saveStyles.fields}>
           <div className={styles.intro}>
@@ -100,29 +107,22 @@ function RegisterProduct() {
             autoCapitalize="none"
             autoComplete="off"
             spellCheck={false}
+            readOnly={transition === 'opening'}
             placeholder="https://"
             value={draft}
-            error={showError && '올바른 상품 링크를 입력해 주세요.'}
-            onBlur={() => setShowError(Boolean(url) && !isShareURL(url))}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              setSubmittedURL(null);
-              setShowError(false);
-            }}
-            onClear={() => {
-              setDraft('');
-              setSubmittedURL(null);
-              setShowError(false);
-            }}
+            error={validationVisible && invalidURL && '올바른 상품 링크를 입력해 주세요.'}
+            onBlur={() => setValidationVisible(Boolean(url))}
+            onChange={(event) => updateDraft(event.target.value)}
+            onClear={() => updateDraft('')}
           />
         </div>
         <footer className={saveStyles.footer}>
-          {navigationError && (
+          {transition === 'error' && (
             <p className={saveStyles.error} role="alert">
               다음 화면을 열지 못했어요. 다시 시도해 주세요.
             </p>
           )}
-          <Button type="submit" disabled={!url}>
+          <Button type="submit" disabled={!url} loading={transition === 'opening'}>
             상품 정보 입력하기
           </Button>
         </footer>

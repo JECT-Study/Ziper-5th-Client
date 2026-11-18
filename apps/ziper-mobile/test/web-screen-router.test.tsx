@@ -202,6 +202,17 @@ it('returns through the in-app registration history without consuming a queued s
   );
 });
 
+it('returns home when registration is the first native screen', async () => {
+  const rendered = await renderRouter(routes, {
+    initialUrl: '/web?path=%2Fregister-product%3Fstep%3Ddetails',
+  });
+  expect(rendered.getSearchParams()).toEqual({ path: '/register-product?step=details' });
+  await act(async () => {
+    expect(await mockWebView.delegate!.navigationBackV1()).toEqual(success({ handled: true }));
+  });
+  expect(rendered.getPathname()).toBe('/');
+});
+
 it('refuses an external path supplied through a deep link', async () => {
   await renderRouter(routes, { initialUrl: '/web?path=%2F%2Fevil.test' });
   expect(screen.getByText('Invalid service-relative page path.')).toBeTruthy();

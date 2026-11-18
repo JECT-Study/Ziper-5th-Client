@@ -14,30 +14,20 @@ const TABS: { id: BottomTab; label: string; icon: IconName }[] = [
 
 type BottomNavigationProps = {
   active: BottomTab;
-  onSelect: (tab: BottomTab) => void;
-  /** 가운데 + 버튼(상품 추가) */
-  onAdd: () => void;
-  disabledTabs?: readonly BottomTab[];
-  addDisabled?: boolean;
+  onSelect?: (tab: BottomTab) => void;
+  onAdd?: () => void;
   className?: string;
 };
 
-export function BottomNavigation({
-  active,
-  onSelect,
-  onAdd,
-  disabledTabs,
-  addDisabled,
-  className,
-}: BottomNavigationProps) {
+export function BottomNavigation({ active, onSelect, onAdd, className }: BottomNavigationProps) {
   const renderTab = (tab: (typeof TABS)[number]) => (
     <button
       key={tab.id}
       type="button"
       className={cx(styles.tab, tab.id === active && styles.active)}
       aria-current={tab.id === active ? 'page' : undefined}
-      disabled={disabledTabs?.includes(tab.id)}
-      onClick={() => onSelect(tab.id)}
+      disabled={!onSelect}
+      onClick={() => onSelect?.(tab.id)}
     >
       <Icon name={tab.icon} />
       <span className={styles.label}>{tab.label}</span>
@@ -52,7 +42,7 @@ export function BottomNavigation({
         type="button"
         className={styles.add}
         onClick={onAdd}
-        disabled={addDisabled}
+        disabled={!onAdd}
         aria-label="상품 추가"
       >
         <img src={addButton} alt="" width={50} height={50} />

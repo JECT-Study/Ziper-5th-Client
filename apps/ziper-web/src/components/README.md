@@ -49,7 +49,7 @@ import { typography, vars } from '../styles/theme.css';
 | modal/default                                                                           | `Modal`                   | `open`, `title`, `description`, `onClose`, `actions`, `actionsLayout`                                          |
 | bottomSheet                                                                             | `BottomSheet`             | `open`, `title`, `onClose`, `footer`                                                                           |
 | Toast                                                                                   | `Toast`                   | 문구(children)                                                                                                 |
-| bottom_navigation                                                                       | `BottomNavigation`        | `active`, `onSelect`, `onAdd`                                                                                  |
+| bottom_navigation                                                                       | `BottomNavigation`        | `active`, `onSelect`, `onAdd` (해당 콜백이 없으면 비활성)                                                      |
 | NAVER, kakao, apple 로그인                                                              | `SocialLoginButton`       | `provider`                                                                                                     |
 | icon (25개)                                                                             | `Icon`, `Spinner`         | `name`, `size`, `label`                                                                                        |
 

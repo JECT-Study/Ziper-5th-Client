@@ -1,29 +1,24 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { usePlatform } from '../bridge/provider';
 import { useIncomingShare } from '../features/product-save/incoming-share';
+import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
 import { ProductSaveScreen, ScreenShell } from '../features/product-save/product-save-screen';
-
-const Preview = import.meta.env.DEV ? lazy(() => import('../features/product-save/preview')) : null;
 
 export const Route = createFileRoute('/share-product')({
   validateSearch: (search: Record<string, unknown>) => ({
-    preview:
-      import.meta.env.DEV &&
-      typeof search.preview === 'string' &&
-      /^(auto|manual|unsupported|offline|auth|duplicate|failed|unknown)$/.test(search.preview)
-        ? search.preview
-        : undefined,
+    preview: parsePreviewMode(search.preview),
   }),
   component: ShareProductRoute,
 });
 
 function ShareProductRoute() {
   const { preview } = Route.useSearch();
-  return Preview && preview ? (
+  const navigate = Route.useNavigate();
+  return ProductSavePreview && preview ? (
     <Suspense fallback={null}>
-      <Preview key={preview} mode={preview} />
+      <ProductSavePreview key={preview} mode={preview} onClose={() => navigate({ to: '/' })} />
     </Suspense>
   ) : (
     <Incoming />
