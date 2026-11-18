@@ -141,6 +141,9 @@ importers:
       '@vanilla-extract/css':
         specifier: ^1.21.3
         version: 1.21.3
+      '@ziper/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@ziper/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
@@ -175,6 +178,8 @@ importers:
       vite:
         specifier: npm:@voidzero-dev/vite-plus-core@1.5.0
         version: '@voidzero-dev/vite-plus-core@1.5.0(@types/node@24.19.2)(@volar/typescript@2.4.31(typescript@6.0.3))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(typescript@6.0.3)(yaml@2.9.1)'
+
+  packages/api: {}
 
   packages/bridge:
     dependencies:
