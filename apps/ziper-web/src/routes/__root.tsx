@@ -1,4 +1,5 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import { BridgeProvider } from '../bridge/provider';
 import '../styles/global.css';
 
 export const Route = createRootRoute({
@@ -23,10 +24,16 @@ function RootComponent() {
   return (
     <html lang="ko">
       <head>
+        <meta
+          httpEquiv="Content-Security-Policy"
+          content="frame-src 'none'; object-src 'none'; base-uri 'none'"
+        />
         <HeadContent />
       </head>
       <body>
-        <Outlet />
+        <BridgeProvider>
+          <Outlet />
+        </BridgeProvider>
         <Scripts />
       </body>
     </html>
