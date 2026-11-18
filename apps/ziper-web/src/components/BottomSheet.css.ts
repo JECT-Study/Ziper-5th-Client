@@ -1,28 +1,18 @@
 import { style } from '@vanilla-extract/css';
 import { typography, vars } from '../styles/theme.css';
 
-export const overlay = style({
-  position: 'fixed',
-  inset: 0,
-  zIndex: 100,
-  display: 'flex',
-  alignItems: 'flex-end',
-  justifyContent: 'center',
-  backgroundColor: vars.color.overlay.dimmed,
-});
-
 export const sheet = style({
+  inset: 'auto 0 0',
+  margin: '0 auto',
   width: '100%',
   maxWidth: 480,
-  minHeight: 244,
-  maxHeight: 650,
-  display: 'flex',
-  flexDirection: 'column',
+  minHeight: 'min(244px, 100dvh)',
+  maxHeight: 'min(650px, 100dvh)',
   borderTopLeftRadius: vars.radius.sheet,
   borderTopRightRadius: vars.radius.sheet,
   backgroundColor: vars.color.background,
   boxShadow: vars.shadow.default,
-  paddingBottom: 'env(safe-area-inset-bottom)',
+  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
 });
 
 export const handlerArea = style({
@@ -41,6 +31,7 @@ export const handler = style({
 });
 
 export const titleBar = style({
+  flexShrink: 0,
   display: 'flex',
   alignItems: 'flex-start',
   gap: vars.space[16],
@@ -63,4 +54,4 @@ export const close = style({
   cursor: 'pointer',
 });
 
-export const contents = style({ flex: 1, overflowY: 'auto' });
+export const contents = style({ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' });

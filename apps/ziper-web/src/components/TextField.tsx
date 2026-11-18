@@ -1,4 +1,4 @@
-import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cx } from './cx';
 import { Icon } from './Icon';
 import * as styles from './TextField.css';
@@ -32,12 +32,14 @@ export function TextField({
   type = 'text',
   className,
   id,
+  'aria-describedby': describedBy,
   ...input
 }: TextFieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const helperId = `${inputId}-helper`;
   const [revealed, setRevealed] = useState(false);
+  const element = useRef<HTMLInputElement>(null);
 
   const value = String(input.value ?? '');
   const isPassword = type === 'password';
@@ -47,6 +49,10 @@ export function TextField({
   const counter =
     showCounter && input.maxLength !== undefined ? `${value.length}/${input.maxLength}` : null;
 
+  const description = [describedBy, message || counter ? helperId : undefined]
+    .filter(Boolean)
+    .join(' ');
+  const fieldName = input['aria-label'] ?? label;
   return (
     <div className={cx(styles.root[variant], className)}>
       {label && (
@@ -61,17 +67,21 @@ export function TextField({
         <input
           {...input}
           id={inputId}
+          ref={element}
           type={isPassword && revealed ? 'text' : type}
           className={styles.input[variant]}
           aria-invalid={hasError || undefined}
-          aria-describedby={message || counter ? helperId : undefined}
+          aria-describedby={description || undefined}
         />
-        {onClear && value && !input.disabled && (
+        {onClear && value && !input.disabled && !input.readOnly && (
           <button
             type="button"
             className={styles.action}
-            onClick={onClear}
-            aria-label="입력 지우기"
+            onClick={() => {
+              onClear();
+              element.current?.focus();
+            }}
+            aria-label={fieldName ? `${fieldName} 지우기` : '입력 지우기'}
           >
             <Icon name="xmark-circle-fill" />
           </button>

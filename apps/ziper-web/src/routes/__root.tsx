@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import { BridgeProvider } from '../bridge/provider';
+import { ShareEntry } from '../features/product-save/incoming-share';
 import '../styles/global.css';
 
 export const Route = createRootRoute({
@@ -32,6 +33,7 @@ function RootComponent() {
       </head>
       <body>
         <BridgeProvider>
+          <ShareEntry />
           <Outlet />
         </BridgeProvider>
         <Scripts />

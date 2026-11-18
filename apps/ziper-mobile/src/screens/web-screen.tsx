@@ -32,12 +32,15 @@ export function WebScreen({ path }: { path: string }) {
   const replaceDocument = useRef<() => void>(() => {});
   const currentDocument = useRef<string | null>(null);
   const [depth, setDepth] = useState(0);
+  const [shareClosing, setShareClosing] = useState(false);
   const [sheet, setSheet] = useState<
     (SheetSnapshot & { owner: SheetSessions; key: string }) | null
   >(null);
   const [blockedURI, setBlockedURI] = useState<string | null>(null);
   const [scopes] = useState(() => new ActiveScope<WebScope>());
   const uri = serviceURL(config, path);
+  const shareScreen = path === '/share-product';
+  const openedShare = useRef(shareScreen ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
   const live = useRef({
     config,
@@ -63,7 +66,7 @@ export function WebScreen({ path }: { path: string }) {
   );
   const intercept = interceptNativeBack(sheet !== null, depth);
   const disablePrevention = usePreventRemove(
-    intercept,
+    intercept || (shareScreen && !blocked && uri !== null && !shareClosing),
     () => {
       back();
     },
@@ -97,17 +100,25 @@ export function WebScreen({ path }: { path: string }) {
           live.current.uri === uri && !live.current.blocked && live.current.navigation.isFocused();
         const scopeBack = () => {
           if (!active()) return false;
-          switch (backTarget(sheets.active, depthRef.current, live.current.router.canGoBack())) {
+          const { router, disablePrevention } = live.current;
+          const canGoBack = router.canGoBack();
+          switch (backTarget(sheets.active, depthRef.current, canGoBack)) {
             case 'sheet':
               return sheets.cancel();
             case 'web':
               web.current?.injectJavaScript('window.history.back(); true;');
               return true;
             case 'native':
-              live.current.router.back();
-              return true;
             case 'root':
-              return false;
+              if (!shareScreen && !canGoBack) return false;
+              if (shareScreen) {
+                if (openedShare.current) shareInbox.dismiss(openedShare.current.id);
+                setShareClosing(true);
+                disablePrevention();
+              }
+              if (canGoBack) router.back();
+              else router.replace('/');
+              return true;
           }
         };
         const handlers = createHandlers({
@@ -122,13 +133,22 @@ export function WebScreen({ path }: { path: string }) {
           active,
           back: scopeBack,
           sheets,
-          shareInbox,
+          shareInbox: shareScreen
+            ? {
+                // This screen keeps its original share even after acknowledgement or reload.
+                read: () => (openedShare.current ??= shareInbox.read()),
+                dismiss: (id) => {
+                  if (id === openedShare.current?.id) shareInbox.dismiss(id);
+                },
+              }
+            : shareInbox,
           navigate: (kind, nextPath) => {
             if (kind === 'replace') {
               // SDK 58 requires BOTH the prop and imperative prevention state cleared.
               sheets.cancel();
               depthRef.current = 0;
               setDepth(0);
+              if (shareScreen) setShareClosing(true);
               live.current.disablePrevention();
             }
             live.current.router[kind]({ pathname: '/web', params: { path: nextPath } });
@@ -150,7 +170,7 @@ export function WebScreen({ path }: { path: string }) {
         scopes.deactivate();
       }
     };
-  }, [uri, blocked, scopes, shareInbox]);
+  }, [uri, blocked, scopes, shareInbox, shareScreen]);
 
   const delegate = useMemo<BridgeDelegate<NativeBridge>>(() => {
     // Retained delegates resolve the active scope per call, never capture disposed handlers.
@@ -196,7 +216,8 @@ export function WebScreen({ path }: { path: string }) {
       <Stack.Screen
         options={{
           title: 'Ziper',
-          gestureEnabled: !intercept,
+          headerShown: !shareScreen || blocked || uri === null,
+          gestureEnabled: !intercept && !shareScreen,
           headerBackButtonMenuEnabled: false,
           headerBackVisible: !intercept,
           headerLeft: intercept ? () => <Button title="Back" onPress={back} /> : undefined,

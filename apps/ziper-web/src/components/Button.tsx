@@ -35,15 +35,12 @@ export function Button({
       aria-busy={loading || undefined}
       {...rest}
     >
-      {loading ? (
-        <Spinner size={SPINNER_SIZE[size]} />
-      ) : (
-        <>
-          {leftIcon && <Icon name={leftIcon} size={ICON_SIZE[size]} />}
-          {children}
-          {rightIcon && <Icon name={rightIcon} size={ICON_SIZE[size]} />}
-        </>
-      )}
+      <span className={styles.content}>
+        {leftIcon && <Icon name={leftIcon} size={ICON_SIZE[size]} />}
+        {children}
+        {rightIcon && <Icon name={rightIcon} size={ICON_SIZE[size]} />}
+      </span>
+      {loading && <Spinner className={styles.loadingIcon} size={SPINNER_SIZE[size]} />}
     </button>
   );
 }

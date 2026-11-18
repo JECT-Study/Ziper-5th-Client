@@ -1,22 +1,13 @@
 import { style } from '@vanilla-extract/css';
 import { typography, vars } from '../styles/theme.css';
 
-export const overlay = style({
-  position: 'fixed',
-  inset: 0,
-  zIndex: 100,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: vars.space[32],
-  backgroundColor: vars.color.overlay.dimmed,
-});
-
 export const card = style({
-  width: '100%',
+  inset: 0,
+  margin: 'auto',
+  width: 'calc(100% - 32px)',
   maxWidth: 313,
-  display: 'flex',
-  flexDirection: 'column',
+  maxHeight: 'calc(100dvh - 32px)',
+  overflowY: 'auto',
   gap: vars.space[24],
   padding: `${vars.space[32]} ${vars.space[16]} ${vars.space[16]}`,
   borderRadius: vars.radius.l,

@@ -239,6 +239,7 @@ function DesignSystemPage() {
 
       <Modal
         open={modalOpen}
+        onClose={() => setModalOpen(false)}
         title="모달타이틀"
         description="서브내용 문구가 들어갑니다"
         actions={

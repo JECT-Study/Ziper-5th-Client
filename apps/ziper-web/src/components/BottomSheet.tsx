@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react';
+import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import * as styles from './BottomSheet.css';
 
@@ -16,28 +17,20 @@ export function BottomSheet({ open, title, onClose, children, footer }: BottomSh
   const titleId = useId();
   if (!open) return null;
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal
-        aria-labelledby={titleId}
-        className={styles.sheet}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.handlerArea}>
-          <span className={styles.handler} />
-        </div>
-        <div className={styles.titleBar}>
-          <h2 id={titleId} className={styles.title}>
-            {title}
-          </h2>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="닫기">
-            <Icon name="xmark-line" />
-          </button>
-        </div>
-        <div className={styles.contents}>{children}</div>
-        {footer}
+    <Dialog className={styles.sheet} titleId={titleId} onClose={onClose} dismissOnBackdrop>
+      <div className={styles.handlerArea}>
+        <span className={styles.handler} />
       </div>
-    </div>
+      <div className={styles.titleBar}>
+        <h2 id={titleId} className={styles.title}>
+          {title}
+        </h2>
+        <button type="button" className={styles.close} onClick={onClose} aria-label="닫기">
+          <Icon name="xmark-line" />
+        </button>
+      </div>
+      <div className={styles.contents}>{children}</div>
+      {footer}
+    </Dialog>
   );
 }

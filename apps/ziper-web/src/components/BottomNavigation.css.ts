@@ -3,25 +3,28 @@ import { typography, vars } from '../styles/theme.css';
 
 export const root = style({
   position: 'relative',
-  display: 'flex',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) clamp(50px, 20%, 74px) minmax(0, 1fr)',
   alignItems: 'center',
-  justifyContent: 'center',
-  gap: 74,
   padding: `${vars.space[12]} 0`,
-  paddingBottom: `calc(${vars.space[12]} + env(safe-area-inset-bottom))`,
+  paddingBottom: `calc(${vars.space[12]} + env(safe-area-inset-bottom, 0px))`,
   borderTop: `1px solid ${vars.color.border.subtle}`,
   backgroundColor: vars.color.background,
 });
 
-export const group = style({ display: 'flex' });
+export const group = style({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  selectors: { '&:nth-child(2)': { gridColumn: 3 } },
+});
 
 export const tab = style({
-  width: 75,
+  minWidth: 0,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   gap: vars.space[4],
-  padding: `0 13px`,
+  padding: 0,
   border: 'none',
   background: 'none',
   color: vars.color.icon.disabled,
@@ -31,7 +34,7 @@ export const tab = style({
 
 export const active = style({ color: vars.color.text.strong });
 
-export const label = style({ width: 60, ...typography.caption2Bold, textAlign: 'center' });
+export const label = style({ ...typography.caption2Bold, textAlign: 'center' });
 
 // 가운데 + 버튼은 바 위로 16px 튀어나온다.
 export const add = style({
