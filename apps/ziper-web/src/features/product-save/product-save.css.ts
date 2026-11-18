@@ -2,7 +2,8 @@ import { globalStyle, style } from '@vanilla-extract/css';
 import { typography, vars } from '../../styles/theme.css';
 
 export const shell = style({
-  minHeight: '100dvh',
+  height: '100dvh',
+  minHeight: 220,
   maxWidth: 480,
   margin: '0 auto',
   display: 'flex',
@@ -11,6 +12,7 @@ export const shell = style({
 });
 
 export const header = style({
+  flexShrink: 0,
   display: 'grid',
   gridTemplateColumns: '56px 1fr 56px',
   alignItems: 'center',
@@ -36,6 +38,7 @@ export const body = style({
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
+  minHeight: 0,
   padding: '8px 16px 0',
 });
 
@@ -43,8 +46,20 @@ export const form = style({
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
-  gap: vars.space[20],
+  minHeight: 0,
   minWidth: 0,
+});
+
+export const fields = style({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: vars.space[20],
+  overflowY: 'auto',
+  scrollPaddingBlock: vars.space[8],
+  // Let focus rings reach into the gutter without changing the field alignment.
+  margin: '-4px -4px 0',
+  padding: '4px 4px 8px',
 });
 
 export const label = style({
@@ -81,8 +96,16 @@ export const shop = style({ ...typography.body3Medium, color: vars.color.text.de
 export const productName = style({ ...typography.body2Medium, overflowWrap: 'anywhere' });
 export const price = style({ ...typography.title2Bold });
 
-export const inline = style({ display: 'flex', alignItems: 'center', gap: vars.space[4] });
-export const grow = style({ flex: 1, minWidth: 0 });
+export const inline = style({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+  alignItems: 'start',
+  gap: vars.space[4],
+});
+export const grow = style({
+  minWidth: 0,
+  '@media': { '(max-width: 359px)': { gridColumn: '1 / -1' } },
+});
 
 export const tags = style({
   display: 'flex',
@@ -104,7 +127,7 @@ export const removeTag = style({
 });
 export const addTag = style({
   background: vars.color.background,
-  border: `1px solid ${vars.color.border.default}`,
+  boxShadow: `inset 0 0 0 1px ${vars.color.border.default}`,
 });
 
 export const boardPanel = style({
@@ -128,7 +151,7 @@ export const boardRow = style({
   minHeight: 34,
   gap: vars.space[8],
 });
-export const boardCheck = style({});
+export const boardCheck = style({ position: 'relative' });
 globalStyle(`${boardCheck} > span[aria-hidden]`, { width: 20, height: 20 });
 export const boardCount = style({ ...typography.caption2Medium, color: vars.color.text.default });
 export const boardActions = style({
@@ -170,6 +193,7 @@ export const cardOption = style({
   gap: vars.space[4],
   ...typography.body3Medium,
   cursor: 'pointer',
+  '@media': { '(min-width: 480px)': { flex: '1 1 0', minWidth: 0 } },
   selectors: {
     '&[aria-pressed="true"]': {
       backgroundColor: vars.palette.gray800,
@@ -179,6 +203,7 @@ export const cardOption = style({
 });
 export const template = style({
   width: 84,
+  maxWidth: '100%',
   height: 84,
   objectFit: 'contain',
   borderRadius: vars.radius.s,
@@ -194,7 +219,9 @@ export const error = style({
   color: vars.color.status.negative,
 });
 export const footer = style({
-  marginTop: 'auto',
-  paddingTop: vars.space[40],
-  paddingBottom: 'max(24px, env(safe-area-inset-bottom, 0px))',
+  display: 'grid',
+  gap: vars.space[8],
+  flexShrink: 0,
+  paddingTop: vars.space[12],
+  paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))',
 });

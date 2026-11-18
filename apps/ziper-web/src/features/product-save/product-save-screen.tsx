@@ -154,10 +154,12 @@ export function ProductSaveScreen({ url, api, onClose, initialDraft, savedMessag
     return (
       <ScreenShell onClose={onClose}>
         <div className={styles.form}>
-          <SharedLink url={url} />
-          <p className={styles.feedback} role="status">
-            상품 저장 서비스는 아직 연결되지 않았어요.
-          </p>
+          <div className={styles.fields}>
+            <SharedLink url={url} />
+            <p className={styles.feedback} role="status">
+              상품 저장 서비스는 아직 연결되지 않았어요.
+            </p>
+          </div>
           <footer className={styles.footer}>
             <Button disabled>보드에 저장하기</Button>
           </footer>
@@ -333,162 +335,170 @@ function ProductForm({
           void save();
         }}
       >
-        <SharedLink url={url} />
-        {product ? (
-          <div className={styles.productCard}>
-            {product.imageURL ? (
-              <img
-                className={styles.productImage}
-                src={product.imageURL}
-                alt=""
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span className={styles.productImage} />
-            )}
-            <div className={styles.productInfo}>
-              <span className={styles.shop}>{product.shop}</span>
-              <span className={styles.productName}>{product.name}</span>
-              <strong className={styles.price}>{won.format(product.price)}원</strong>
+        <div className={styles.fields}>
+          <SharedLink url={url} />
+          {product ? (
+            <div className={styles.productCard}>
+              {product.imageURL ? (
+                <img
+                  className={styles.productImage}
+                  src={product.imageURL}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className={styles.productImage} />
+              )}
+              <div className={styles.productInfo}>
+                <span className={styles.shop}>{product.shop}</span>
+                <span className={styles.productName}>{product.name}</span>
+                <strong className={styles.price}>{won.format(product.price)}원</strong>
+              </div>
             </div>
-          </div>
-        ) : (
-          <>
-            <TextField
-              label="상품명"
-              variant="box"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onClear={() => setName('')}
-              maxLength={200}
-            />
-            <TextField
-              label="가격"
-              variant="box"
-              value={price && won.format(Number(price))}
-              inputMode="numeric"
-              placeholder="ex)10,000원"
-              onChange={(event) => setPrice(event.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-            />
-            <CardImagePicker image={image} setImage={setImage} />
-          </>
-        )}
-        <section className={styles.group} aria-label="해시태그">
-          <p className={styles.label}>해시태그</p>
-          <div className={styles.tags}>
-            {tags.map((value) => (
-              <span className={styles.customTag} key={value}>
+          ) : (
+            <>
+              <TextField
+                label="상품명"
+                variant="box"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                onClear={() => setName('')}
+                maxLength={200}
+              />
+              <TextField
+                label="가격"
+                variant="box"
+                value={price && won.format(Number(price))}
+                inputMode="numeric"
+                placeholder="ex)10,000원"
+                onChange={(event) =>
+                  setPrice(event.target.value.replace(/[^0-9]/g, '').slice(0, 10))
+                }
+              />
+              <CardImagePicker image={image} setImage={setImage} />
+            </>
+          )}
+          <section className={styles.group} aria-label="해시태그">
+            <p className={styles.label}>해시태그</p>
+            <div className={styles.tags}>
+              {tags.map((value) => (
+                <span className={styles.customTag} key={value}>
+                  <ChipFilter
+                    selected={selectedTags.includes(value)}
+                    onClick={() => setSelectedTags(toggle(selectedTags, value))}
+                  >
+                    {value}
+                  </ChipFilter>
+                  {!initialTags.includes(value) && (
+                    <button
+                      type="button"
+                      className={styles.removeTag}
+                      aria-label={value + ' 해시태그 삭제'}
+                      onClick={() => {
+                        setTags(tags.filter((item) => item !== value));
+                        setSelectedTags(selectedTags.filter((item) => item !== value));
+                      }}
+                    >
+                      <Icon name="xmark-circle-fill" size={16} />
+                    </button>
+                  )}
+                </span>
+              ))}
+              {tag === null && (
                 <ChipFilter
-                  selected={selectedTags.includes(value)}
-                  onClick={() => setSelectedTags(toggle(selectedTags, value))}
+                  className={styles.addTag}
+                  aria-pressed={undefined}
+                  onClick={() => setTag('')}
                 >
-                  {value}
+                  +직접 추가
                 </ChipFilter>
-                {!initialTags.includes(value) && (
+              )}
+            </div>
+            {tag !== null && (
+              <InlineEntry
+                label="새 해시태그"
+                value={tag}
+                maxLength={6}
+                action="추가"
+                disabled={!canAddTag}
+                onChange={setTag}
+                onConfirm={addTag}
+                onCancel={() => setTag(null)}
+              />
+            )}
+          </section>
+          <TextField
+            label="한 줄 메모(선택)"
+            variant="box"
+            value={memo}
+            onChange={(event) => setMemo(event.target.value)}
+            onClear={() => setMemo('')}
+            maxLength={100}
+          />
+          <section className={styles.group} aria-label="보드 선택">
+            <p className={styles.label}>보드 선택</p>
+            <div className={styles.boardPanel}>
+              {boards.length > 0 ? (
+                <ul className={styles.boardList} ref={boardList}>
+                  {boards.map((board) => (
+                    <li className={styles.boardRow} key={board.id}>
+                      <Checkbox
+                        className={styles.boardCheck}
+                        checked={selectedBoards.includes(board.id)}
+                        onChange={() => setSelectedBoards(toggle(selectedBoards, board.id))}
+                      >
+                        {board.name}
+                      </Checkbox>
+                      <span className={styles.boardCount}>{board.productCount}개</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={styles.feedback}>첫 보드를 만들어 주세요.</p>
+              )}
+              <div className={styles.boardActions}>
+                {boardName === null ? (
                   <button
                     type="button"
-                    className={styles.removeTag}
-                    aria-label={value + ' 해시태그 삭제'}
-                    onClick={() => {
-                      setTags(tags.filter((item) => item !== value));
-                      setSelectedTags(selectedTags.filter((item) => item !== value));
-                    }}
+                    className={styles.addBoard}
+                    onClick={() => setBoardName('')}
                   >
-                    <Icon name="xmark-circle-fill" size={16} />
+                    <Icon name="plus-small-line" size={16} />새 보드 만들기
                   </button>
+                ) : (
+                  <InlineEntry
+                    label="새 보드 이름"
+                    value={boardName}
+                    maxLength={10}
+                    action="완료"
+                    variant="secondary"
+                    placeholder="보드 이름"
+                    helperText="최대 10자까지 입력 가능해요"
+                    loading={creating}
+                    disabled={!canCreateBoard}
+                    onChange={setBoardName}
+                    onConfirm={() => void createBoard()}
+                    onCancel={() => {
+                      setBoardError(false);
+                      setBoardName(null);
+                    }}
+                  />
                 )}
-              </span>
-            ))}
-            {tag === null && (
-              <ChipFilter
-                className={styles.addTag}
-                aria-pressed={undefined}
-                onClick={() => setTag('')}
-              >
-                +직접 추가
-              </ChipFilter>
-            )}
-          </div>
-          {tag !== null && (
-            <InlineEntry
-              label="새 해시태그"
-              value={tag}
-              maxLength={6}
-              action="추가"
-              disabled={!canAddTag}
-              onChange={setTag}
-              onConfirm={addTag}
-              onCancel={() => setTag(null)}
-            />
-          )}
-        </section>
-        <TextField
-          label="한 줄 메모(선택)"
-          variant="box"
-          value={memo}
-          onChange={(event) => setMemo(event.target.value)}
-          onClear={() => setMemo('')}
-          maxLength={100}
-        />
-        <section className={styles.group} aria-label="보드 선택">
-          <p className={styles.label}>보드 선택</p>
-          <div className={styles.boardPanel}>
-            {boards.length > 0 ? (
-              <ul className={styles.boardList} ref={boardList}>
-                {boards.map((board) => (
-                  <li className={styles.boardRow} key={board.id}>
-                    <Checkbox
-                      className={styles.boardCheck}
-                      checked={selectedBoards.includes(board.id)}
-                      onChange={() => setSelectedBoards(toggle(selectedBoards, board.id))}
-                    >
-                      {board.name}
-                    </Checkbox>
-                    <span className={styles.boardCount}>{board.productCount}개</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={styles.feedback}>첫 보드를 만들어 주세요.</p>
-            )}
-            <div className={styles.boardActions}>
-              {boardName === null ? (
-                <button type="button" className={styles.addBoard} onClick={() => setBoardName('')}>
-                  <Icon name="plus-small-line" size={16} />새 보드 만들기
-                </button>
-              ) : (
-                <InlineEntry
-                  label="새 보드 이름"
-                  value={boardName}
-                  maxLength={10}
-                  action="완료"
-                  variant="secondary"
-                  placeholder="보드 이름"
-                  helperText="최대 10자까지 입력 가능해요"
-                  loading={creating}
-                  disabled={!canCreateBoard}
-                  onChange={setBoardName}
-                  onConfirm={() => void createBoard()}
-                  onCancel={() => {
-                    setBoardError(false);
-                    setBoardName(null);
-                  }}
-                />
-              )}
-              {boardError && (
-                <p className={styles.error} role="alert">
-                  보드를 만들지 못했어요.
-                </p>
-              )}
+                {boardError && (
+                  <p className={styles.error} role="alert">
+                    보드를 만들지 못했어요.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
-        {saveError && (
-          <p className={styles.error} role="alert">
-            {saveError}
-          </p>
-        )}
+          </section>
+        </div>
         <footer className={styles.footer}>
+          {saveError && (
+            <p className={styles.error} role="alert">
+              {saveError}
+            </p>
+          )}
           <Button type="submit" loading={saveStatus === 'saving'} disabled={!canSave || creating}>
             보드에 저장하기
           </Button>
