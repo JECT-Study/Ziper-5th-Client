@@ -1,7 +1,3 @@
-import { registerRootComponent } from 'expo';
-
-// Must run before any StyleSheet.create so the theme is registered first.
+// Must run before Router loads any route or StyleSheet.create call.
 import './src/styles/unistyles';
-import App from './src/App';
-
-registerRootComponent(App);
+import 'expo-router/entry';
