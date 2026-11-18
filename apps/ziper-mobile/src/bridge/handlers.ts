@@ -30,7 +30,7 @@ export type HostServices = Readonly<{
   back: () => boolean;
   setDepth: (depth: number) => void;
   sheets: SheetSessions;
-  shareInbox?: ShareInbox;
+  shareInbox?: Pick<ShareInbox, 'read' | 'dismiss'>;
 }>;
 
 // Detect stripped extra properties as well as schema failures, including nested objects.

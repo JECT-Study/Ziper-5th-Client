@@ -142,6 +142,40 @@ it('navigates the real WebScreen Stack through its bridge delegate', async () =>
   expect(router.canGoBack()).toBe(false);
 });
 
+it.each(['web close', 'native Back'])(
+  '%s leaves the next share for the previous screen',
+  async (action) => {
+    sharing.payloads = [{ shareType: 'url', value: 'https://example.com/first' }];
+    const rendered = await renderRouter(routes);
+    const home = mockWebView.delegate!;
+    await act(async () => {
+      expect(
+        await home.navigationPushV1({ path: '/share-product', operationId: 'share-open' }),
+      ).toEqual(success({ handled: true }));
+    });
+    expect(rendered.getSearchParams()).toEqual({ path: '/share-product' });
+    const save = mockWebView.delegate!;
+    sharing.payloads = [{ shareType: 'url', value: 'https://example.com/second' }];
+    await act(() => {
+      DeviceEventEmitter.emit('appStateDidChange', { app_state: 'active' });
+    });
+    const first = success({ id: 'share-1', url: 'https://example.com/first' });
+    expect(await save.shareReadV1()).toEqual(first);
+    if (action === 'web close') {
+      expect(await save.shareDismissV1({ id: 'share-1' })).toEqual(success({ done: true }));
+      expect(await save.shareReadV1()).toEqual(first);
+      await save.shareDismissV1({ id: 'share-2' });
+    }
+    await act(async () => {
+      expect(await save.navigationBackV1()).toEqual(success({ handled: true }));
+    });
+    expect(rendered.getPathname()).toBe('/');
+    expect(await home.shareReadV1()).toEqual(
+      success({ id: 'share-2', url: 'https://example.com/second' }),
+    );
+  },
+);
+
 it('refuses an external path supplied through a deep link', async () => {
   await renderRouter(routes, { initialUrl: '/web?path=%2F%2Fevil.test' });
   expect(screen.getByText('Invalid service-relative page path.')).toBeTruthy();
