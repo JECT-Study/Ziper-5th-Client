@@ -99,7 +99,14 @@ export function BridgeProvider({
       const sync = () => {
         void instance.syncHistory().catch(onError);
       };
-      const unbindHistory = router.history.subscribe(sync);
+      let pathname = router.history.location.pathname;
+      const unbindHistory = router.history.subscribe(({ location }) => {
+        if (location.pathname !== pathname) {
+          pathname = location.pathname;
+          sheets.leaveRoute();
+        }
+        sync();
+      });
       const unbindRuntime = next.subscribe(() => {
         if (next.status === 'native') sync();
       });

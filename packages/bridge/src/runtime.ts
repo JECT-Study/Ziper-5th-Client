@@ -482,20 +482,24 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
       },
     },
     sheets: {
-      async actions(input: Omit<SheetInput, 'operationId'> & { operationId?: string }) {
+      async actions(input: Omit<SheetInput, 'operationId'>) {
         check();
         const parsed = methods.sheetActionsV1.input.safeParse({
           ...input,
-          operationId: input.operationId ?? operationId(),
+          operationId: operationId(),
         });
         if (!parsed.success) throw new BridgeError('INVALID_REQUEST');
         // Lock before negotiation; a late native handshake must not stack a second sheet.
         if (sheetBusy) throw new BridgeError('PERMISSION_DENIED');
         sheetBusy = true;
         try {
+          const scope = web.sheets.getScope?.();
           const value = await fallback(
             () => native(capability.sheet, 'sheetActionsV1', parsed.data),
-            () => web.sheets.actions(parsed.data, lifetime.signal),
+            () =>
+              scope === web.sheets.getScope?.()
+                ? web.sheets.actions(parsed.data, lifetime.signal)
+                : Promise.resolve({ status: 'cancelled' as const }),
           );
           const output = methods.sheetActionsV1.output.safeParse(value);
           if (!output.success) throw new BridgeError('NATIVE_ERROR');

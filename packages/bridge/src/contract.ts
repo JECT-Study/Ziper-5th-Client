@@ -235,7 +235,11 @@ export interface WebNavigation {
 export interface WebServices {
   auth?: WebAuthService;
   navigation: WebNavigation;
-  sheets: { actions(input: SheetInput, signal?: AbortSignal): Promise<SheetResult> };
+  sheets: {
+    actions(input: SheetInput, signal?: AbortSignal): Promise<SheetResult>;
+    // Changes when the web route leaves, including while native support is still being negotiated.
+    getScope?(): number;
+  };
 }
 
 export type RuntimeStatus = 'initializing' | 'web' | 'native' | 'unavailable' | 'closed';

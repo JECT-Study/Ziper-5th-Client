@@ -170,6 +170,45 @@ it('releases StrictMode/pagehide state and reinitializes BFCache callbacks witho
 
 const sheetActions = [{ id: 'save', label: '저장' }];
 
+it('keeps a web sheet through query and hash changes and cancels it on browser Back to another route', async () => {
+  window.history.replaceState(null, '', '/');
+  const router = setup(true);
+  await mount(router, 'web');
+  await act(async () => createWebNavigation(router).push('/next'));
+  const { result, element } = await openWebSheet();
+
+  await act(async () => router.history.replace('/next?tab=other#top'));
+  await vi.waitFor(() => expect(router.state.location.href).toBe('/next?tab=other#top'));
+  expect(element.isConnected && element.open).toBe(true);
+
+  await act(async () => {
+    window.history.back();
+    await vi.waitFor(() => expect(router.history.location.pathname).toBe('/'));
+  });
+  expect(router.state.location.pathname).toBe('/');
+  await expect(result).resolves.toEqual({ status: 'cancelled' });
+  expect(document.querySelector('dialog')).toBeNull();
+
+  const reopened = await openWebSheet();
+  await act(async () => reopened.element.close());
+  await expect(reopened.result).resolves.toEqual({ status: 'cancelled' });
+  router.history.destroy();
+});
+
+it('does not open a web fallback if its requesting route was left before presentation', async () => {
+  const router = setup();
+  await mount(router, 'web');
+  let result!: ReturnType<typeof captured.platform.sheets.actions>;
+  await act(async () => {
+    result = captured.platform.sheets.actions({ title: '작업 선택', actions: sheetActions });
+    router.history.push('/next');
+  });
+  await expect(result).resolves.toEqual({ status: 'cancelled' });
+  expect(router.state.location.pathname).toBe('/next');
+  expect(document.querySelector('dialog')).toBeNull();
+  router.history.destroy();
+});
+
 it('renders the design system dialog, settles selection once, and restores focus', async () => {
   const router = setup();
   await mount(router, 'web');

@@ -91,11 +91,11 @@ afterEach(() => {
 });
 const signedIn: Session = { status: 'signedIn', profile: { id: 'account', displayName: null } };
 
-const sheetInput = {
+const sheetRequest = {
   title: 'Actions',
-  operationId: 'sheet',
   actions: [{ id: 'save', label: 'Save' }],
 };
+const sheetInput = { ...sheetRequest, operationId: 'sheet' };
 
 function webServices(): WebServices & { auth: NonNullable<WebServices['auth']> } {
   return {
@@ -134,14 +134,19 @@ describe('production runtime', () => {
     const platform = createPlatform(makeRuntime(), web);
     try {
       await platform.navigation.push('/profile');
-      await expect(
-        platform.sheets.actions({ title: 'Actions', actions: sheetInput.actions }),
-      ).resolves.toEqual({ status: 'selected', actionId: 'save' });
+      await expect(platform.sheets.actions(sheetRequest)).resolves.toEqual({
+        status: 'selected',
+        actionId: 'save',
+      });
+      // @ts-expect-error The public API doesn't accept operationId, even though RPC does.
+      const repeated = platform.sheets.actions({ ...sheetRequest, operationId: 'caller-supplied' });
+      await expect(repeated).resolves.toEqual({ status: 'selected', actionId: 'save' });
       const ids = calls
         .filter((call) => call.method === 'navigationPushV1' || call.method === 'sheetActionsV1')
         .map((call) => (call.args[0] as { operationId: string }).operationId);
-      expect(ids).toHaveLength(2);
-      expect(new Set(ids).size).toBe(2);
+      expect(ids).toHaveLength(3);
+      expect(new Set(ids).size).toBe(3);
+      expect(ids).not.toContain('caller-supplied');
       expect(ids.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 128)).toBe(
         true,
       );
@@ -774,24 +779,20 @@ describe('platform navigation and sheets', () => {
     const runtime = makeRuntime();
     const platform = createPlatform(runtime, web);
 
-    const first = platform.sheets.actions(sheetInput);
+    const first = platform.sheets.actions(sheetRequest);
     await vi.waitFor(() => expect(web.sheets.actions).toHaveBeenCalledOnce());
     const { calls } = host({
       capabilities: [capability.sheet],
       reply: () => success({ status: 'selected', actionId: 'save' }),
     });
     await runtime.initialize();
-    await expect(
-      platform.sheets.actions({ ...sheetInput, operationId: 'other' }),
-    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
-    expect(calls.map((call) => call.method)).toEqual(['getBridgeInfoV1']);
-
-    await expect(platform.sheets.actions(sheetInput)).rejects.toMatchObject({
+    await expect(platform.sheets.actions(sheetRequest)).rejects.toMatchObject({
       code: 'PERMISSION_DENIED',
     });
+    expect(calls.map((call) => call.method)).toEqual(['getBridgeInfoV1']);
     visible.resolve({ status: 'selected', actionId: 'save' });
     await expect(first).resolves.toEqual({ status: 'selected', actionId: 'save' });
-    await expect(platform.sheets.actions(sheetInput)).resolves.toEqual({
+    await expect(platform.sheets.actions(sheetRequest)).resolves.toEqual({
       status: 'selected',
       actionId: 'save',
     });
@@ -808,7 +809,9 @@ describe('platform navigation and sheets', () => {
         reply: () => failure('UNSUPPORTED'),
       });
       const web = webServices();
-      await expect(createPlatform(makeRuntime(), web).sheets.actions(sheetInput)).resolves.toEqual({
+      await expect(
+        createPlatform(makeRuntime(), web).sheets.actions(sheetRequest),
+      ).resolves.toEqual({
         status: 'cancelled',
       });
       expect(web.sheets.actions).toHaveBeenCalledOnce();
@@ -829,7 +832,7 @@ describe('platform navigation and sheets', () => {
       });
       const web = webServices();
       const platform = createPlatform(makeRuntime({ interactiveTimeoutMs: 150 }), web);
-      await expect(platform.sheets.actions(sheetInput)).rejects.toMatchObject({ code });
+      await expect(platform.sheets.actions(sheetRequest)).rejects.toMatchObject({ code });
       expect(web.sheets.actions).not.toHaveBeenCalled();
       expect(calls.filter((call) => call.method === method)).toHaveLength(1);
     },
@@ -842,7 +845,7 @@ describe('platform navigation and sheets', () => {
     });
     const web = webServices();
     const platform = createPlatform(makeRuntime(), web);
-    const input = sheetInput;
+    const input = sheetRequest;
     await expect(platform.sheets.actions(input)).rejects.toMatchObject({ code: 'NATIVE_ERROR' });
     await expect(
       platform.sheets.actions({ ...input, actions: [input.actions[0], input.actions[0]] }),
