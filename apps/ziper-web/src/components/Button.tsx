@@ -40,7 +40,11 @@ export function Button({
         {children}
         {rightIcon && <Icon name={rightIcon} size={ICON_SIZE[size]} />}
       </span>
-      {loading && <Spinner className={styles.loadingIcon} size={SPINNER_SIZE[size]} />}
+      {loading && (
+        <span className={styles.loadingIcon} aria-hidden="true">
+          <Spinner size={SPINNER_SIZE[size]} />
+        </span>
+      )}
     </button>
   );
 }

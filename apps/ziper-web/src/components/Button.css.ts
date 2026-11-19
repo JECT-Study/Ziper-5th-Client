@@ -27,7 +27,7 @@ export const content = style({
   selectors: { [`${base}[aria-busy="true"] > &`]: { opacity: 0 } },
 });
 
-export const loadingIcon = style({ gridArea: '1 / 1' });
+export const loadingIcon = style({ display: 'inline-flex', gridArea: '1 / 1' });
 
 export const variant = styleVariants({
   primary: {

@@ -1,6 +1,6 @@
 # JEC-24 이후 디자인 시스템: 웹·WebView·React Native
 
-**권고:** 브라우저와 WebView의 일반 화면은 현재 TanStack Start + Vanilla Extract를 그대로 쓴다. 네이티브로 표시해야 하는 UI만 별도 렌더러로 구현한다. 두 곳에 같은 UI가 실제로 필요할 때 **값으로 된 토큰 → 작은 공통 컴포넌트 계약 → 플랫폼별 구현** 순서로 공유한다. 브릿지에는 직렬화 가능한 데이터와 결과만 전달한다. 이 브랜치는 액션 시트만 구현하며 디자인 시스템 패키지 이동이나 신규 라이브러리 도입은 하지 않는다.
+**권고:** 브라우저와 WebView의 일반 화면은 현재 TanStack Start + Vanilla Extract를 그대로 쓴다. 네이티브로 표시해야 하는 UI만 별도 렌더러로 구현한다. 두 곳에 같은 UI가 실제로 필요할 때 **값으로 된 토큰 → 작은 공통 컴포넌트 계약 → 플랫폼별 구현** 순서로 공유한다. 브릿지에는 직렬화 가능한 데이터와 결과만 전달한다. JEC-24에서는 액션 시트와 공통 토큰만 도입하고, Button과 웹 Vanilla Extract 테마는 각 앱에 둔다. `packages/ui` 도입은 보류한다.
 
 - 이슈: [JEC-24](https://linear.app/ject5-team6/issue/JEC-24), [JEC-19](https://linear.app/ject5-team6/issue/JEC-19)
 - 조사 근거: Figma MCP로 [Components](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=488-2999)와 [IA+화면디자인](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=10-3) 트리를 조회했다. 아래 주요 노드는 상세 디자인 컨텍스트까지 확인했다. Figma 원본은 변경하지 않았다.
@@ -18,7 +18,7 @@
 | [Heading 274:982](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=274-982) — 제목·설명·구분선 레이아웃                                                                                                                              | 신설 후보: 전용 `Heading` export가 없다. `HeaderMain/Sub`는 화면 헤더로 용도가 다르다. Figma에서 독립 Symbol이 아닌 프레임이므로 반복 사용 확인 전에는 추출하지 않는다. | 시트 제목은 현 구현으로 충분하다. 설명/구분선까지 반복되는 경우만 네이티브 대응.                                                                                                                                                        |
 | [Modal 619:6699](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=619-6699), [Toast 701:6008](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=701-6008), header/chips/divider/segmented/nav/social                       | 주요 export가 이미 있다. `TextField`의 Timer/Password도 속성으로 제공된다. Toast는 화면이 위치/수명을 정하는 UI이지 범용 알림 큐가 아니다.                              | 현재 네이티브 복제 불필요. 네이티브가 기능을 소유하는 경우에 한해 필요한 것부터 추가. Figma OS status bar/home indicator/keyboard는 앱 공통 컴포넌트가 아닌 OS 책임.                                                                    |
 
-**우선순위:** P0 액션 시트·취소·공통 브릿지 오류(이번 변경) → P1 다음 양쪽 소비처에서 색/크기/타이포 토큰과 Button/Footer/Icon → P2 기능 요구가 확정된 보드 폼 또는 다중 선택. Figma 컴포넌트에 슬롯이 있다는 이유로 브릿지에 임의 슬롯·함수·HTML을 추가하지 않는다.
+**우선순위:** P0 액션 시트·취소·공통 브릿지 오류 → P1 양쪽 앱의 색/크기/타이포 토큰 공유 → P2 실제 재사용처가 생긴 UI나 기능 요구가 확정된 보드 폼·다중 선택. Figma 컴포넌트에 슬롯이 있다는 이유로 브릿지에 임의 슬롯·함수·HTML을 추가하지 않는다.
 
 ## 접근 비교
 
