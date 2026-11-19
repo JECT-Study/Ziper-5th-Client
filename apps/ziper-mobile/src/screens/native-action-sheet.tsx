@@ -1,5 +1,6 @@
 import { BottomSheet, RNHostView } from '@expo/ui';
 import type { SheetInput } from '@ziper/bridge/contract';
+import { buttonHeight, colors, radius, space, typeScale } from '@ziper/design-tokens';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export function NativeActionSheet({
@@ -17,7 +18,7 @@ export function NativeActionSheet({
       onDismiss={onCancel}
       shouldDismissOnBackPress
       snapPoints={['half', 'full']}
-      containerColor="#ffffff"
+      containerColor={colors.background}
       contentPadding={0}
     >
       <RNHostView>
@@ -67,22 +68,22 @@ function SheetButton({
 }
 
 const styles = StyleSheet.create({
-  panel: { flex: 1, backgroundColor: '#ffffff' },
-  title: { padding: 16, color: '#222222', fontSize: 20, fontWeight: '700' },
+  panel: { flex: 1, backgroundColor: colors.background },
+  title: { padding: space[16], color: colors.textStrong, ...typeScale.title1Bold },
   list: { flex: 1 },
-  rows: { gap: 8, paddingHorizontal: 16, paddingVertical: 4 },
-  footer: { padding: 16 },
+  rows: { gap: space[8], paddingHorizontal: space[16], paddingVertical: space[4] },
+  footer: { padding: space[16] },
   button: {
-    minHeight: 48,
+    minHeight: buttonHeight.large,
     cursor: 'pointer',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: space[16],
+    paddingVertical: space[12],
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: '#f1f1f1',
+    borderRadius: radius.s,
+    backgroundColor: colors.secondary.default,
   },
-  pressed: { backgroundColor: '#e3e3e3' },
-  label: { color: '#222222', fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  destructive: { color: '#97000d' },
+  pressed: { backgroundColor: colors.secondary.pressed },
+  label: { ...typeScale.title3Bold, color: colors.textStrong, textAlign: 'center' },
+  destructive: { color: colors.textDestructive },
 });

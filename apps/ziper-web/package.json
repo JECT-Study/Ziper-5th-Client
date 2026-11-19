@@ -15,6 +15,7 @@
     "@vanilla-extract/css": "^1.21.3",
     "@ziper/api": "workspace:*",
     "@ziper/bridge": "workspace:*",
+    "@ziper/design-tokens": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
