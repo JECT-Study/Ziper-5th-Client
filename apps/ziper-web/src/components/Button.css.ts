@@ -12,9 +12,7 @@ export const base = style({
   color: vars.color.text.strong,
   fontFamily: 'inherit',
   whiteSpace: 'nowrap',
-  cursor: 'pointer',
   selectors: {
-    '&:disabled': { cursor: 'default' },
     [DISABLED]: { color: vars.color.text.disabled },
   },
   ':focus-visible': { outline: `2px solid ${vars.palette.lime600}`, outlineOffset: 2 },

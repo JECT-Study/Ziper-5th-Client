@@ -35,16 +35,18 @@ export function BottomSheet({
       <div className={styles.handlerArea}>
         <span className={styles.handler} />
       </div>
-      <div className={styles.titleBar}>
-        <h2 id={titleId} className={styles.title}>
-          {title}
-        </h2>
-        <button type="button" className={styles.close} onClick={onClose} aria-label="닫기">
-          <Icon name="xmark-line" />
-        </button>
+      <div className={styles.contents}>
+        <div className={styles.titleBar}>
+          <h2 id={titleId} className={styles.title}>
+            {title}
+          </h2>
+          <button type="button" className={styles.close} onClick={onClose} aria-label="닫기">
+            <Icon name="xmark-line" />
+          </button>
+        </div>
+        {children}
       </div>
-      <div className={styles.contents}>{children}</div>
-      {footer}
+      {footer && <div className={styles.footer}>{footer}</div>}
     </Dialog>
   );
 }

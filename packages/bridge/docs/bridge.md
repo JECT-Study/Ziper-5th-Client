@@ -28,7 +28,7 @@ v1 입력은 엄격하게 고정한다. 새 입력 필드는 버전이나 기능
 
 ## 액션 바텀시트
 
-- `platform.sheets.actions()`는 한 번에 한 시트만 연다. 같은 요청 ID와 내용의 진행 중 호출은 결과를 공유하며, 그 외 동시 호출은 `PERMISSION_DENIED`다.
+- `platform.sheets.actions()`는 한 번에 한 시트만 연다. 진행 중인 시트에 대한 동시 호출은 요청 ID가 같아도 `PERMISSION_DENIED`다. 네이티브 전송 계층에서의 중복 제거는 그대로 유지한다.
 - 브라우저 또는 지원되지 않는 앱에서는 디자인 시스템 `BottomSheet`를, 지원 앱에서는 문서 범위의 `SheetSessions`와 Expo UI 시트를 사용한다. 선택은 `{ status: 'selected', actionId }`, 사용자 닫기는 `{ status: 'cancelled' }`이다. 실제 저장·삭제는 호출 화면에서 실행한다.
 - 웹은 X/취소/배경/Escape로, 네이티브는 취소/플랫폼 dismiss(스와이프, Android Back 등)로 닫는다. 연결 종료는 `BRIDGE_CLOSED`다. `RESULT_UNKNOWN`은 웹이 응답을 더 이상 기다리지 않는다는 뜻이지 네이티브가 자동으로 닫힌다는 뜻이 아니다. 웹 시트 전환이나 자동 재호출 없이 사용자가 네이티브 시트를 닫을 수 있어야 한다.
 - 웹의 `platformErrorMessage`는 브릿지 오류를 화면용 문구로 바꾼다. 화면 이탈로 인한 종료와 정상 취소에는 알림을 띄우지 않는다. 기능별 검증·실패 처리는 호출부 책임이다.

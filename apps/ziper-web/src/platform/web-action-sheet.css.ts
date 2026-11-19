@@ -14,6 +14,7 @@ export const action = style({
       minHeight: 48,
       paddingBlock: vars.space[8],
       whiteSpace: 'normal',
+      wordBreak: 'keep-all',
       overflowWrap: 'anywhere',
     },
   },

@@ -81,7 +81,6 @@ export const action = style({
   border: 'none',
   background: 'none',
   color: vars.color.icon.default,
-  cursor: 'pointer',
 });
 
 const helperBase = style({

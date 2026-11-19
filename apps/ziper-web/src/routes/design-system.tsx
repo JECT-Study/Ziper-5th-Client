@@ -287,11 +287,16 @@ function PlatformSheetExample() {
     setFeedback(null);
     try {
       const result = await platform.sheets.actions({
-        title: '작업 선택',
+        title: longList
+          ? '좁은 화면에서 긴 제목과 항목을 확인해요. 아래로 스크롤하면 마지막 항목까지 선택할 수 있어요.'
+          : '작업 선택',
         actions: longList
           ? Array.from({ length: 20 }, (_, index) => ({
               id: `action-${index + 1}`,
-              label: `선택 항목 ${index + 1}`,
+              label:
+                index === 0
+                  ? '선택 항목 1 · 화면 너비를 넘는 긴 문구도 버튼 안에서 자연스럽게 줄바꿈돼요.'
+                  : `선택 항목 ${index + 1}`,
             }))
           : [
               { id: 'save', label: '저장' },

@@ -11,8 +11,7 @@ const base = style({
   fontFamily: 'inherit',
   ...typography.title3Bold,
   textAlign: 'center',
-  cursor: 'pointer',
-  ':disabled': { opacity: 0.6, cursor: 'default' },
+  ':disabled': { opacity: 0.6 },
   ':focus-visible': { outline: `2px solid ${vars.palette.lime600}`, outlineOffset: 2 },
 });
 

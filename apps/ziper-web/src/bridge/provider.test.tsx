@@ -222,7 +222,7 @@ it.each(['x', 'cancel button', 'escape', 'backdrop'])(
       else if (mode === 'escape') element.dispatchEvent(new Event('cancel', { cancelable: true }));
       else {
         vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 20, 200, 100));
-        element.dispatchEvent(new MouseEvent('click', { bubbles: true, clientY: 10 }));
+        clickFrom(element, 10, 10);
       }
       await expect(result).resolves.toEqual({ status: 'cancelled' });
     });
@@ -230,6 +230,32 @@ it.each(['x', 'cancel button', 'escape', 'backdrop'])(
     router.history.destroy();
   },
 );
+
+function clickFrom(dialog: HTMLDialogElement, startY: number, endY: number) {
+  dialog.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, isPrimary: true, clientY: startY }),
+  );
+  dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientY: endY }));
+}
+
+it('keeps the sheet open when a press starts or ends inside it', async () => {
+  const router = setup();
+  await mount(router, 'web');
+  const { element, result } = await openWebSheet();
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 20, 200, 100));
+
+  await act(async () => {
+    clickFrom(element, 40, 10);
+    clickFrom(element, 10, 40);
+  });
+  expect(element.open).toBe(true);
+
+  await act(async () => {
+    clickFrom(element, 10, 10);
+    await expect(result).resolves.toEqual({ status: 'cancelled' });
+  });
+  router.history.destroy();
+});
 
 it('clears failed web presentations and aborts an open one on pagehide', async () => {
   const router = setup();

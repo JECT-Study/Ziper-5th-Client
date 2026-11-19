@@ -22,18 +22,20 @@ export function NativeActionSheet({
     >
       <RNHostView>
         <View style={styles.panel} accessibilityViewIsModal>
-          <Text accessible accessibilityRole="header" style={styles.title}>
-            {input.title || '작업 선택'}
-          </Text>
-          <ScrollView nestedScrollEnabled style={styles.list} contentContainerStyle={styles.rows}>
-            {input.actions.map((action) => (
-              <SheetButton
-                key={action.id}
-                label={action.label}
-                destructive={action.destructive}
-                onPress={() => onSelect(action.id)}
-              />
-            ))}
+          <ScrollView nestedScrollEnabled style={styles.list}>
+            <Text accessible accessibilityRole="header" style={styles.title}>
+              {input.title || '작업 선택'}
+            </Text>
+            <View style={styles.rows}>
+              {input.actions.map((action) => (
+                <SheetButton
+                  key={action.id}
+                  label={action.label}
+                  destructive={action.destructive}
+                  onPress={() => onSelect(action.id)}
+                />
+              ))}
+            </View>
           </ScrollView>
           <View style={styles.footer}>
             <SheetButton label="취소" onPress={onCancel} />
@@ -72,6 +74,7 @@ const styles = StyleSheet.create({
   footer: { padding: 16 },
   button: {
     minHeight: 48,
+    cursor: 'pointer',
     paddingHorizontal: 16,
     paddingVertical: 12,
     justifyContent: 'center',

@@ -786,12 +786,11 @@ describe('platform navigation and sheets', () => {
     ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
     expect(calls.map((call) => call.method)).toEqual(['getBridgeInfoV1']);
 
-    const same = platform.sheets.actions(sheetInput);
-    visible.resolve({ status: 'cancelled' });
-    await expect(Promise.all([first, same])).resolves.toEqual([
-      { status: 'cancelled' },
-      { status: 'cancelled' },
-    ]);
+    await expect(platform.sheets.actions(sheetInput)).rejects.toMatchObject({
+      code: 'PERMISSION_DENIED',
+    });
+    visible.resolve({ status: 'selected', actionId: 'save' });
+    await expect(first).resolves.toEqual({ status: 'selected', actionId: 'save' });
     await expect(platform.sheets.actions(sheetInput)).resolves.toEqual({
       status: 'selected',
       actionId: 'save',

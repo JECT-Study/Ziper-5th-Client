@@ -1,6 +1,14 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { cx } from './cx';
 import * as styles from './Dialog.css';
+
+function isBackdrop(event: MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false;
+  const { top, right, bottom, left } = event.currentTarget.getBoundingClientRect();
+  return (
+    event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom
+  );
+}
 
 export function Dialog({
   children,
@@ -23,6 +31,7 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const cleaningUp = useRef(false);
+  const pressedBackdrop = useRef(false);
 
   useLayoutEffect(() => {
     const dialog = ref.current;
@@ -57,6 +66,7 @@ export function Dialog({
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
+      data-dismiss-on-backdrop={dismissOnBackdrop || undefined}
       onClose={(event) => {
         // A delayed close event from StrictMode cleanup must not dismiss the reopened dialog.
         if (!cleaningUp.current && !event.currentTarget.open) onClose();
@@ -65,18 +75,23 @@ export function Dialog({
         event.preventDefault();
         onClose();
       }}
+      onPointerDown={
+        dismissOnBackdrop
+          ? (event) => {
+              if (event.isPrimary)
+                pressedBackdrop.current = event.button === 0 && isBackdrop(event);
+            }
+          : undefined
+      }
+      onPointerCancel={() => {
+        pressedBackdrop.current = false;
+      }}
       onClick={
         dismissOnBackdrop
           ? (event) => {
-              if (event.target !== event.currentTarget) return;
-              const { top, right, bottom, left } = event.currentTarget.getBoundingClientRect();
-              if (
-                event.clientX < left ||
-                event.clientX > right ||
-                event.clientY < top ||
-                event.clientY > bottom
-              )
-                onClose();
+              const shouldClose = pressedBackdrop.current && event.detail > 0 && isBackdrop(event);
+              pressedBackdrop.current = false;
+              if (shouldClose) onClose();
             }
           : undefined
       }
