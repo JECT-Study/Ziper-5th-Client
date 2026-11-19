@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 import { DeviceEventEmitter, Platform } from 'react-native';
+import { fireEvent } from '@testing-library/react-native';
+import type { ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { success } from '@ziper/bridge/contract';
 import type { BridgeDelegate } from '@webview-bridge/react-native';
@@ -38,7 +40,14 @@ vi.mock('../src/bridge/webview', async () => {
     },
   };
 });
-vi.mock('@expo/ui', () => ({ BottomSheet: () => null }));
+const mockSheet = vi.hoisted(() => ({ onDismiss: undefined as (() => void) | undefined }));
+vi.mock('@expo/ui', () => ({
+  BottomSheet: ({ children, onDismiss }: { children: ReactNode; onDismiss: () => void }) => {
+    mockSheet.onDismiss = onDismiss;
+    return children;
+  },
+  RNHostView: ({ children }: { children: ReactNode }) => children,
+}));
 
 const routes = {
   _layout: RootLayout,
@@ -79,6 +88,7 @@ it('keeps a cold-start share across native screens and only lets the focused scr
 
 afterEach(() => {
   mockWebView.delegate = null;
+  mockSheet.onDismiss = undefined;
   vi.useRealTimers();
 });
 
@@ -212,6 +222,61 @@ it('returns home when registration is the first native screen', async () => {
   });
   expect(rendered.getPathname()).toBe('/');
 });
+
+const sheet = {
+  title: '작업 선택',
+  operationId: 'first',
+  actions: [{ id: 'save', label: '저장' }],
+};
+
+it('opens a native sheet through the production delegate and ignores an obsolete dismiss event', async () => {
+  await renderRouter(routes);
+  const page = mockWebView.delegate!;
+  let first!: ReturnType<typeof page.sheetActionsV1>;
+  await act(async () => {
+    first = page.sheetActionsV1(sheet);
+  });
+  expect(screen.getByRole('header', { name: '작업 선택' })).toBeTruthy();
+  const oldDismiss = mockSheet.onDismiss!;
+  await fireEvent.press(screen.getByRole('button', { name: '저장' }));
+  await expect(first).resolves.toEqual(success({ status: 'selected', actionId: 'save' }));
+
+  let second!: typeof first;
+  await act(async () => {
+    second = page.sheetActionsV1({ ...sheet, operationId: 'second' });
+  });
+  await act(() => oldDismiss());
+  expect(screen.getByRole('header', { name: '작업 선택' })).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: '취소' }));
+  await expect(second).resolves.toEqual(success({ status: 'cancelled' }));
+  expect(screen.queryByRole('header', { name: '작업 선택' })).toBeNull();
+});
+
+it.each(['sheet dismiss', 'bridge back', 'route blur'] as const)(
+  'cancels the native sheet on %s',
+  async (mode) => {
+    const rendered = await renderRouter(routes);
+    await act(() => router.push({ pathname: '/web', params: { path: '/design-system' } }));
+    const page = mockWebView.delegate!;
+    let result!: ReturnType<typeof page.sheetActionsV1>;
+    await act(async () => {
+      result = page.sheetActionsV1(sheet);
+    });
+    if (mode === 'sheet dismiss') {
+      await act(() => mockSheet.onDismiss?.());
+    } else if (mode === 'bridge back') {
+      await act(async () => {
+        expect(await page.navigationBackV1()).toEqual(success({ handled: true }));
+      });
+      expect(rendered.getSearchParams()).toEqual({ path: '/design-system' });
+    } else {
+      await act(() => router.push({ pathname: '/web', params: { path: '/other' } }));
+      expect(rendered.getSearchParams()).toEqual({ path: '/other' });
+    }
+    await expect(result).resolves.toEqual(success({ status: 'cancelled' }));
+    expect(screen.queryByText('작업 선택')).toBeNull();
+  },
+);
 
 it('refuses an external path supplied through a deep link', async () => {
   await renderRouter(routes, { initialUrl: '/web?path=%2F%2Fevil.test' });

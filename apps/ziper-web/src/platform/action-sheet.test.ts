@@ -1,88 +1,49 @@
-// @vitest-environment happy-dom
-import { afterEach, expect, it, vi } from 'vitest';
-import { createWebSheets } from './action-sheet';
+import { expect, it, vi } from 'vitest';
+import { createWebSheets, type WebSheet } from './action-sheet';
 
 const input = {
   title: 'Choose action',
   operationId: 'sheet',
-  actions: [
-    { id: 'save', label: 'Save' },
-    { id: 'delete', label: 'Delete', destructive: true },
-  ],
+  actions: [{ id: 'save', label: 'Save' }],
 };
-afterEach(() => {
-  document.body.replaceChildren();
+
+it('settles once and does not let a stale callback close a new sheet', async () => {
+  const present = vi.fn<(sheet: WebSheet | null) => void>();
+  const sheets = createWebSheets(present);
+  const first = sheets.actions(input);
+  const old = present.mock.lastCall![0]!;
+  old.settle({ status: 'selected', actionId: 'save' });
+  await expect(first).resolves.toEqual({ status: 'selected', actionId: 'save' });
+  const second = sheets.actions(input);
+  const current = present.mock.lastCall![0]!;
+  old.settle({ status: 'cancelled' });
+  expect(present.mock.lastCall![0]).toBe(current);
+  current.settle({ status: 'cancelled' });
+  await expect(second).resolves.toEqual({ status: 'cancelled' });
 });
 
-it('opens an accessible modal, selects once, removes it and restores focus', async () => {
-  const trigger = document.createElement('button');
-  document.body.append(trigger);
-  trigger.focus();
-  const focus = vi.spyOn(trigger, 'focus');
-  const sheets = createWebSheets(document);
-  const result = sheets.actions(input);
-  const dialog = document.querySelector('dialog')!;
-  expect(dialog.open).toBe(true);
-  expect(dialog.getAttribute('aria-modal')).toBe('true');
-  expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe(
-    input.title,
-  );
-  const save = dialog.querySelector('button')!;
-  expect(document.activeElement).toBe(save);
-  save.click();
-  save.click();
-  sheets.dispose();
-  await expect(result).resolves.toEqual({ status: 'selected', actionId: 'save' });
-  expect(document.querySelector('dialog')).toBeNull();
-  expect(document.activeElement).toBe(trigger);
-  expect(focus).toHaveBeenCalledOnce();
-});
-
-it('opens and settles without the secure-context-only randomUUID API', async () => {
-  const uuid = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
-    throw new Error('randomUUID unavailable on development HTTP');
+it('rejects invalid input, overlapping requests, abort and disposal; releases the slot on failure', async () => {
+  const present = vi.fn<(sheet: WebSheet | null) => void>();
+  const sheets = createWebSheets(present);
+  await expect(sheets.actions({ ...input, actions: [] })).rejects.toMatchObject({
+    code: 'INVALID_REQUEST',
   });
-  const sheets = createWebSheets(document);
-  try {
-    const result = sheets.actions(input);
-    document.querySelector<HTMLButtonElement>('dialog button')?.click();
-    await expect(result).resolves.toEqual({ status: 'selected', actionId: 'save' });
-    expect(uuid).not.toHaveBeenCalled();
-    expect(document.querySelector('dialog')).toBeNull();
-  } finally {
-    sheets.dispose();
-  }
-});
+  expect(present).not.toHaveBeenCalled();
+  const first = sheets.actions(input);
+  await expect(sheets.actions(input)).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
+  present.mock.lastCall![0]!.failToOpen();
+  await expect(first).rejects.toMatchObject({ code: 'INTERNAL' });
 
-it.each(['cancel', 'escape', 'button', 'close'])(
-  'cancels on %s and cleans up exactly once',
-  async (mode) => {
-    const sheets = createWebSheets(document);
-    const promise = sheets.actions(input);
-    const dialog = document.querySelector('dialog')!;
-    if (mode === 'escape')
-      dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-    else if (mode === 'button') (dialog.lastElementChild as HTMLButtonElement).click();
-    else dialog.dispatchEvent(new Event(mode, { cancelable: true }));
-    await expect(promise).resolves.toEqual({ status: 'cancelled' });
-    expect(document.querySelector('dialog')).toBeNull();
-    sheets.dispose();
-  },
-);
-
-it('rejects abort/disposal, detaches abort listeners, and rejects overlapping sheets', async () => {
-  const sheets = createWebSheets(document);
   const controller = new AbortController();
   const remove = vi.spyOn(controller.signal, 'removeEventListener');
-  const first = sheets.actions(input, controller.signal);
-  await expect(sheets.actions(input)).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+  const second = sheets.actions(input, controller.signal);
   controller.abort();
-  await expect(first).rejects.toMatchObject({ code: 'BRIDGE_CLOSED' });
-  expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
-  const second = sheets.actions(input);
-  sheets.dispose();
-  sheets.dispose();
   await expect(second).rejects.toMatchObject({ code: 'BRIDGE_CLOSED' });
+  expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+  const third = sheets.actions(input);
+  sheets.dispose();
+  sheets.dispose();
+  await expect(third).rejects.toMatchObject({ code: 'BRIDGE_CLOSED' });
   await expect(sheets.actions(input)).rejects.toMatchObject({ code: 'BRIDGE_CLOSED' });
-  expect(document.querySelector('dialog')).toBeNull();
+  expect(present.mock.lastCall![0]).toBeNull();
 });

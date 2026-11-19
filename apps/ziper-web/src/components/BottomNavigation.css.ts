@@ -29,8 +29,6 @@ export const tab = style({
   background: 'none',
   color: vars.color.icon.disabled,
   fontFamily: 'inherit',
-  cursor: 'pointer',
-  ':disabled': { cursor: 'default' },
 });
 
 export const active = style({ color: vars.color.text.strong });
@@ -47,6 +45,4 @@ export const add = style({
   border: 'none',
   borderRadius: vars.radius.full,
   background: 'none',
-  cursor: 'pointer',
-  ':disabled': { cursor: 'default' },
 });

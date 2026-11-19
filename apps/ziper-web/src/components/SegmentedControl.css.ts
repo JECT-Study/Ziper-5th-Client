@@ -24,7 +24,6 @@ export const item = style({
   color: vars.color.text.default,
   fontFamily: 'inherit',
   ...typography.body2Medium,
-  cursor: 'pointer',
 });
 
 export const selected = style({

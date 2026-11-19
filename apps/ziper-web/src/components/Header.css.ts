@@ -36,5 +36,4 @@ export const iconButton = style({
   border: 'none',
   background: 'none',
   color: vars.color.icon.strong,
-  cursor: 'pointer',
 });

@@ -17,6 +17,7 @@ export const sheet = style({
 
 export const handlerArea = style({
   display: 'flex',
+  flexShrink: 0,
   justifyContent: 'center',
   minHeight: 20,
   padding: `${vars.space[12]} ${vars.space[16]} 0`,
@@ -31,7 +32,6 @@ export const handler = style({
 });
 
 export const titleBar = style({
-  flexShrink: 0,
   display: 'flex',
   alignItems: 'flex-start',
   gap: vars.space[16],
@@ -40,18 +40,28 @@ export const titleBar = style({
 
 export const title = style({
   flex: 1,
+  minWidth: 0,
   margin: 0,
+  wordBreak: 'keep-all',
+  overflowWrap: 'anywhere',
   ...typography.title1Bold,
   color: vars.color.text.strong,
 });
 
 export const close = style({
   display: 'inline-flex',
+  flexShrink: 0,
   padding: 0,
   border: 'none',
   background: 'none',
   color: vars.color.icon.strong,
-  cursor: 'pointer',
 });
 
-export const contents = style({ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' });
+export const contents = style({
+  flex: '1 1 auto',
+  minHeight: 0,
+  overflowY: 'auto',
+  overscrollBehaviorY: 'contain',
+});
+
+export const footer = style({ flexShrink: 0 });

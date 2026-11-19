@@ -10,7 +10,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { capability, methods, success } from '@ziper/bridge/contract';
 import { BridgeProvider, usePlatform } from './provider';
 import { createWebNavigation } from '../platform/navigation';
@@ -90,6 +90,7 @@ function host() {
   };
   return calls;
 }
+beforeEach(() => vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true));
 afterEach(async () => {
   await act(async () => {
     root?.unmount();
@@ -101,8 +102,9 @@ afterEach(async () => {
   delete nativeWindow.nativeEmitter;
   delete nativeWindow.nativeEmitterMap;
   errors.splice(0);
+  vi.unstubAllGlobals();
 });
-async function mount(router: ReturnType<typeof setup>) {
+async function mount(router: ReturnType<typeof setup>, status: 'native' | 'web' = 'native') {
   const container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -113,7 +115,7 @@ async function mount(router: ReturnType<typeof setup>) {
       </StrictMode>,
     );
   });
-  await vi.waitFor(() => expect(captured?.status).toBe('native'));
+  await vi.waitFor(() => expect(captured?.status).toBe(status));
 }
 
 it('keeps root runtime and retained callbacks alive across real TanStack route navigation', async () => {
@@ -163,6 +165,163 @@ it('releases StrictMode/pagehide state and reinitializes BFCache callbacks witho
   expect(calls.filter((call) => call.method === 'getBridgeInfoV1')).toHaveLength(initial + 1);
   expect(Object.keys(nativeWindow.nativeEmitterMap!)).toHaveLength(1);
   expect(errors).toEqual([]);
+  router.history.destroy();
+});
+
+const sheetActions = [{ id: 'save', label: '저장' }];
+
+it('keeps a web sheet through query and hash changes and cancels it on browser Back to another route', async () => {
+  window.history.replaceState(null, '', '/');
+  const router = setup(true);
+  await mount(router, 'web');
+  await act(async () => createWebNavigation(router).push('/next'));
+  const { result, element } = await openWebSheet();
+
+  await act(async () => router.history.replace('/next?tab=other#top'));
+  await vi.waitFor(() => expect(router.state.location.href).toBe('/next?tab=other#top'));
+  expect(element.isConnected && element.open).toBe(true);
+
+  await act(async () => {
+    window.history.back();
+    await vi.waitFor(() => expect(router.history.location.pathname).toBe('/'));
+  });
+  expect(router.state.location.pathname).toBe('/');
+  await expect(result).resolves.toEqual({ status: 'cancelled' });
+  expect(document.querySelector('dialog')).toBeNull();
+
+  const reopened = await openWebSheet();
+  await act(async () => reopened.element.close());
+  await expect(reopened.result).resolves.toEqual({ status: 'cancelled' });
+  router.history.destroy();
+});
+
+it('does not open a web fallback if its requesting route was left before presentation', async () => {
+  const router = setup();
+  await mount(router, 'web');
+  let result!: ReturnType<typeof captured.platform.sheets.actions>;
+  await act(async () => {
+    result = captured.platform.sheets.actions({ title: '작업 선택', actions: sheetActions });
+    router.history.push('/next');
+  });
+  await expect(result).resolves.toEqual({ status: 'cancelled' });
+  expect(router.state.location.pathname).toBe('/next');
+  expect(document.querySelector('dialog')).toBeNull();
+  router.history.destroy();
+});
+
+it('renders the design system dialog, settles selection once, and restores focus', async () => {
+  const router = setup();
+  await mount(router, 'web');
+  const trigger = document.createElement('button');
+  document.body.append(trigger);
+  trigger.focus();
+
+  const dialog = await openWebSheet();
+  const result = dialog.result;
+  const sheet = dialog.element;
+  expect(sheet.open).toBe(true);
+  expect(sheet.getAttribute('aria-modal')).toBe('true');
+  expect(document.getElementById(sheet.getAttribute('aria-labelledby')!)?.textContent).toBe(
+    '작업 선택',
+  );
+  const save = [...sheet.querySelectorAll('button')].find(
+    (button) => button.textContent === '저장',
+  )!;
+  save.focus();
+  await act(async () => {
+    save.click();
+    save.click();
+    await expect(result).resolves.toEqual({ status: 'selected', actionId: 'save' });
+  });
+  expect(document.querySelector('dialog')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  router.history.destroy();
+});
+
+async function openWebSheet() {
+  let result!: ReturnType<typeof captured.platform.sheets.actions>;
+  await act(async () => {
+    result = captured.platform.sheets.actions({ title: '작업 선택', actions: sheetActions });
+  });
+  return { result, element: document.querySelector('dialog')! };
+}
+
+it.each(['x', 'cancel button', 'escape', 'backdrop'])(
+  'closes via %s without a selection',
+  async (mode) => {
+    const router = setup();
+    await mount(router, 'web');
+    const { element, result } = await openWebSheet();
+    await act(async () => {
+      if (mode === 'x') element.querySelector<HTMLButtonElement>('[aria-label="닫기"]')!.click();
+      else if (mode === 'cancel button')
+        [...element.querySelectorAll('button')]
+          .find((button) => button.textContent === '취소')!
+          .click();
+      else if (mode === 'escape') element.dispatchEvent(new Event('cancel', { cancelable: true }));
+      else {
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 20, 200, 100));
+        clickFrom(element, 10, 10);
+      }
+      await expect(result).resolves.toEqual({ status: 'cancelled' });
+    });
+    expect(document.querySelector('dialog')).toBeNull();
+    router.history.destroy();
+  },
+);
+
+function clickFrom(dialog: HTMLDialogElement, startY: number, endY: number) {
+  dialog.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, isPrimary: true, clientY: startY }),
+  );
+  dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, clientY: endY }));
+}
+
+it('keeps the sheet open when a press starts or ends inside it', async () => {
+  const router = setup();
+  await mount(router, 'web');
+  const { element, result } = await openWebSheet();
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 20, 200, 100));
+
+  await act(async () => {
+    clickFrom(element, 40, 10);
+    clickFrom(element, 10, 40);
+  });
+  expect(element.open).toBe(true);
+
+  await act(async () => {
+    clickFrom(element, 10, 10);
+    await expect(result).resolves.toEqual({ status: 'cancelled' });
+  });
+  router.history.destroy();
+});
+
+it('clears failed web presentations and aborts an open one on pagehide', async () => {
+  const router = setup();
+  await mount(router, 'web');
+  const showModal = vi.spyOn(window.HTMLDialogElement.prototype, 'showModal');
+  showModal.mockImplementationOnce(() => {
+    throw new Error('unsupported');
+  });
+  let rejected!: Promise<void>;
+  await act(async () => {
+    rejected = expect(
+      captured.platform.sheets.actions({ title: '', actions: sheetActions }),
+    ).rejects.toMatchObject({ code: 'INTERNAL' });
+  });
+  await rejected;
+  expect(document.querySelector('dialog')).toBeNull();
+
+  const { result } = await openWebSheet();
+  const closed = expect(result).rejects.toMatchObject({ code: 'BRIDGE_CLOSED' });
+  await act(async () => window.dispatchEvent(new Event('pagehide')));
+  await closed;
+  expect(document.querySelector('dialog')).toBeNull();
+
+  await act(async () => window.dispatchEvent(new Event('pageshow')));
+  const reopened = await openWebSheet();
+  await act(async () => reopened.element.close());
+  await expect(reopened.result).resolves.toEqual({ status: 'cancelled' });
   router.history.destroy();
 });
 

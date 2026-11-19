@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { usePlatform } from '../bridge/provider';
 import {
   BottomNavigation,
   BottomSheet,
@@ -20,6 +21,7 @@ import {
   type BottomTab,
   type IconName,
 } from '../components';
+import { platformErrorMessage } from '../platform/platform-error';
 import * as styles from '../styles/design-system.css';
 
 // 디자인 시스템 컴포넌트를 한눈에 확인하는 개발용 페이지. Figma "Design_필수산출물_디자인시스템"과 비교할 때 쓴다.
@@ -223,6 +225,10 @@ function DesignSystemPage() {
         </Button>
       </Section>
 
+      <Section title="웹·네이티브 액션 시트">
+        <PlatformSheetExample />
+      </Section>
+
       <Section title="Icon">
         <div className={styles.icons}>
           {ICON_NAMES.map((name) => (
@@ -267,6 +273,57 @@ function DesignSystemPage() {
         <div className={styles.sheetBody} />
       </BottomSheet>
     </main>
+  );
+}
+
+function PlatformSheetExample() {
+  const { platform, status } = usePlatform();
+  const pending = useRef(false);
+  const [feedback, setFeedback] = useState<{ message: string; error?: boolean } | null>(null);
+
+  async function open(longList: boolean) {
+    if (pending.current) return;
+    pending.current = true;
+    setFeedback(null);
+    try {
+      const result = await platform.sheets.actions({
+        title: longList
+          ? '좁은 화면에서 긴 제목과 항목을 확인해요. 아래로 스크롤하면 마지막 항목까지 선택할 수 있어요.'
+          : '작업 선택',
+        actions: longList
+          ? Array.from({ length: 20 }, (_, index) => ({
+              id: `action-${index + 1}`,
+              label:
+                index === 0
+                  ? '선택 항목 1 · 화면 너비를 넘는 긴 문구도 버튼 안에서 자연스럽게 줄바꿈돼요.'
+                  : `선택 항목 ${index + 1}`,
+            }))
+          : [
+              { id: 'save', label: '저장' },
+              { id: 'delete', label: '삭제', destructive: true },
+            ],
+      });
+      setFeedback({
+        message: result.status === 'selected' ? `선택: ${result.actionId}` : '취소됨',
+      });
+    } catch (error) {
+      const message = platformErrorMessage(error);
+      if (message) setFeedback({ message, error: true });
+    } finally {
+      pending.current = false;
+    }
+  }
+
+  return (
+    <>
+      <Button onClick={() => open(false)} disabled={status === 'initializing'}>
+        공통 액션 시트 열기
+      </Button>
+      <Button variant="secondary" onClick={() => open(true)} disabled={status === 'initializing'}>
+        긴 액션 시트 열기
+      </Button>
+      {feedback && <p role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
+    </>
   );
 }
 

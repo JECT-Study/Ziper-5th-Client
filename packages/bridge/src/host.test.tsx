@@ -6,13 +6,14 @@ import { createDelegate } from '../../../apps/ziper-mobile/src/bridge/delegate';
 import { createHostMiddleware } from '../../../apps/ziper-mobile/src/bridge/middleware';
 import { hostConfig } from '../../../apps/ziper-mobile/src/bridge/security';
 import { SheetSessions } from '../../../apps/ziper-mobile/src/bridge/sheets';
-import { capability } from './contract';
+import { capability, success } from './contract';
 
 const id = 'A'.repeat(21);
 
 async function productionHost() {
   const navigate = vi.fn();
   const config = hostConfig('https://app.example.test', false, 'ios');
+  const sheets = new SheetSessions(() => {});
   const handlers = createHandlers({
     config,
     platform: 'ios',
@@ -21,7 +22,7 @@ async function productionHost() {
     navigate,
     back: () => false,
     setDepth: () => {},
-    sheets: new SheetSessions(() => {}),
+    sheets,
   });
   const host = await mountWebView({}, () => false, {
     delegate: createDelegate(handlers.invoke),
@@ -33,7 +34,7 @@ async function productionHost() {
     handlers.dispose();
     host.close();
   });
-  return { navigate, client };
+  return { navigate, client, sheets, flush: host.flush };
 }
 
 describe('production native declarations, middleware and protocol boundary', () => {
@@ -130,6 +131,23 @@ describe('production native declarations, middleware and protocol boundary', () 
       error: { code: 'INVALID_REQUEST' },
     });
   });
+  it('round-trips the native sheet selection through the real declaration and host middleware', async () => {
+    const { client, sheets, flush } = await productionHost();
+    const request = {
+      title: '작업 선택',
+      operationId: 'one',
+      actions: [{ id: 'save', label: '저장' }],
+    };
+    const first = client.callNative('sheetActionsV1', [request]);
+    const same = client.callNative('sheetActionsV1', [request]);
+    await flush();
+    expect(sheets.active).toBe(true);
+    expect(sheets.settle(1, 'save')).toBe(true);
+    const selected = success({ status: 'selected', actionId: 'save' });
+    await expect(Promise.all([first, same])).resolves.toEqual([selected, selected]);
+    expect(sheets.active).toBe(false);
+  });
+
   it('drops an old async completion after replacing the same native WebView document', async () => {
     let finish!: (value: string) => void;
     let started = false;

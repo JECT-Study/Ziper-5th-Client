@@ -1,8 +1,7 @@
-import { BottomSheet } from '@expo/ui';
 import Constants from 'expo-constants';
 import { Stack, useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Button, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { BackHandler, Button, Platform, Text, View } from 'react-native';
 import type { BridgeDelegate, BridgeWebView } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
 import { failure, incomingShareEvent } from '@ziper/bridge/contract';
@@ -15,6 +14,7 @@ import { allowedDocument, serviceURL } from '../bridge/security';
 import { useMobileServices } from '../bridge/services';
 import { SheetSessions, type SheetSnapshot } from '../bridge/sheets';
 import { WebView } from '../bridge/webview';
+import { NativeActionSheet } from './native-action-sheet';
 
 type WebScope = ReturnType<typeof createHandlers> & {
   uri: string;
@@ -268,31 +268,12 @@ export function WebScreen({ path }: { path: string }) {
         />
       )}
       {sheet && (
-        <BottomSheet
+        <NativeActionSheet
           key={sheet.key}
-          isPresented
-          onDismiss={() => sheet.owner.settle(sheet.token)}
-          shouldDismissOnBackPress
-        >
-          <ScrollView style={{ maxHeight: 480 }} contentContainerStyle={{ padding: 20, gap: 12 }}>
-            <Text accessibilityRole="header" style={{ fontSize: 20 }}>
-              {sheet.input.title}
-            </Text>
-            {sheet.input.actions.map((action) => (
-              <Pressable
-                key={action.id}
-                accessibilityRole="button"
-                onPress={() => sheet.owner.settle(sheet.token, action.id)}
-                style={{ padding: 14 }}
-              >
-                <Text style={{ color: action.destructive ? '#b00020' : '#111' }}>
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
-            <Button title="Cancel" onPress={() => sheet.owner.settle(sheet.token)} />
-          </ScrollView>
-        </BottomSheet>
+          input={sheet.input}
+          onSelect={(id) => sheet.owner.settle(sheet.token, id)}
+          onCancel={() => sheet.owner.settle(sheet.token)}
+        />
       )}
     </View>
   );

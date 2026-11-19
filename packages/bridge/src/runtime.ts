@@ -221,6 +221,7 @@ const isUnsupported = (error: unknown) =>
 export function createPlatform(runtime: Runtime, web: WebServices) {
   let closed = false;
   let authEpoch = 0;
+  let sheetBusy = false;
   let loginBusy = false;
   let logoutBusy = 0;
   const lifetime = new AbortController();
@@ -481,26 +482,37 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
       },
     },
     sheets: {
-      async actions(input: Omit<SheetInput, 'operationId'> & { operationId?: string }) {
+      async actions(input: Omit<SheetInput, 'operationId'>) {
         check();
         const parsed = methods.sheetActionsV1.input.safeParse({
           ...input,
-          operationId: input.operationId ?? operationId(),
+          operationId: operationId(),
         });
         if (!parsed.success) throw new BridgeError('INVALID_REQUEST');
-        const result = await fallback(
-          () => native(capability.sheet, 'sheetActionsV1', parsed.data),
-          () => web.sheets.actions(parsed.data, lifetime.signal),
-        );
-        const output = methods.sheetActionsV1.output.safeParse(result);
-        if (!output.success) throw new BridgeError('NATIVE_ERROR');
-        const value = output.data;
-        if (
-          value.status === 'selected' &&
-          !input.actions.some((action) => action.id === value.actionId)
-        )
-          throw new BridgeError('NATIVE_ERROR');
-        return value;
+        // Lock before negotiation so late native injection can't stack sheets.
+        if (sheetBusy) throw new BridgeError('PERMISSION_DENIED');
+        sheetBusy = true;
+        try {
+          const scope = web.sheets.getScope?.();
+          const value = await fallback(
+            () => native(capability.sheet, 'sheetActionsV1', parsed.data),
+            () =>
+              scope === web.sheets.getScope?.()
+                ? web.sheets.actions(parsed.data, lifetime.signal)
+                : Promise.resolve({ status: 'cancelled' as const }),
+          );
+          const output = methods.sheetActionsV1.output.safeParse(value);
+          if (!output.success) throw new BridgeError('NATIVE_ERROR');
+          const selected = output.data;
+          if (
+            selected.status === 'selected' &&
+            !parsed.data.actions.some((action) => action.id === selected.actionId)
+          )
+            throw new BridgeError('NATIVE_ERROR');
+          return selected;
+        } finally {
+          sheetBusy = false;
+        }
       },
     },
     syncHistory,

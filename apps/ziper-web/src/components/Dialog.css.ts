@@ -12,4 +12,5 @@ export const dialog = style({
   '::backdrop': { backgroundColor: vars.color.overlay.dimmed },
 });
 
+globalStyle(`${dialog}[data-dismiss-on-backdrop]::backdrop`, { cursor: 'pointer' });
 globalStyle(`body:has(${dialog}[open])`, { overflow: 'hidden' });

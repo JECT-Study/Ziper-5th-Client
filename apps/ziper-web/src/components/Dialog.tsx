@@ -1,6 +1,14 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { cx } from './cx';
 import * as styles from './Dialog.css';
+
+function isBackdrop(event: MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false;
+  const { top, right, bottom, left } = event.currentTarget.getBoundingClientRect();
+  return (
+    event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom
+  );
+}
 
 export function Dialog({
   children,
@@ -8,6 +16,7 @@ export function Dialog({
   titleId,
   descriptionId,
   onClose,
+  onOpenError,
   dismissOnBackdrop,
   alert,
 }: {
@@ -16,17 +25,38 @@ export function Dialog({
   titleId: string;
   descriptionId?: string;
   onClose: () => void;
+  onOpenError?: (() => void) | undefined;
   dismissOnBackdrop?: boolean;
   alert?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const cleaningUp = useRef(false);
+  const pressedBackdrop = useRef(false);
 
   useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, []);
+    const previousFocus = dialog.ownerDocument.activeElement;
+    try {
+      dialog.showModal();
+    } catch (error) {
+      if (!onOpenError) throw error;
+      onOpenError();
+      return;
+    }
+    return () => {
+      cleaningUp.current = true;
+      dialog.close();
+      cleaningUp.current = false;
+      if (
+        previousFocus instanceof HTMLElement &&
+        previousFocus.isConnected &&
+        previousFocus !== dialog.ownerDocument.activeElement
+      ) {
+        previousFocus.focus();
+      }
+    };
+  }, [onOpenError]);
 
   return (
     <dialog
@@ -36,22 +66,32 @@ export function Dialog({
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
+      data-dismiss-on-backdrop={dismissOnBackdrop || undefined}
+      onClose={(event) => {
+        // Ignore stale close events after StrictMode reopens the dialog.
+        if (!cleaningUp.current && !event.currentTarget.open) onClose();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
+      onPointerDown={
+        dismissOnBackdrop
+          ? (event) => {
+              if (event.isPrimary)
+                pressedBackdrop.current = event.button === 0 && isBackdrop(event);
+            }
+          : undefined
+      }
+      onPointerCancel={() => {
+        pressedBackdrop.current = false;
+      }}
       onClick={
         dismissOnBackdrop
           ? (event) => {
-              if (event.target !== event.currentTarget) return;
-              const { top, right, bottom, left } = event.currentTarget.getBoundingClientRect();
-              if (
-                event.clientX < left ||
-                event.clientX > right ||
-                event.clientY < top ||
-                event.clientY > bottom
-              )
-                onClose();
+              const shouldClose = pressedBackdrop.current && event.detail > 0 && isBackdrop(event);
+              pressedBackdrop.current = false;
+              if (shouldClose) onClose();
             }
           : undefined
       }

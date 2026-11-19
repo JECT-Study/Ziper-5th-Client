@@ -7,7 +7,6 @@ export const root = style({
   display: 'inline-flex',
   alignItems: 'center',
   gap: vars.space[8],
-  cursor: 'pointer',
 });
 
 // 실제 체크박스는 접근성을 위해 남겨 두고 화면에서만 숨긴다.

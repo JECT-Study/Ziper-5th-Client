@@ -31,7 +31,6 @@ export const close = style({
   border: 0,
   background: 'none',
   color: vars.color.icon.strong,
-  cursor: 'pointer',
 });
 
 export const body = style({
@@ -123,7 +122,6 @@ export const removeTag = style({
   padding: 0,
   background: 'none',
   color: vars.color.icon.default,
-  cursor: 'pointer',
 });
 export const addTag = style({
   background: vars.color.background,
@@ -173,7 +171,6 @@ export const addBoard = style({
   backgroundColor: 'transparent',
   color: vars.color.text.default,
   ...typography.body2Medium,
-  cursor: 'pointer',
 });
 
 export const imageModes = style({ width: '100%' });
@@ -197,7 +194,6 @@ export const cardOption = style({
   placeItems: 'center',
   gap: vars.space[4],
   ...typography.body3Medium,
-  cursor: 'pointer',
   '@media': { '(min-width: 480px)': { flex: '1 1 0', minWidth: 0 } },
   selectors: {
     '&[aria-pressed="true"]': {

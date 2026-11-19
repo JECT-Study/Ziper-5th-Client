@@ -14,7 +14,6 @@ export const base = style({
   fontFamily: 'inherit',
   ...typography.subtitle1Semibold,
   whiteSpace: 'nowrap',
-  cursor: 'pointer',
   ':focus-visible': { outline: `2px solid ${vars.palette.lime600}`, outlineOffset: 2 },
 });
 

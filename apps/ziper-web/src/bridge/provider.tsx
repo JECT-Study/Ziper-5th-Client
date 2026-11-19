@@ -22,7 +22,8 @@ import {
   type RuntimeOptions,
 } from '@ziper/bridge/runtime';
 import { createWebNavigation } from '../platform/navigation';
-import { createWebSheets } from '../platform/action-sheet';
+import { createWebSheets, type WebSheet } from '../platform/action-sheet';
+import { WebActionSheet } from '../platform/web-action-sheet';
 
 export interface BridgeProviderConfig {
   auth?: WebAuthService;
@@ -50,6 +51,7 @@ export function BridgeProvider({
   const router = useRouter();
   const current = useRef<Platform | null>(null);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
+  const [sheet, setSheet] = useState<WebSheet | null>(null);
   // Forward at invocation time: retained callbacks never capture a disposed StrictMode/BFCache runtime.
   const platform = useMemo<PublicPlatform>(() => {
     const get = () => {
@@ -85,7 +87,7 @@ export function BridgeProvider({
     const start = () => {
       if (stop) return;
       const next = createRuntime(config?.runtime);
-      const sheets = createWebSheets(document);
+      const sheets = createWebSheets(setSheet);
       const instance = createPlatform(next, {
         auth: config?.auth,
         navigation: createWebNavigation(router),
@@ -97,7 +99,14 @@ export function BridgeProvider({
       const sync = () => {
         void instance.syncHistory().catch(onError);
       };
-      const unbindHistory = router.history.subscribe(sync);
+      let pathname = router.history.location.pathname;
+      const unbindHistory = router.history.subscribe(({ location }) => {
+        if (location.pathname !== pathname) {
+          pathname = location.pathname;
+          sheets.leaveRoute();
+        }
+        sync();
+      });
       const unbindRuntime = next.subscribe(() => {
         if (next.status === 'native') sync();
       });
@@ -124,7 +133,13 @@ export function BridgeProvider({
     };
   }, [router, config]);
 
-  return <Context.Provider value={{ platform, status }}>{children}</Context.Provider>;
+  const value = useMemo(() => ({ platform, status }), [platform, status]);
+  return (
+    <Context.Provider value={value}>
+      {children}
+      {sheet && <WebActionSheet key={sheet.input.operationId} sheet={sheet} />}
+    </Context.Provider>
+  );
 }
 
 export function usePlatform() {
