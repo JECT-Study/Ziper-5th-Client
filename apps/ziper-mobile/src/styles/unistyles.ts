@@ -1,9 +1,10 @@
+import { colors, palette } from '@ziper/design-tokens';
 import { StyleSheet } from 'react-native-unistyles';
 
 const lightTheme = {
   colors: {
-    background: '#ffffff',
-    text: '#111111',
+    background: colors.background,
+    text: palette.gray950,
   },
 };
 
