@@ -1,9 +1,7 @@
 import { createGlobalTheme } from '@vanilla-extract/css';
 import { colors, palette as sharedPalette, radius, space, typeScale } from '@ziper/design-tokens';
 
-// Figma "Design_필수산출물_디자인시스템" 페이지의 Color·Typography 변수를 옮긴 것.
-// 화면 코드에서는 palette 대신 의미가 붙은 color 토큰을 먼저 쓴다.
-
+// 화면에서는 Figma 팔레트보다 의미가 붙은 color 토큰을 우선 사용한다.
 const palette = {
   ...sharedPalette,
   black: '#000000',
@@ -85,7 +83,7 @@ export const vars = createGlobalTheme(':root', {
     },
     border: { default: palette.gray600, disabled: palette.gray300, subtle: palette.gray200 },
     divider: { default: palette.gray100, strong: palette.gray200 },
-    // positive 는 Figma Color 표에는 없고 텍스트 필드 완료 상태에서만 쓰인다.
+    // Figma에 없는 positive는 텍스트 필드 완료 상태에만 쓴다.
     status: { negative: palette.red500, positive: palette.lime500 },
     accent: {
       yellow: palette.yellow300,
@@ -100,7 +98,7 @@ export const vars = createGlobalTheme(':root', {
   font: {
     family: "'Pretendard Variable', Pretendard, system-ui, sans-serif",
   },
-  // Spacing 규칙: 4배수, 16 이하는 2배수도 허용. 키는 px 값 그대로.
+  // 간격은 4px 단위, 16px 이하는 2px 단위도 허용.
   space: {
     2: px(space[2]),
     4: px(space[4]),
@@ -119,7 +117,7 @@ export const vars = createGlobalTheme(':root', {
     64: '64px',
     72: '72px',
   },
-  // Radius 규칙: 4 / 8 / 12 / 16 네 가지. sheet(24)와 full 은 컴포넌트에서 쓰는 예외 값.
+  // sheet와 full은 기본 라운드의 예외다.
   radius: {
     xs: px(radius.xs),
     s: px(radius.s),
@@ -136,7 +134,6 @@ const textStyle = (token: { fontSize: number; fontWeight: number; lineHeight: nu
   lineHeight: px(token.lineHeight),
 });
 
-// style() 안에 펼쳐서 쓴다. 예: style({ ...typography.title3Bold, color: vars.color.text.strong })
 export const typography = {
   headline1Bold: textStyle({ fontSize: 30, fontWeight: 700, lineHeight: 40 }),
   headline2Bold: textStyle({ fontSize: 24, fontWeight: 700, lineHeight: 34 }),

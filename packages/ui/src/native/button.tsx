@@ -7,7 +7,6 @@ export type ButtonProps = ButtonOptions & {
   onPress: () => void;
 };
 
-/** Secondary action used in the native sheet. */
 export function Button({ label, onPress, destructive, disabled = false }: ButtonProps) {
   return (
     <Pressable

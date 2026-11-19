@@ -2,7 +2,7 @@ import { style, styleVariants } from '@vanilla-extract/css';
 import { buttonHeight } from '@ziper/design-tokens';
 import { typography, vars } from './theme.css';
 
-// 로딩 중에도 disabled 속성이 붙지만, 색은 비활성이 아니라 기본 상태를 유지한다.
+// 로딩 버튼은 클릭을 막되 기본 색을 유지한다.
 const DISABLED = '&:disabled:not([aria-busy="true"])';
 const PRESSED = '&:active:not(:disabled)';
 
@@ -24,7 +24,7 @@ export const content = style({
   alignItems: 'center',
   gap: 'inherit',
   gridArea: '1 / 1',
-  // Keep the accessible name and width when swapping the visible label for a spinner.
+  // Hide visually to preserve the button name and width.
   selectors: { '&[data-loading-replaced="true"]': { opacity: 0 } },
 });
 
