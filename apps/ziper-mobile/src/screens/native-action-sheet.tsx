@@ -1,7 +1,8 @@
 import { BottomSheet, RNHostView } from '@expo/ui';
 import type { SheetInput } from '@ziper/bridge/contract';
-import { buttonHeight, colors, radius, space, typeScale } from '@ziper/design-tokens';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { colors, space, typeScale } from '@ziper/design-tokens';
+import { Button } from '@ziper/ui/native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export function NativeActionSheet({
   input,
@@ -29,7 +30,7 @@ export function NativeActionSheet({
             </Text>
             <View style={styles.rows}>
               {input.actions.map((action) => (
-                <SheetButton
+                <Button
                   key={action.id}
                   label={action.label}
                   destructive={action.destructive}
@@ -39,31 +40,11 @@ export function NativeActionSheet({
             </View>
           </ScrollView>
           <View style={styles.footer}>
-            <SheetButton label="취소" onPress={onCancel} />
+            <Button label="취소" onPress={onCancel} />
           </View>
         </View>
       </RNHostView>
     </BottomSheet>
-  );
-}
-
-function SheetButton({
-  label,
-  destructive,
-  onPress,
-}: {
-  label: string;
-  destructive?: boolean | undefined;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-    >
-      <Text style={[styles.label, destructive && styles.destructive]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -73,17 +54,4 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   rows: { gap: space[8], paddingHorizontal: space[16], paddingVertical: space[4] },
   footer: { padding: space[16] },
-  button: {
-    minHeight: buttonHeight.large,
-    cursor: 'pointer',
-    paddingHorizontal: space[16],
-    paddingVertical: space[12],
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: radius.s,
-    backgroundColor: colors.secondary.default,
-  },
-  pressed: { backgroundColor: colors.secondary.pressed },
-  label: { ...typeScale.title3Bold, color: colors.textStrong, textAlign: 'center' },
-  destructive: { color: colors.textDestructive },
 });

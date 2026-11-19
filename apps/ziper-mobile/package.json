@@ -15,6 +15,7 @@
     "@webview-bridge/react-native": "1.9.0",
     "@ziper/bridge": "workspace:*",
     "@ziper/design-tokens": "workspace:*",
+    "@ziper/ui": "workspace:*",
     "expo": "~58.0.23",
     "expo-constants": "~58.0.16",
     "expo-dev-client": "~58.0.18",

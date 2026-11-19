@@ -1,6 +1,6 @@
 import { style, styleVariants } from '@vanilla-extract/css';
 import { buttonHeight } from '@ziper/design-tokens';
-import { typography, vars } from '../styles/theme.css';
+import { typography, vars } from './theme.css';
 
 // 로딩 중에도 disabled 속성이 붙지만, 색은 비활성이 아니라 기본 상태를 유지한다.
 const DISABLED = '&:disabled:not([aria-busy="true"])';
@@ -25,10 +25,16 @@ export const content = style({
   gap: 'inherit',
   gridArea: '1 / 1',
   // Keep the accessible name and width when swapping the visible label for a spinner.
-  selectors: { [`${base}[aria-busy="true"] > &`]: { opacity: 0 } },
+  selectors: { '&[data-loading-replaced="true"]': { opacity: 0 } },
 });
 
-export const loadingIcon = style({ gridArea: '1 / 1' });
+export const loadingIcon = style({ display: 'inline-flex', gridArea: '1 / 1' });
+
+export const destructive = style({
+  selectors: {
+    '&:where(:not(:disabled)), &[aria-busy="true"]': { color: vars.color.text.destructive },
+  },
+});
 
 export const variant = styleVariants({
   primary: {

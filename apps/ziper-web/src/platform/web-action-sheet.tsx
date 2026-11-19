@@ -27,7 +27,8 @@ export function WebActionSheet({ sheet }: { sheet: WebSheet }) {
           <Button
             key={action.id}
             variant="secondary"
-            className={action.destructive ? styles.destructive : styles.action}
+            destructive={action.destructive}
+            className={styles.action}
             onClick={() => settle({ status: 'selected', actionId: action.id })}
           >
             {action.label}

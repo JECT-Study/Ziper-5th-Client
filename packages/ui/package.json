@@ -1,0 +1,28 @@
+{
+  "name": "@ziper/ui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./web": "./src/web/button.tsx",
+    "./web/theme.css": "./src/web/theme.css.ts",
+    "./native": "./src/native/button.tsx"
+  },
+  "dependencies": {
+    "@vanilla-extract/css": "^1.21.3",
+    "@ziper/design-tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "~19.3.0",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  },
+  "peerDependencies": {
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    }
+  }
+}

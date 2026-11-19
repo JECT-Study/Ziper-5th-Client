@@ -20,9 +20,3 @@ export const action = style({
     },
   },
 });
-
-// Keep enough contrast on both the normal and pressed secondary background.
-export const destructive = style([
-  action,
-  { selectors: { '&&': { color: vars.color.text.destructive } } },
-]);

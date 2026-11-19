@@ -16,6 +16,7 @@
     "@ziper/api": "workspace:*",
     "@ziper/bridge": "workspace:*",
     "@ziper/design-tokens": "workspace:*",
+    "@ziper/ui": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

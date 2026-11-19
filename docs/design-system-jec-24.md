@@ -6,6 +6,8 @@
 - 조사 근거: Figma MCP로 [Components](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=488-2999)와 [IA+화면디자인](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=10-3) 트리를 조회했다. 아래 주요 노드는 상세 디자인 컨텍스트까지 확인했다. Figma 원본은 변경하지 않았다.
 - 코드 기준: [웹 컴포넌트 목록](../apps/ziper-web/src/components/README.md), [웹 토큰](../apps/ziper-web/src/styles/theme.css.ts), [네이티브 테마](../apps/ziper-mobile/src/styles/unistyles.ts), [브릿지 계약](../packages/bridge/src/contract.ts). 인벤토리는 현재 소스의 재사용 경계를 기준으로 하며, 모든 Figma 상태의 시각 일치를 보장하지 않는다.
 
+후속 브랜치의 구현 상태는 [로컬 PR 스택](jec-24-stack.md)을 참고한다. 스택 끝에서는 토큰과 Button만 패키지로 분리하고, 나머지 UI와 브릿지는 앱에 남긴다.
+
 ## 디자인 인벤토리와 구현 우선순위
 
 | Figma 근거                                                                                                                                                                                                                                      | 웹 / WebView DOM 현황                                                                                                                                                   | React Native 현황과 권고                                                                                                                                                                                                                |
