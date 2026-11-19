@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Stack, useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Button, Platform, Text, View } from 'react-native';
+import { BackHandler, Button, Linking, Platform, Text, View } from 'react-native';
 import type { BridgeDelegate, BridgeWebView } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
 import { failure, incomingShareEvent } from '@ziper/bridge/contract';
@@ -40,7 +40,9 @@ export function WebScreen({ path }: { path: string }) {
   const [scopes] = useState(() => new ActiveScope<WebScope>());
   const uri = serviceURL(config, path);
   const shareScreen = path === '/share-product';
-  const hasWebHeader = shareScreen || path.split(/[?#]/, 1)[0] === '/register-product';
+  const pathname = path.split(/[?#]/, 1)[0];
+  const hasWebHeader =
+    shareScreen || pathname === '/register-product' || /^\/products\/[^/]+$/.test(pathname);
   const openedShare = useRef(shareScreen ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
   const live = useRef({
@@ -133,6 +135,9 @@ export function WebScreen({ path }: { path: string }) {
           appVersion: Constants.expoConfig?.version ?? '1.0.0',
           active,
           back: scopeBack,
+          openExternal: async (url) => {
+            await Linking.openURL(url);
+          },
           sheets,
           shareInbox: shareScreen
             ? {

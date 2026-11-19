@@ -123,7 +123,13 @@ it('keeps root runtime and retained callbacks alive across real TanStack route n
   const router = setup();
   await mount(router);
   const facade = captured.platform;
-  expect(Object.keys(facade).sort()).toEqual(['auth', 'incomingShare', 'navigation', 'sheets']);
+  expect(Object.keys(facade).sort()).toEqual([
+    'auth',
+    'external',
+    'incomingShare',
+    'navigation',
+    'sheets',
+  ]);
   expect(await facade.incomingShare.read()).toBeNull();
   const initialized = calls.filter((call) => call.method === 'getBridgeInfoV1').length;
   const emitters = Object.keys(nativeWindow.nativeEmitterMap!);

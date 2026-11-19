@@ -29,6 +29,10 @@ export const nativeBridge = bridge({
     output: resultSchema(methods.navigationReplaceV1.output),
   }),
   navigationBackV1: delegate({ output: resultSchema(methods.navigationBackV1.output) }),
+  externalOpenV1: delegate({
+    input: methods.externalOpenV1.input,
+    output: resultSchema(methods.externalOpenV1.output),
+  }),
   navigationSetWebHistoryV1: delegate({
     input: methods.navigationSetWebHistoryV1.input,
     output: resultSchema(methods.navigationSetWebHistoryV1.output),

@@ -24,6 +24,7 @@ import {
 import { createWebNavigation } from '../platform/navigation';
 import { createWebSheets, type WebSheet } from '../platform/action-sheet';
 import { WebActionSheet } from '../platform/web-action-sheet';
+import { openWebExternal } from '../platform/external';
 
 export interface BridgeProviderConfig {
   auth?: WebAuthService;
@@ -31,7 +32,10 @@ export interface BridgeProviderConfig {
   onError?: (error: unknown) => void;
 }
 
-type PublicPlatform = Pick<Platform, 'auth' | 'navigation' | 'sheets' | 'incomingShare'>;
+type PublicPlatform = Pick<
+  Platform,
+  'auth' | 'navigation' | 'sheets' | 'incomingShare' | 'external'
+>;
 
 const Context = createContext<{ platform: PublicPlatform; status: RuntimeStatus } | null>(null);
 
@@ -70,6 +74,7 @@ export function BridgeProvider({
         back: async () => get().navigation.back(),
       },
       sheets: { actions: async (input) => get().sheets.actions(input) },
+      external: { open: async (url) => get().external.open(url) },
       incomingShare: {
         read: async () => get().incomingShare.read(),
         dismiss: async (id) => get().incomingShare.dismiss(id),
@@ -92,6 +97,7 @@ export function BridgeProvider({
         auth: config?.auth,
         navigation: createWebNavigation(router),
         sheets,
+        openExternal: openWebExternal,
       });
       current.current = instance;
       setRuntime(next);

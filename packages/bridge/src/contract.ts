@@ -16,6 +16,7 @@ export const capability = {
   history: 'navigation.history.v1',
   sheet: 'sheet.actions.v1',
   incomingShare: 'share.incoming.v1',
+  external: 'external.open.v1',
 } as const;
 
 export function isInternalPath(path: unknown): path is string {
@@ -173,6 +174,10 @@ export const methods = {
   navigationBackV1: { input: z.undefined(), output: navigationOutput },
   navigationSetWebHistoryV1: { input: historyInput, output: done },
   sheetActionsV1: { input: sheetInputSchema, output: sheetResultSchema },
+  externalOpenV1: {
+    input: z.object({ url: z.string().refine(isShareURL), operationId: idSchema }).strict(),
+    output: done,
+  },
   shareReadV1: { input: z.undefined(), output: incomingShare.nullable() },
   shareDismissV1: { input: z.object({ id: idSchema }).strict(), output: done },
 };
@@ -234,6 +239,7 @@ export interface WebNavigation {
 
 export interface WebServices {
   auth?: WebAuthService;
+  openExternal?: (url: string) => Promise<void>;
   navigation: WebNavigation;
   sheets: {
     actions(input: SheetInput, signal?: AbortSignal): Promise<SheetResult>;

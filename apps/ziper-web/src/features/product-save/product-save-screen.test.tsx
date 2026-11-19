@@ -3,7 +3,8 @@ import type { ProductSaveApi } from '@ziper/api/product-save';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { parseWholeWon, ProductSaveScreen } from './product-save-screen';
+import { ProductSaveScreen } from './product-save-screen';
+import { parseWholeWon } from './price';
 
 it('accepts whole won amounts without turning malformed input into a different price', () => {
   expect(['0', ' 45,900 ', '9,999,999,999'].map(parseWholeWon)).toEqual([0, 45900, 9999999999]);

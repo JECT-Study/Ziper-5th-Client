@@ -28,6 +28,7 @@ export type HostServices = Readonly<{
   active: () => boolean;
   navigate: (kind: 'push' | 'replace', path: string) => void;
   back: () => boolean;
+  openExternal?: (url: string) => Promise<void>;
   setDepth: (depth: number) => void;
   sheets: SheetSessions;
   shareInbox?: Pick<ShareInbox, 'read' | 'dismiss'>;
@@ -82,6 +83,10 @@ export function bridgeInfo(host: HostServices): BridgeInfo {
   if (host.shareInbox) {
     names.push('shareReadV1', 'shareDismissV1');
     capabilities.push(capability.incomingShare);
+  }
+  if (host.openExternal) {
+    names.push('externalOpenV1');
+    capabilities.push(capability.external);
   }
   const auth = host.auth;
   if (auth) {
@@ -210,6 +215,20 @@ export function createHandlers(host: HostServices) {
               if (disposed || !host.active()) return failure('PERMISSION_DENIED');
               host.navigate(method === 'navigationPushV1' ? 'push' : 'replace', request.path);
               return success({ handled: true });
+            },
+          );
+          break;
+        }
+        case 'externalOpenV1': {
+          if (!host.openExternal) return failure('UNSUPPORTED');
+          const request = input as Input<'externalOpenV1'>;
+          result = await operations.run(
+            request.operationId,
+            `${method}:${JSON.stringify(input)}`,
+            async () => {
+              if (disposed || !host.active()) return failure('PERMISSION_DENIED');
+              await host.openExternal!(request.url);
+              return success({ done: true });
             },
           );
           break;
