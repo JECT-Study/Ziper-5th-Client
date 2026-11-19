@@ -138,7 +138,7 @@ describe('production runtime', () => {
         status: 'selected',
         actionId: 'save',
       });
-      // @ts-expect-error The public API doesn't accept operationId, even though RPC does.
+      // @ts-expect-error operationId is RPC-only.
       const repeated = platform.sheets.actions({ ...sheetRequest, operationId: 'caller-supplied' });
       await expect(repeated).resolves.toEqual({ status: 'selected', actionId: 'save' });
       const ids = calls

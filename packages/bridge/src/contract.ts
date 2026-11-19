@@ -237,7 +237,7 @@ export interface WebServices {
   navigation: WebNavigation;
   sheets: {
     actions(input: SheetInput, signal?: AbortSignal): Promise<SheetResult>;
-    // Changes when the web route leaves, including while native support is still being negotiated.
+    // Changes on route exit so a delayed fallback can't open on the next page.
     getScope?(): number;
   };
 }

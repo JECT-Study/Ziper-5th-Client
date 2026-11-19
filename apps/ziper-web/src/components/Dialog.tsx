@@ -68,7 +68,7 @@ export function Dialog({
       aria-describedby={descriptionId}
       data-dismiss-on-backdrop={dismissOnBackdrop || undefined}
       onClose={(event) => {
-        // A delayed close event from StrictMode cleanup must not dismiss the reopened dialog.
+        // Ignore stale close events after StrictMode reopens the dialog.
         if (!cleaningUp.current && !event.currentTarget.open) onClose();
       }}
       onCancel={(event) => {

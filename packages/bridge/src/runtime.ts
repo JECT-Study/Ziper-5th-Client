@@ -489,7 +489,7 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
           operationId: operationId(),
         });
         if (!parsed.success) throw new BridgeError('INVALID_REQUEST');
-        // Lock before negotiation; a late native handshake must not stack a second sheet.
+        // Lock before negotiation so late native injection can't stack sheets.
         if (sheetBusy) throw new BridgeError('PERMISSION_DENIED');
         sheetBusy = true;
         try {
