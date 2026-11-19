@@ -1,4 +1,5 @@
 import { style, styleVariants } from '@vanilla-extract/css';
+import { buttonHeight } from '@ziper/design-tokens';
 import { typography, vars } from '../styles/theme.css';
 
 // 로딩 중에도 disabled 속성이 붙지만, 색은 비활성이 아니라 기본 상태를 유지한다.
@@ -49,7 +50,7 @@ export const variant = styleVariants({
 export const size = styleVariants({
   large: {
     width: '100%',
-    height: 48,
+    height: buttonHeight.large,
     padding: `0 ${vars.space[16]}`,
     gap: vars.space[4],
     borderRadius: vars.radius.s,
@@ -57,7 +58,7 @@ export const size = styleVariants({
   },
   medium: {
     width: '100%',
-    height: 40,
+    height: buttonHeight.medium,
     padding: `0 ${vars.space[16]}`,
     gap: vars.space[2],
     borderRadius: vars.radius.s,
@@ -65,7 +66,7 @@ export const size = styleVariants({
   },
   small: {
     width: 'fit-content',
-    height: 32,
+    height: buttonHeight.small,
     padding: `0 ${vars.space[12]}`,
     gap: vars.space[2],
     borderRadius: vars.radius.xs,

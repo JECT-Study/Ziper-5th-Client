@@ -1,29 +1,20 @@
 import { createGlobalTheme } from '@vanilla-extract/css';
+import { colors, palette as sharedPalette, radius, space, typeScale } from '@ziper/design-tokens';
 
 // Figma "Design_필수산출물_디자인시스템" 페이지의 Color·Typography 변수를 옮긴 것.
 // 화면 코드에서는 palette 대신 의미가 붙은 color 토큰을 먼저 쓴다.
 
 const palette = {
-  white: '#ffffff',
+  ...sharedPalette,
   black: '#000000',
-  gray100: '#f6f6f6',
-  gray150: '#f1f1f1',
-  gray200: '#ebebeb',
-  gray300: '#e3e3e3',
-  gray400: '#c2c2c2',
   gray500: '#a2a2a2',
   gray600: '#808080',
   gray700: '#595959',
   gray800: '#303030',
-  gray900: '#222222',
-  gray950: '#111111',
   lime50: '#f5fee5',
   lime100: '#e8fec4',
   lime200: '#d1fa8c',
-  lime300: '#abf61c',
-  lime400: '#81e900',
   lime500: '#5cd100',
-  lime600: '#41a700',
   lime700: '#357f00',
   lime800: '#2e6400',
   lime900: '#2b5500',
@@ -33,7 +24,6 @@ const palette = {
   red400: '#ff616c',
   red500: '#d82c3b',
   red600: '#c00011',
-  red700: '#97000d',
   red800: '#6e000a',
   red900: '#460006',
   blue50: '#eff6ff',
@@ -71,15 +61,18 @@ const palette = {
   orange950: '#431407',
 };
 
+const px = (value: number) => `${value}px`;
+
 export const vars = createGlobalTheme(':root', {
   palette,
   color: {
-    primary: { default: palette.lime300, pressed: palette.lime400, disabled: palette.gray200 },
-    secondary: { default: palette.gray150, pressed: palette.gray300, disabled: palette.gray100 },
+    primary: colors.primary,
+    secondary: colors.secondary,
     text: {
-      strong: palette.gray900,
+      strong: colors.textStrong,
       default: palette.gray700,
-      disabled: palette.gray400,
+      disabled: colors.textDisabled,
+      destructive: colors.textDestructive,
       placeholder: palette.gray300,
       brand: palette.lime400,
       white: palette.white,
@@ -102,23 +95,23 @@ export const vars = createGlobalTheme(':root', {
       blue: palette.blue500,
     },
     overlay: { dimmed: 'rgba(0, 0, 0, 0.6)' },
-    background: palette.white,
+    background: colors.background,
   },
   font: {
     family: "'Pretendard Variable', Pretendard, system-ui, sans-serif",
   },
   // Spacing 규칙: 4배수, 16 이하는 2배수도 허용. 키는 px 값 그대로.
   space: {
-    2: '2px',
-    4: '4px',
+    2: px(space[2]),
+    4: px(space[4]),
     6: '6px',
-    8: '8px',
+    8: px(space[8]),
     10: '10px',
-    12: '12px',
+    12: px(space[12]),
     14: '14px',
-    16: '16px',
+    16: px(space[16]),
     20: '20px',
-    24: '24px',
+    24: px(space[24]),
     32: '32px',
     40: '40px',
     48: '48px',
@@ -127,29 +120,35 @@ export const vars = createGlobalTheme(':root', {
     72: '72px',
   },
   // Radius 규칙: 4 / 8 / 12 / 16 네 가지. sheet(24)와 full 은 컴포넌트에서 쓰는 예외 값.
-  radius: { xs: '4px', s: '8px', m: '12px', l: '16px', sheet: '24px', full: '9999px' },
+  radius: {
+    xs: px(radius.xs),
+    s: px(radius.s),
+    m: '12px',
+    l: '16px',
+    sheet: px(radius.sheet),
+    full: '9999px',
+  },
   shadow: { default: '0 4px 8px rgba(0, 0, 0, 0.08)' },
 });
 
-const textStyle = (fontSize: number, fontWeight: 500 | 600 | 700, lineHeight: number) => ({
-  fontSize,
-  fontWeight,
-  lineHeight: `${lineHeight}px`,
+const textStyle = (token: { fontSize: number; fontWeight: number; lineHeight: number }) => ({
+  ...token,
+  lineHeight: px(token.lineHeight),
 });
 
 // style() 안에 펼쳐서 쓴다. 예: style({ ...typography.title3Bold, color: vars.color.text.strong })
 export const typography = {
-  headline1Bold: textStyle(30, 700, 40),
-  headline2Bold: textStyle(24, 700, 34),
-  title1Bold: textStyle(20, 700, 28),
-  title2Bold: textStyle(18, 700, 24),
-  title3Bold: textStyle(16, 700, 22),
-  subtitle1Bold: textStyle(14, 700, 22),
-  subtitle1Semibold: textStyle(14, 600, 22),
-  body1Medium: textStyle(16, 500, 24),
-  body2Medium: textStyle(14, 500, 22),
-  body3Medium: textStyle(12, 500, 18),
-  caption1Bold: textStyle(12, 700, 18),
-  caption2Bold: textStyle(10, 700, 16),
-  caption2Medium: textStyle(10, 500, 16),
+  headline1Bold: textStyle({ fontSize: 30, fontWeight: 700, lineHeight: 40 }),
+  headline2Bold: textStyle({ fontSize: 24, fontWeight: 700, lineHeight: 34 }),
+  title1Bold: textStyle(typeScale.title1Bold),
+  title2Bold: textStyle({ fontSize: 18, fontWeight: 700, lineHeight: 24 }),
+  title3Bold: textStyle(typeScale.title3Bold),
+  subtitle1Bold: textStyle({ fontSize: 14, fontWeight: 700, lineHeight: 22 }),
+  subtitle1Semibold: textStyle(typeScale.subtitle1Semibold),
+  body1Medium: textStyle({ fontSize: 16, fontWeight: 500, lineHeight: 24 }),
+  body2Medium: textStyle({ fontSize: 14, fontWeight: 500, lineHeight: 22 }),
+  body3Medium: textStyle({ fontSize: 12, fontWeight: 500, lineHeight: 18 }),
+  caption1Bold: textStyle(typeScale.caption1Bold),
+  caption2Bold: textStyle({ fontSize: 10, fontWeight: 700, lineHeight: 16 }),
+  caption2Medium: textStyle({ fontSize: 10, fontWeight: 500, lineHeight: 16 }),
 };
