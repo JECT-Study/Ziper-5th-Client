@@ -10,6 +10,7 @@ import {
   type Method,
   type Runtime,
   type Session,
+  type SheetResult,
   type WebServices,
 } from './contract';
 import { createPlatform, createRuntime } from './runtime';
@@ -765,6 +766,75 @@ describe('platform navigation and sheets', () => {
     );
     expect(web.navigation.push).not.toHaveBeenCalled();
   });
+
+  it('does not stack native UI over a web sheet when the host is injected late', async () => {
+    const web = webServices();
+    const visible = deferred<SheetResult>();
+    vi.mocked(web.sheets.actions).mockReturnValueOnce(visible.promise);
+    const runtime = makeRuntime();
+    const platform = createPlatform(runtime, web);
+
+    const first = platform.sheets.actions(sheetInput);
+    await vi.waitFor(() => expect(web.sheets.actions).toHaveBeenCalledOnce());
+    const { calls } = host({
+      capabilities: [capability.sheet],
+      reply: () => success({ status: 'selected', actionId: 'save' }),
+    });
+    await runtime.initialize();
+    await expect(
+      platform.sheets.actions({ ...sheetInput, operationId: 'other' }),
+    ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
+    expect(calls.map((call) => call.method)).toEqual(['getBridgeInfoV1']);
+
+    const same = platform.sheets.actions(sheetInput);
+    visible.resolve({ status: 'cancelled' });
+    await expect(Promise.all([first, same])).resolves.toEqual([
+      { status: 'cancelled' },
+      { status: 'cancelled' },
+    ]);
+    await expect(platform.sheets.actions(sheetInput)).resolves.toEqual({
+      status: 'selected',
+      actionId: 'save',
+    });
+    expect(calls.map((call) => call.method)).toEqual(['getBridgeInfoV1', 'sheetActionsV1']);
+    expect(web.sheets.actions).toHaveBeenCalledOnce();
+  });
+
+  it.each(['capability', 'method', 'explicit unsupported'] as const)(
+    'falls back to web for missing %s',
+    async (mode) => {
+      const { calls } = host({
+        capabilities: mode === 'capability' ? [] : [capability.sheet],
+        advertised: mode === 'method' ? ['getBridgeInfoV1'] : undefined,
+        reply: () => failure('UNSUPPORTED'),
+      });
+      const web = webServices();
+      await expect(createPlatform(makeRuntime(), web).sheets.actions(sheetInput)).resolves.toEqual({
+        status: 'cancelled',
+      });
+      expect(web.sheets.actions).toHaveBeenCalledOnce();
+      expect(calls.filter((call) => call.method === 'sheetActionsV1')).toHaveLength(
+        mode === 'explicit unsupported' ? 1 : 0,
+      );
+    },
+  );
+
+  it.each(['PERMISSION_DENIED', 'RESULT_UNKNOWN', 'BRIDGE_NOT_READY'] as const)(
+    'does not fall back or reissue a sheet after %s',
+    async (code) => {
+      const method = code === 'BRIDGE_NOT_READY' ? 'getBridgeInfoV1' : 'sheetActionsV1';
+      const { calls } = host({
+        capabilities: [capability.sheet],
+        ackOnly: code === 'PERMISSION_DENIED' ? undefined : method,
+        reply: () => failure('PERMISSION_DENIED'),
+      });
+      const web = webServices();
+      const platform = createPlatform(makeRuntime({ interactiveTimeoutMs: 150 }), web);
+      await expect(platform.sheets.actions(sheetInput)).rejects.toMatchObject({ code });
+      expect(web.sheets.actions).not.toHaveBeenCalled();
+      expect(calls.filter((call) => call.method === method)).toHaveLength(1);
+    },
+  );
 
   it('validates sheet inputs and action membership, and aborts web sheets on disposal', async () => {
     host({

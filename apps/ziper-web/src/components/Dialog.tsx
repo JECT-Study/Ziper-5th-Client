@@ -8,6 +8,7 @@ export function Dialog({
   titleId,
   descriptionId,
   onClose,
+  onOpenError,
   dismissOnBackdrop,
   alert,
 }: {
@@ -16,17 +17,37 @@ export function Dialog({
   titleId: string;
   descriptionId?: string;
   onClose: () => void;
+  onOpenError?: (() => void) | undefined;
   dismissOnBackdrop?: boolean;
   alert?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const cleaningUp = useRef(false);
 
   useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    dialog.showModal();
-    return () => dialog.close();
-  }, []);
+    const previousFocus = dialog.ownerDocument.activeElement;
+    try {
+      dialog.showModal();
+    } catch (error) {
+      if (!onOpenError) throw error;
+      onOpenError();
+      return;
+    }
+    return () => {
+      cleaningUp.current = true;
+      dialog.close();
+      cleaningUp.current = false;
+      if (
+        previousFocus instanceof HTMLElement &&
+        previousFocus.isConnected &&
+        previousFocus !== dialog.ownerDocument.activeElement
+      ) {
+        previousFocus.focus();
+      }
+    };
+  }, [onOpenError]);
 
   return (
     <dialog
@@ -36,6 +57,10 @@ export function Dialog({
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
+      onClose={(event) => {
+        // A delayed close event from StrictMode cleanup must not dismiss the reopened dialog.
+        if (!cleaningUp.current && !event.currentTarget.open) onClose();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         onClose();

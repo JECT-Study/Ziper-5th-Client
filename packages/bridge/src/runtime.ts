@@ -17,6 +17,7 @@ import {
   type RuntimeStatus,
   type Session,
   type SheetInput,
+  type SheetResult,
   type WebAuthService,
   type WebServices,
 } from './contract';
@@ -221,6 +222,7 @@ const isUnsupported = (error: unknown) =>
 export function createPlatform(runtime: Runtime, web: WebServices) {
   let closed = false;
   let authEpoch = 0;
+  let pendingSheet: { request: string; result: Promise<SheetResult> } | undefined;
   let loginBusy = false;
   let logoutBusy = 0;
   const lifetime = new AbortController();
@@ -488,19 +490,32 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
           operationId: input.operationId ?? operationId(),
         });
         if (!parsed.success) throw new BridgeError('INVALID_REQUEST');
-        const result = await fallback(
+        // Lock the call before negotiation; a late native handshake must not stack a second sheet.
+        const request = JSON.stringify(parsed.data);
+        if (pendingSheet) {
+          if (pendingSheet.request === request) return pendingSheet.result;
+          throw new BridgeError('PERMISSION_DENIED');
+        }
+        const result = fallback(
           () => native(capability.sheet, 'sheetActionsV1', parsed.data),
           () => web.sheets.actions(parsed.data, lifetime.signal),
-        );
-        const output = methods.sheetActionsV1.output.safeParse(result);
-        if (!output.success) throw new BridgeError('NATIVE_ERROR');
-        const value = output.data;
-        if (
-          value.status === 'selected' &&
-          !input.actions.some((action) => action.id === value.actionId)
         )
-          throw new BridgeError('NATIVE_ERROR');
-        return value;
+          .then((value) => {
+            const output = methods.sheetActionsV1.output.safeParse(value);
+            if (!output.success) throw new BridgeError('NATIVE_ERROR');
+            const selected = output.data;
+            if (
+              selected.status === 'selected' &&
+              !parsed.data.actions.some((action) => action.id === selected.actionId)
+            )
+              throw new BridgeError('NATIVE_ERROR');
+            return selected;
+          })
+          .finally(() => {
+            pendingSheet = undefined;
+          });
+        pendingSheet = { request, result };
+        return result;
       },
     },
     syncHistory,

@@ -26,6 +26,15 @@ RPC 기본 기한은 handshake 3초, 일반 호출 5초, 로그인과 시트 호
 
 v1 입력은 엄격하게 고정한다. 새 입력 필드는 버전이나 기능 협상 없이 보내지 않는다. 출력의 추가 필드는 이전 웹 클라이언트가 무시할 수 있다.
 
+## 액션 바텀시트
+
+- `platform.sheets.actions()`는 한 번에 한 시트만 연다. 같은 요청 ID와 내용의 진행 중 호출은 결과를 공유하며, 그 외 동시 호출은 `PERMISSION_DENIED`다.
+- 브라우저 또는 지원되지 않는 앱에서는 디자인 시스템 `BottomSheet`를, 지원 앱에서는 문서 범위의 `SheetSessions`와 Expo UI 시트를 사용한다. 선택은 `{ status: 'selected', actionId }`, 사용자 닫기는 `{ status: 'cancelled' }`이다. 실제 저장·삭제는 호출 화면에서 실행한다.
+- 웹은 X/취소/배경/Escape로, 네이티브는 취소/플랫폼 dismiss(스와이프, Android Back 등)로 닫는다. 연결 종료는 `BRIDGE_CLOSED`다. `RESULT_UNKNOWN`은 웹이 응답을 더 이상 기다리지 않는다는 뜻이지 네이티브가 자동으로 닫힌다는 뜻이 아니다. 웹 시트 전환이나 자동 재호출 없이 사용자가 네이티브 시트를 닫을 수 있어야 한다.
+- 웹의 `platformErrorMessage`는 브릿지 오류를 화면용 문구로 바꾼다. 화면 이탈로 인한 종료와 정상 취소에는 알림을 띄우지 않는다. 기능별 검증·실패 처리는 호출부 책임이다.
+- 브라우저의 `/design-system` 또는 개발 빌드의 딥 링크 `ziper://web?path=%2Fdesign-system`에서 **공통 액션 시트 열기**와 **긴 액션 시트 열기**(20개 항목)를 사용한다. 브라우저는 시트의 포커스와 Escape를, 앱은 동작 결과, 시트 우선 Back, 연속 닫기/재열기, 긴 콘텐츠 스크롤·safe area를 확인한다. 자동 테스트는 네이티브 UI를 모킹한다.
+- 디자인 컴포넌트 인벤토리와 플랫폼별 패키지 제안은 [디자인 시스템 조사](../../../docs/design-system-jec-24.md)를 참고한다.
+
 ## 외부 링크 공유
 
 - Expo의 공유 URL은 앱 진입 신호로만 사용한다. 네이티브가 원본을 읽고 앱 단위 인박스에 보관하며, 활성 WebView가 `share.incoming.v1` 협상 후 `shareReadV1`으로 조회한다.
