@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { requireSignedOut } from '../../features/auth';
 import { useEffect, useState } from 'react';
 import tooltipTriangle from '../../assets/login/tooltip-triangle.svg';
 import welcomeImage from '../../assets/login/welcome.png';
@@ -12,6 +13,8 @@ import {
 import * as styles from '../../styles/login.css';
 
 export const Route = createFileRoute('/login/')({
+  ssr: false,
+  beforeLoad: requireSignedOut,
   component: LoginPage,
 });
 
@@ -74,7 +77,8 @@ function LoginPage() {
           <button
             type="button"
             className={styles.signInLink}
-            onClick={() => navigate({ to: '/login/email' })}
+            // TODO(JEC-66): 이메일 로그인 API 가 나오면 이메일 로그인 화면으로 보낸다.
+            onClick={() => showToast('이메일 로그인은 준비 중이에요')}
           >
             로그인 하기
           </button>

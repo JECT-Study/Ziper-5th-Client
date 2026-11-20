@@ -1,5 +1,5 @@
 {
-  "include": ["src", "vite.config.ts"],
+  "include": ["src", "dev", "vite.config.ts"],
   "compilerOptions": {
     "strict": true,
     "target": "ES2022",

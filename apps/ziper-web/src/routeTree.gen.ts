@@ -14,7 +14,6 @@ import { Route as DesignSystemRouteImport } from './routes/design-system'
 import { Route as RegisterProductRouteImport } from './routes/register-product'
 import { Route as ShareProductRouteImport } from './routes/share-product'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
-import { Route as LoginEmailRouteImport } from './routes/login/email'
 import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as SignupCompleteRouteImport } from './routes/signup/complete'
 
@@ -43,11 +42,6 @@ const LoginIndexRoute = LoginIndexRouteImport.update({
   path: '/login/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoginEmailRoute = LoginEmailRouteImport.update({
-  id: '/login/email',
-  path: '/login/email',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignupIndexRoute = SignupIndexRouteImport.update({
   id: '/signup/',
   path: '/signup/',
@@ -64,7 +58,6 @@ export interface FileRoutesByFullPath {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
-  '/login/email': typeof LoginEmailRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
@@ -74,7 +67,6 @@ export interface FileRoutesByTo {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
-  '/login/email': typeof LoginEmailRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/login': typeof LoginIndexRoute
   '/signup': typeof SignupIndexRoute
@@ -85,7 +77,6 @@ export interface FileRoutesById {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
-  '/login/email': typeof LoginEmailRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
@@ -97,7 +88,6 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/register-product'
     | '/share-product'
-    | '/login/email'
     | '/signup/complete'
     | '/login/'
     | '/signup/'
@@ -107,7 +97,6 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/register-product'
     | '/share-product'
-    | '/login/email'
     | '/signup/complete'
     | '/login'
     | '/signup'
@@ -117,7 +106,6 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/register-product'
     | '/share-product'
-    | '/login/email'
     | '/signup/complete'
     | '/login/'
     | '/signup/'
@@ -128,7 +116,6 @@ export interface RootRouteChildren {
   DesignSystemRoute: typeof DesignSystemRoute
   RegisterProductRoute: typeof RegisterProductRoute
   ShareProductRoute: typeof ShareProductRoute
-  LoginEmailRoute: typeof LoginEmailRoute
   SignupCompleteRoute: typeof SignupCompleteRoute
   LoginIndexRoute: typeof LoginIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
@@ -171,13 +158,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/login/email': {
-      id: '/login/email'
-      path: '/login/email'
-      fullPath: '/login/email'
-      preLoaderRoute: typeof LoginEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signup/': {
       id: '/signup/'
       path: '/signup'
@@ -200,7 +180,6 @@ const rootRouteChildren: RootRouteChildren = {
   DesignSystemRoute: DesignSystemRoute,
   RegisterProductRoute: RegisterProductRoute,
   ShareProductRoute: ShareProductRoute,
-  LoginEmailRoute: LoginEmailRoute,
   SignupCompleteRoute: SignupCompleteRoute,
   LoginIndexRoute: LoginIndexRoute,
   SignupIndexRoute: SignupIndexRoute,

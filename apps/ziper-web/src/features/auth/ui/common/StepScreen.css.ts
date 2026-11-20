@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css';
-import { typography, vars } from '../styles/theme.css';
+import { typography, vars } from '../../../../styles/theme.css';
 
 export const screen = style({
   maxWidth: 480,
@@ -46,4 +46,11 @@ export const description = style({
 export const bottom = style({
   position: 'sticky',
   bottom: 0,
+});
+
+// 입력칸 여러 개를 세로로 쌓을 때 쓴다.
+export const fields = style({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: vars.space[40],
 });
