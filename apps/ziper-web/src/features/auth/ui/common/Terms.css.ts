@@ -1,11 +1,5 @@
 import { style } from '@vanilla-extract/css';
-import { typography, vars } from './theme.css';
-
-export const fields = style({
-  display: 'flex',
-  flexDirection: 'column',
-  gap: vars.space[40],
-});
+import { typography, vars } from '../../../../styles/theme.css';
 
 export const terms = style({
   marginTop: vars.space[32],

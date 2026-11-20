@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Footer, HeaderSub } from '../components';
+import { Footer, HeaderSub } from '../../../../components';
 import * as styles from './StepScreen.css';
 
 type StepScreenProps = {
