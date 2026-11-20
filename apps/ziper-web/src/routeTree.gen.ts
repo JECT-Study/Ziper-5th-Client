@@ -16,6 +16,8 @@ import { Route as ShareProductRouteImport } from './routes/share-product'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as SignupCompleteRouteImport } from './routes/signup/complete'
+import { Route as SignupTermsRouteImport } from './routes/signup/terms'
+import { Route as AuthCallbackProviderRouteImport } from './routes/auth/callback/$provider'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +54,16 @@ const SignupCompleteRoute = SignupCompleteRouteImport.update({
   path: '/signup/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignupTermsRoute = SignupTermsRouteImport.update({
+  id: '/signup/terms',
+  path: '/signup/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackProviderRoute = AuthCallbackProviderRouteImport.update({
+  id: '/auth/callback/$provider',
+  path: '/auth/callback/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,8 +71,10 @@ export interface FileRoutesByFullPath {
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
   '/signup/complete': typeof SignupCompleteRoute
+  '/signup/terms': typeof SignupTermsRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/auth/callback/$provider': typeof AuthCallbackProviderRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -68,8 +82,10 @@ export interface FileRoutesByTo {
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
   '/signup/complete': typeof SignupCompleteRoute
+  '/signup/terms': typeof SignupTermsRoute
   '/login': typeof LoginIndexRoute
   '/signup': typeof SignupIndexRoute
+  '/auth/callback/$provider': typeof AuthCallbackProviderRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,8 +94,10 @@ export interface FileRoutesById {
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
   '/signup/complete': typeof SignupCompleteRoute
+  '/signup/terms': typeof SignupTermsRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/auth/callback/$provider': typeof AuthCallbackProviderRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -89,8 +107,10 @@ export interface FileRouteTypes {
     | '/register-product'
     | '/share-product'
     | '/signup/complete'
+    | '/signup/terms'
     | '/login/'
     | '/signup/'
+    | '/auth/callback/$provider'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -98,8 +118,10 @@ export interface FileRouteTypes {
     | '/register-product'
     | '/share-product'
     | '/signup/complete'
+    | '/signup/terms'
     | '/login'
     | '/signup'
+    | '/auth/callback/$provider'
   id:
     | '__root__'
     | '/'
@@ -107,8 +129,10 @@ export interface FileRouteTypes {
     | '/register-product'
     | '/share-product'
     | '/signup/complete'
+    | '/signup/terms'
     | '/login/'
     | '/signup/'
+    | '/auth/callback/$provider'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,8 +141,10 @@ export interface RootRouteChildren {
   RegisterProductRoute: typeof RegisterProductRoute
   ShareProductRoute: typeof ShareProductRoute
   SignupCompleteRoute: typeof SignupCompleteRoute
+  SignupTermsRoute: typeof SignupTermsRoute
   LoginIndexRoute: typeof LoginIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
+  AuthCallbackProviderRoute: typeof AuthCallbackProviderRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +198,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signup/terms': {
+      id: '/signup/terms'
+      path: '/signup/terms'
+      fullPath: '/signup/terms'
+      preLoaderRoute: typeof SignupTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback/$provider': {
+      id: '/auth/callback/$provider'
+      path: '/auth/callback/$provider'
+      fullPath: '/auth/callback/$provider'
+      preLoaderRoute: typeof AuthCallbackProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -181,8 +221,10 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterProductRoute: RegisterProductRoute,
   ShareProductRoute: ShareProductRoute,
   SignupCompleteRoute: SignupCompleteRoute,
+  SignupTermsRoute: SignupTermsRoute,
   LoginIndexRoute: LoginIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
+  AuthCallbackProviderRoute: AuthCallbackProviderRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
