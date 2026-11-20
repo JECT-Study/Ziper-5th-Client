@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import { BridgeProvider } from '../bridge/provider';
+import { Toaster } from '../components';
 import { ShareEntry } from '../features/product-save/incoming-share';
 import '../styles/global.css';
 
@@ -35,6 +36,7 @@ function RootComponent() {
         <BridgeProvider>
           <ShareEntry />
           <Outlet />
+          <Toaster />
         </BridgeProvider>
         <Scripts />
       </body>

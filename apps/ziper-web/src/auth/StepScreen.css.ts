@@ -47,12 +47,3 @@ export const bottom = style({
   position: 'sticky',
   bottom: 0,
 });
-
-// Figma 처럼 하단 버튼 영역 바로 위, 가운데에 붙는다.
-export const toast = style({
-  position: 'absolute',
-  bottom: '100%',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  whiteSpace: 'nowrap',
-});

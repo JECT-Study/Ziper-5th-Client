@@ -12,3 +12,4 @@ export { SegmentedControl } from './SegmentedControl';
 export { SocialLoginButton, type SocialProvider } from './SocialLoginButton';
 export { TextField } from './TextField';
 export { Toast } from './Toast';
+export { Toaster, showToast } from './Toaster';

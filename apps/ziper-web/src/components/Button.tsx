@@ -13,7 +13,6 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const ICON_SIZE = { large: 24, medium: 16, small: 12 } as const;
-const SPINNER_SIZE = { large: 24, medium: 24, small: 16 } as const;
 
 export function Button({
   variant = 'primary',
@@ -36,15 +35,18 @@ export function Button({
       {...rest}
     >
       <span className={styles.content}>
-        {leftIcon && <Icon name={leftIcon} size={ICON_SIZE[size]} />}
+        {/* 로딩 중에는 왼쪽 아이콘 자리에 스피너를 두고 글자는 그대로 보여준다. */}
+        {loading ? (
+          // 버튼 이름은 글자만 읽히도록 스피너는 보조기기에서 숨긴다(aria-busy 로 로딩을 알린다).
+          <span className={styles.loadingIcon} aria-hidden="true">
+            <Spinner size={ICON_SIZE[size]} />
+          </span>
+        ) : (
+          leftIcon && <Icon name={leftIcon} size={ICON_SIZE[size]} />
+        )}
         {children}
         {rightIcon && <Icon name={rightIcon} size={ICON_SIZE[size]} />}
       </span>
-      {loading && (
-        <span className={styles.loadingIcon} aria-hidden="true">
-          <Spinner size={SPINNER_SIZE[size]} />
-        </span>
-      )}
     </button>
   );
 }

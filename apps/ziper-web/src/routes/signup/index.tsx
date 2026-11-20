@@ -10,7 +10,7 @@ import {
   isValidPassword,
 } from '../../auth/rules';
 import { StepScreen } from '../../auth/StepScreen';
-import { Button, Checkbox, Divider, Modal, TextField } from '../../components';
+import { Button, Checkbox, Divider, Modal, TextField, showToast } from '../../components';
 import * as styles from '../../styles/signup.css';
 
 export const Route = createFileRoute('/signup/')({
@@ -21,7 +21,6 @@ type Step = 'nickname' | 'email' | 'code' | 'password';
 const STEPS: Step[] = ['nickname', 'email', 'code', 'password'];
 
 const HEADER_TITLE = '회원 가입';
-const TOAST_DURATION_MS = 2500;
 
 /** 이메일 회원가입(RQ-AUTH-13·14): 닉네임 → 이메일 → 인증번호 → 비밀번호·약관 */
 function SignupPage() {
@@ -29,13 +28,6 @@ function SignupPage() {
   const [step, setStep] = useState<Step>('nickname');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
-  const [toast, setToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), TOAST_DURATION_MS);
-    return () => clearTimeout(timer);
-  }, [toast]);
 
   const back = () => {
     const index = STEPS.indexOf(step);
@@ -47,7 +39,6 @@ function SignupPage() {
     <>
       {step === 'nickname' && (
         <NicknameStep
-          toast={toast}
           value={nickname}
           onChange={setNickname}
           onBack={back}
@@ -56,24 +47,21 @@ function SignupPage() {
       )}
       {step === 'email' && (
         <EmailStep
-          toast={toast}
           value={email}
           onChange={setEmail}
           onBack={back}
           onSent={() => {
-            setToast('인증번호가 발송되었어요');
+            showToast('인증번호가 발송되었어요');
             setStep('code');
           }}
         />
       )}
       {step === 'code' && (
         <CodeStep
-          toast={toast}
           email={email}
           onBack={back}
-          onResent={() => setToast('인증번호가 재발송되었어요')}
+          onResent={() => showToast('인증번호가 재발송되었어요')}
           onVerified={() => {
-            setToast(null);
             setStep('password');
           }}
           onRetryEmail={() => setStep('email')}
@@ -82,7 +70,6 @@ function SignupPage() {
       )}
       {step === 'password' && (
         <PasswordStep
-          toast={toast}
           onBack={back}
           onSubmit={async (password, marketingAgreed) => {
             await signUp({ nickname, email, password, marketingAgreed });
@@ -97,13 +84,11 @@ function SignupPage() {
 type NicknameState = 'idle' | 'checking' | 'available' | 'taken';
 
 function NicknameStep({
-  toast,
   value,
   onChange,
   onBack,
   onNext,
 }: {
-  toast: string | null;
   value: string;
   onChange: (value: string) => void;
   onBack: () => void;
@@ -132,7 +117,6 @@ function NicknameStep({
 
   return (
     <StepScreen
-      toast={toast}
       headerTitle={HEADER_TITLE}
       onBack={onBack}
       title="닉네임을 입력해주세요"
@@ -161,13 +145,11 @@ function NicknameStep({
 }
 
 function EmailStep({
-  toast,
   value,
   onChange,
   onBack,
   onSent,
 }: {
-  toast: string | null;
   value: string;
   onChange: (value: string) => void;
   onBack: () => void;
@@ -188,7 +170,6 @@ function EmailStep({
 
   return (
     <StepScreen
-      toast={toast}
       headerTitle={HEADER_TITLE}
       onBack={onBack}
       title="이메일을 입력해주세요"
@@ -215,7 +196,6 @@ function EmailStep({
 }
 
 function CodeStep({
-  toast,
   email,
   onBack,
   onResent,
@@ -223,7 +203,6 @@ function CodeStep({
   onRetryEmail,
   onOtherMethod,
 }: {
-  toast: string | null;
   email: string;
   onBack: () => void;
   onResent: () => void;
@@ -256,7 +235,6 @@ function CodeStep({
 
   return (
     <StepScreen
-      toast={toast}
       headerTitle={HEADER_TITLE}
       onBack={onBack}
       eyebrow="아래 주소로 인증코드가 발송되었습니다"
@@ -315,11 +293,9 @@ const TERMS = [
 type TermId = (typeof TERMS)[number]['id'];
 
 function PasswordStep({
-  toast,
   onBack,
   onSubmit,
 }: {
-  toast: string | null;
   onBack: () => void;
   onSubmit: (password: string, marketingAgreed: boolean) => Promise<void>;
 }) {
@@ -349,7 +325,6 @@ function PasswordStep({
 
   return (
     <StepScreen
-      toast={toast}
       headerTitle={HEADER_TITLE}
       onBack={onBack}
       title="비밀번호를 입력해주세요"

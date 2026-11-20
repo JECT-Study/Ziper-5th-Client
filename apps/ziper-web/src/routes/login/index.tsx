@@ -2,7 +2,13 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import tooltipTriangle from '../../assets/login/tooltip-triangle.svg';
 import welcomeImage from '../../assets/login/welcome.png';
-import { Button, Divider, SocialLoginButton, Toast, type SocialProvider } from '../../components';
+import {
+  Button,
+  Divider,
+  SocialLoginButton,
+  showToast,
+  type SocialProvider,
+} from '../../components';
 import * as styles from '../../styles/login.css';
 
 export const Route = createFileRoute('/login/')({
@@ -13,28 +19,19 @@ const PROVIDERS: SocialProvider[] = ['naver', 'kakao', 'apple'];
 
 const LAST_PROVIDER_KEY = 'ziper:lastLoginProvider';
 
-const TOAST_DURATION_MS = 2500;
-
 function LoginPage() {
   const navigate = useNavigate();
   const [lastProvider, setLastProvider] = useState<SocialProvider | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   // TODO(소셜 로그인 연결): 로그인에 성공하면 이 값에 provider 를 저장한다.
   useEffect(() => {
     setLastProvider(localStorage.getItem(LAST_PROVIDER_KEY) as SocialProvider | null);
   }, []);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), TOAST_DURATION_MS);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
   // TODO(소셜 로그인 연결): 팀 공용 브릿지(JEC-19)가 들어오면 앱의 네이티브 SDK 로그인을 부른다.
   function login(provider: SocialProvider) {
     void provider;
-    setToast('소셜 로그인은 준비 중이에요');
+    showToast('소셜 로그인은 준비 중이에요');
   }
 
   return (
@@ -83,8 +80,6 @@ function LoginPage() {
           </button>
         </p>
       </div>
-
-      {toast && <Toast className={styles.toast}>{toast}</Toast>}
     </main>
   );
 }
