@@ -13,6 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DesignSystemRouteImport } from './routes/design-system'
 import { Route as RegisterProductRouteImport } from './routes/register-product'
 import { Route as ShareProductRouteImport } from './routes/share-product'
+import { Route as LoginIndexRouteImport } from './routes/login/index'
+import { Route as LoginEmailRouteImport } from './routes/login/email'
+import { Route as SignupIndexRouteImport } from './routes/signup/index'
+import { Route as SignupCompleteRouteImport } from './routes/signup/complete'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +38,46 @@ const ShareProductRoute = ShareProductRouteImport.update({
   path: '/share-product',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginIndexRoute = LoginIndexRouteImport.update({
+  id: '/login/',
+  path: '/login/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginEmailRoute = LoginEmailRouteImport.update({
+  id: '/login/email',
+  path: '/login/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupIndexRoute = SignupIndexRouteImport.update({
+  id: '/signup/',
+  path: '/signup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupCompleteRoute = SignupCompleteRouteImport.update({
+  id: '/signup/complete',
+  path: '/signup/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/login/email': typeof LoginEmailRoute
+  '/signup/complete': typeof SignupCompleteRoute
+  '/login/': typeof LoginIndexRoute
+  '/signup/': typeof SignupIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/login/email': typeof LoginEmailRoute
+  '/signup/complete': typeof SignupCompleteRoute
+  '/login': typeof LoginIndexRoute
+  '/signup': typeof SignupIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,14 +85,42 @@ export interface FileRoutesById {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/login/email': typeof LoginEmailRoute
+  '/signup/complete': typeof SignupCompleteRoute
+  '/login/': typeof LoginIndexRoute
+  '/signup/': typeof SignupIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design-system' | '/register-product' | '/share-product'
+  fullPaths:
+    | '/'
+    | '/design-system'
+    | '/register-product'
+    | '/share-product'
+    | '/login/email'
+    | '/signup/complete'
+    | '/login/'
+    | '/signup/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design-system' | '/register-product' | '/share-product'
+  to:
+    | '/'
+    | '/design-system'
+    | '/register-product'
+    | '/share-product'
+    | '/login/email'
+    | '/signup/complete'
+    | '/login'
+    | '/signup'
   id:
-    '__root__' | '/' | '/design-system' | '/register-product' | '/share-product'
+    | '__root__'
+    | '/'
+    | '/design-system'
+    | '/register-product'
+    | '/share-product'
+    | '/login/email'
+    | '/signup/complete'
+    | '/login/'
+    | '/signup/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -68,6 +128,10 @@ export interface RootRouteChildren {
   DesignSystemRoute: typeof DesignSystemRoute
   RegisterProductRoute: typeof RegisterProductRoute
   ShareProductRoute: typeof ShareProductRoute
+  LoginEmailRoute: typeof LoginEmailRoute
+  SignupCompleteRoute: typeof SignupCompleteRoute
+  LoginIndexRoute: typeof LoginIndexRoute
+  SignupIndexRoute: typeof SignupIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -100,6 +164,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShareProductRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login/': {
+      id: '/login/'
+      path: '/login'
+      fullPath: '/login/'
+      preLoaderRoute: typeof LoginIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login/email': {
+      id: '/login/email'
+      path: '/login/email'
+      fullPath: '/login/email'
+      preLoaderRoute: typeof LoginEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup/': {
+      id: '/signup/'
+      path: '/signup'
+      fullPath: '/signup/'
+      preLoaderRoute: typeof SignupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup/complete': {
+      id: '/signup/complete'
+      path: '/signup/complete'
+      fullPath: '/signup/complete'
+      preLoaderRoute: typeof SignupCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -108,6 +200,10 @@ const rootRouteChildren: RootRouteChildren = {
   DesignSystemRoute: DesignSystemRoute,
   RegisterProductRoute: RegisterProductRoute,
   ShareProductRoute: ShareProductRoute,
+  LoginEmailRoute: LoginEmailRoute,
+  SignupCompleteRoute: SignupCompleteRoute,
+  LoginIndexRoute: LoginIndexRoute,
+  SignupIndexRoute: SignupIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
