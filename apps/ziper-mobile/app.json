@@ -23,9 +23,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kimjiyu.ziper-mobile"
+      "bundleIdentifier": "com.ject.ziper"
     },
     "android": {
+      "package": "com.ject.ziper",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
