@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css';
-import { typography, vars } from './theme.css';
+import { typography, vars } from '../../../../styles/theme.css';
 
 // 수치는 Figma RQ-AUTH-10 (375 x 812, 상태 표시줄 44 제외) 기준.
 // 68·-43·34 처럼 토큰에 없는 값은 Figma 요소 위치에서 계산한 레이아웃 간격이다.
@@ -122,5 +122,3 @@ export const signInLink = style({
   font: 'inherit',
   cursor: 'pointer',
 });
-
-// 홈 인디케이터(안전 영역) 위에 띄운다.

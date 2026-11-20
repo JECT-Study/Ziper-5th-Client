@@ -62,6 +62,19 @@ export async function signUp(input: {
   });
 }
 
+/** 앱 SDK 가 받은 토큰(Apple 은 ID Token, 카카오·네이버는 Access Token)으로 로그인한다. */
+export function signInWithSocialToken(provider: string, token: string) {
+  return signIn(`/api/v1/auth/oauth/${provider}`, { token });
+}
+
+/** 웹 로그인으로 받은 인가 코드를 백엔드가 프로바이더 토큰으로 바꿔 로그인한다. */
+export async function signInWithOAuthCode(
+  provider: string,
+  input: { code: string; redirectUri: string; state: string },
+) {
+  return signIn(`/api/v1/auth/oauth/${provider}/code`, input);
+}
+
 /** 이 기기의 토큰을 먼저 지우고, 백엔드 세션도 끊는다. */
 export async function signOut() {
   const tokens = loadTokens();

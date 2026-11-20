@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
-import { BridgeProvider } from '../bridge/provider';
+import { BridgeProvider, type BridgeProviderConfig } from '../bridge/provider';
 import { Toaster } from '../components';
+import { webAuth } from '../features/auth';
 import { ShareEntry } from '../features/product-save/incoming-share';
 import '../styles/global.css';
 
@@ -22,6 +23,9 @@ export const Route = createRootRoute({
   component: RootComponent,
 });
 
+// BridgeProvider 는 config 가 바뀌면 브릿지를 다시 만들므로 모듈에 한 번만 둔다.
+const bridgeConfig: BridgeProviderConfig = { auth: webAuth };
+
 function RootComponent() {
   return (
     <html lang="ko">
@@ -33,7 +37,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body>
-        <BridgeProvider>
+        <BridgeProvider config={bridgeConfig}>
           <ShareEntry />
           <Outlet />
           <Toaster />
