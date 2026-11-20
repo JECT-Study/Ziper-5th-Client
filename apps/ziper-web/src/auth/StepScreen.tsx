@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Footer, HeaderSub, Toast } from '../components';
+import { Footer, HeaderSub } from '../components';
 import * as styles from './StepScreen.css';
 
 type StepScreenProps = {
@@ -14,8 +14,6 @@ type StepScreenProps = {
   /** 하단 버튼들 */
   actions: ReactNode;
   actionsLayout?: 'single' | 'stack';
-  /** 하단 버튼 바로 위에 띄우는 알림 문구 */
-  toast?: string | null;
 };
 
 /** 회원가입·이메일 로그인 단계 화면의 공통 틀(RQ-AUTH-13·14·16): 헤더, 제목, 입력 영역, 하단 버튼. */
@@ -28,7 +26,6 @@ export function StepScreen({
   children,
   actions,
   actionsLayout = 'single',
-  toast,
 }: StepScreenProps) {
   return (
     <div className={styles.screen}>
@@ -42,7 +39,6 @@ export function StepScreen({
         {children}
       </main>
       <div className={styles.bottom}>
-        {toast && <Toast className={styles.toast}>{toast}</Toast>}
         <Footer layout={actionsLayout}>{actions}</Footer>
       </div>
     </div>

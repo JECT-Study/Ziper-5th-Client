@@ -124,11 +124,3 @@ export const signInLink = style({
 });
 
 // 홈 인디케이터(안전 영역) 위에 띄운다.
-export const toast = style({
-  position: 'fixed',
-  left: '50%',
-  bottom: `calc(${vars.space[24]} + env(safe-area-inset-bottom))`,
-  transform: 'translateX(-50%)',
-  zIndex: 10,
-  whiteSpace: 'nowrap',
-});

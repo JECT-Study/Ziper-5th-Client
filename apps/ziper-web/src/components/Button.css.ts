@@ -24,11 +24,9 @@ export const content = style({
   alignItems: 'center',
   gap: 'inherit',
   gridArea: '1 / 1',
-  // Keep the accessible name and width when swapping the visible label for a spinner.
-  selectors: { [`${base}[aria-busy="true"] > &`]: { opacity: 0 } },
 });
 
-export const loadingIcon = style({ display: 'inline-flex', gridArea: '1 / 1' });
+export const loadingIcon = style({ display: 'inline-flex' });
 
 export const variant = styleVariants({
   primary: {
