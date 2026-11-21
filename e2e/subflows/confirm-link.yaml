@@ -1,0 +1,10 @@
+# iOS 시뮬레이터는 외부에서 연 URL 마다 "Open in Ziper?" 확인 창을 띄운다.
+appId: com.ject.ziper
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: Open
+          optional: true

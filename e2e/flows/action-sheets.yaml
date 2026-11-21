@@ -1,0 +1,39 @@
+# 디자인 시스템 페이지의 공통·긴 액션 시트: 선택 결과가 브릿지로 웹에 돌아오고, 긴 목록도 끝까지 선택할 수 있다.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/launch.yaml
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fdesign-system
+- scrollUntilVisible:
+    element: 공통 액션 시트 열기
+    direction: DOWN
+- tapOn: 공통 액션 시트 열기
+- tapOn:
+    id: sheet-action-save
+- scrollUntilVisible:
+    element: '선택: save'
+    direction: DOWN
+- scrollUntilVisible:
+    element: 공통 액션 시트 열기
+    direction: UP
+- tapOn: 공통 액션 시트 열기
+- tapOn:
+    id: sheet-cancel
+- scrollUntilVisible:
+    element: 취소됨
+    direction: DOWN
+- scrollUntilVisible:
+    element: 긴 액션 시트 열기
+    direction: UP
+- tapOn: 긴 액션 시트 열기
+- scrollUntilVisible:
+    element:
+      id: sheet-action-action-20
+    direction: DOWN
+- tapOn:
+    id: sheet-action-action-20
+- scrollUntilVisible:
+    element: '선택: action-20'
+    direction: DOWN

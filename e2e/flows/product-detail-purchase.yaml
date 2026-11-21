@@ -1,0 +1,21 @@
+# JEC-23 상품 상세: 웹 "상품 관리" → 네이티브 액션 시트 → 구매 완료 확인 → 결과 화면 → 상세로 복귀.
+# 웹 dev 서버의 프리뷰 fixture(?preview=normal)를 쓰므로 백엔드가 필요 없다.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/launch.yaml
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F1%3Fpreview%3Dnormal
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn:
+    id: sheet-action-purchase
+- tapOn: 이동하기
+- extendedWaitUntil:
+    visible: '.*구매 완료 목록으로 이동했어요'
+    timeout: 10000
+- tapOn: 뒤로 가기
+- assertVisible: 구매 완료 목록 보기

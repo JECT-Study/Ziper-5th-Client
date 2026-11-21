@@ -1,0 +1,33 @@
+# Android 하드웨어 Back 순서: 네이티브 시트 → 웹 화면 안의 단계(확인 창·수정 화면) → 화면 이탈.
+appId: com.ject.ziper
+---
+- runFlow: ../../subflows/launch.yaml
+- runFlow:
+    file: ../../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F1%3Fpreview%3Dnormal
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 상품 관리
+- assertVisible:
+    id: sheet-cancel
+- back
+- assertNotVisible:
+    id: sheet-cancel
+- assertVisible: 상품 관리
+- tapOn: 상품 관리
+- tapOn:
+    id: sheet-action-purchase
+- assertVisible: 이동하기
+- back
+- assertNotVisible: 이동하기
+- assertVisible: 상품 관리
+- tapOn: 상품 관리
+- tapOn:
+    id: sheet-action-edit
+- assertNotVisible: 상품 관리
+- back
+- assertVisible: 상품 관리
+- back
+- assertVisible: 이메일로 가입하기

@@ -1,0 +1,5 @@
+# 앱 실행 → dev client 가 Metro 에 붙고 WebView 가 웹(로그인 화면)을 띄운다.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/launch.yaml
+- assertVisible: 이메일로 가입하기
