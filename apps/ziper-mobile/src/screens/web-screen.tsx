@@ -16,6 +16,7 @@ import { useMobileServices } from '../bridge/services';
 import { SheetSessions, type SheetSnapshot } from '../bridge/sheets';
 import { WebView } from '../bridge/webview';
 import { NativeActionSheet } from './native-action-sheet';
+import { WebLoadError } from './web-load-error';
 
 type WebScope = ReturnType<typeof createHandlers> & {
   uri: string;
@@ -242,10 +243,10 @@ export function WebScreen({ path }: { path: string }) {
         }}
       />
       {!uri ? (
-        <Text accessibilityRole="alert">Invalid service-relative page path.</Text>
+        <Text accessibilityRole="alert">잘못된 화면 주소예요.</Text>
       ) : blocked ? (
         <View style={{ padding: 24 }}>
-          <Text accessibilityRole="alert">This page was blocked by the web host policy.</Text>
+          <Text accessibilityRole="alert">허용되지 않은 페이지라서 열지 않았어요.</Text>
         </View>
       ) : (
         <WebView
@@ -256,6 +257,7 @@ export function WebScreen({ path }: { path: string }) {
           style={{ flex: 1 }}
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={(request) => allowedDocument(config, request.url)}
+          renderError={() => <WebLoadError onRetry={() => web.current?.reload()} />}
           onOpenWindow={() => {
             /* Block popups instead of handing them to Linking. */
           }}
