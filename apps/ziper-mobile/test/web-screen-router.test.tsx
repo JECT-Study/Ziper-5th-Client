@@ -68,7 +68,10 @@ it.each([
     .mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
   try {
     await renderRouter(routes, { initialUrl: '/web?path=' + encodeURIComponent(path) });
-    expect(screen.getByText(/^WebView:/).parent?.props.style).toMatchObject({ paddingTop });
+    // Android WebView 는 env(safe-area-inset-top) 을 스스로 주므로 네이티브 여백을 두지 않는다.
+    expect(screen.getByText(/^WebView:/).parent?.props.style).toMatchObject({
+      paddingTop: Platform.OS === 'android' ? 0 : paddingTop,
+    });
   } finally {
     insets.mockRestore();
   }
