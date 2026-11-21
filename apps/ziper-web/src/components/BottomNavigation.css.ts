@@ -7,7 +7,6 @@ export const root = style({
   gridTemplateColumns: 'minmax(0, 1fr) clamp(50px, 20%, 74px) minmax(0, 1fr)',
   alignItems: 'center',
   padding: `${vars.space[12]} 0`,
-  paddingBottom: `calc(${vars.space[12]} + env(safe-area-inset-bottom, 0px))`,
   borderTop: `1px solid ${vars.color.border.subtle}`,
   backgroundColor: vars.color.background,
 });

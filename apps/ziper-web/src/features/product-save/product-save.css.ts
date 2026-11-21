@@ -1,8 +1,9 @@
 import { globalStyle, style } from '@vanilla-extract/css';
 import { typography, vars } from '../../styles/theme.css';
+import { viewportHeight } from '../../styles/viewport';
 
 export const shell = style({
-  height: '100dvh',
+  height: viewportHeight,
   minHeight: 220,
   maxWidth: 480,
   margin: '0 auto',
@@ -231,5 +232,5 @@ export const footer = style({
   gap: vars.space[8],
   flexShrink: 0,
   paddingTop: vars.space[12],
-  paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))',
+  paddingBottom: vars.space[16],
 });
