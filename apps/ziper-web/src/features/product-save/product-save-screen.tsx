@@ -21,6 +21,7 @@ import {
   Toast,
 } from '../../components';
 import { InlineEntry } from './inline-entry';
+import { parseWholeWon } from './price';
 import * as styles from './product-save.css';
 
 const initialTags = ['봄', '여름', '가을', '겨울'];
@@ -36,13 +37,6 @@ const imageModes = [
   { value: 'template', label: '도안 고르기' },
 ] as const;
 const won = new Intl.NumberFormat('ko-KR');
-
-export function parseWholeWon(value: string): number | null {
-  const amount = value.trim();
-  if (amount.length > 13 || !/^(?:\d+|\d{1,3}(?:,\d{3})+)$/u.test(amount)) return null;
-  const digits = amount.replaceAll(',', '');
-  return digits.length <= 10 ? Number(digits) : null;
-}
 
 type ScreenProps = {
   url: string | null;

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./product-save": "./src/product-save.ts"
+    "./product-save": "./src/product-save.ts",
+    "./product-detail": "./src/product-detail.ts"
   }
 }

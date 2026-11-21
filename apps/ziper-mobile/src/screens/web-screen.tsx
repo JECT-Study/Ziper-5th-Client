@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { Stack, useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Button, Platform, Text, View } from 'react-native';
+import { BackHandler, Button, Linking, Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BridgeDelegate, BridgeWebView } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
@@ -43,7 +43,9 @@ export function WebScreen({ path }: { path: string }) {
   const [scopes] = useState(() => new ActiveScope<WebScope>());
   const uri = serviceURL(config, path);
   const shareScreen = path === '/share-product';
-  const hasWebHeader = shareScreen || path.split(/[?#]/, 1)[0] === '/register-product';
+  const pathname = path.split(/[?#]/, 1)[0];
+  const edgeToEdge = shareScreen || pathname === '/register-product';
+  const hasWebHeader = edgeToEdge || /^\/products\/[^/]+$/.test(pathname);
   const openedShare = useRef(shareScreen ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
   const live = useRef({
@@ -136,6 +138,9 @@ export function WebScreen({ path }: { path: string }) {
           appVersion: Constants.expoConfig?.version ?? '1.0.0',
           active,
           back: scopeBack,
+          openExternal: async (url) => {
+            await Linking.openURL(url);
+          },
           sheets,
           shareInbox: shareScreen
             ? {
@@ -218,7 +223,7 @@ export function WebScreen({ path }: { path: string }) {
   return (
     // 웹이 화면 전체(헤더 포함)를 그리므로 네이티브 헤더는 숨긴다. 공유·상품 등록 화면은 기존처럼 여백 없이 두고,
     // 나머지는 상태 표시줄 아래부터 그린다.
-    <View style={{ flex: 1, paddingTop: hasWebHeader ? 0 : top, backgroundColor: '#ffffff' }}>
+    <View style={{ flex: 1, paddingTop: edgeToEdge ? 0 : top, backgroundColor: '#ffffff' }}>
       <Stack.Screen
         options={{
           title: 'Ziper',

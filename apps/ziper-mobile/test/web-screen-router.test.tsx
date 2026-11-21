@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
-import { DeviceEventEmitter, Platform } from 'react-native';
+import { DeviceEventEmitter, Linking, Platform } from 'react-native';
+import * as SafeArea from 'react-native-safe-area-context';
 import { fireEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -56,6 +57,35 @@ const routes = {
   '+native-intent': { redirectSystemPath },
 };
 
+it.each([
+  ['/products/1?preview=normal', 24],
+  ['/register-product?step=details', 0],
+  ['/share-product', 0],
+  ['/', 24],
+] as const)('preserves the top safe area for %s', async (path, paddingTop) => {
+  const insets = vi
+    .spyOn(SafeArea, 'useSafeAreaInsets')
+    .mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
+  try {
+    await renderRouter(routes, { initialUrl: '/web?path=' + encodeURIComponent(path) });
+    expect(screen.getByText(/^WebView:/).parent?.props.style).toMatchObject({ paddingTop });
+  } finally {
+    insets.mockRestore();
+  }
+});
+
+it('opens an external product through the real screen delegate without navigating its WebView', async () => {
+  const open = vi.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  const rendered = await renderRouter(routes);
+  const page = mockWebView.delegate!;
+  const input = { url: 'https://shop.example/item', operationId: 'original-1' };
+  await act(async () => {
+    expect(await page.externalOpenV1(input)).toEqual(success({ done: true }));
+  });
+  expect(open).toHaveBeenCalledExactlyOnceWith(input.url);
+  expect(rendered.getPathname()).toBe('/');
+  open.mockRestore();
+});
 it('reads a warm Expo share from the Linking wake signal', async () => {
   await renderRouter(routes);
   expect(redirectSystemPath({ path: 'ziper://expo-sharing', initial: false })).toBeNull();

@@ -16,6 +16,8 @@ pnpm dev:web
 pnpm dev:mobile
 ```
 
+상품 상세·상태 관리의 개발 프리뷰와 서버 API 조사 결과는 [JEC-23 안내](docs/jec-23-product-detail.md)를 참고하세요.
+
 웹의 기본 포트는 3000입니다. 네이티브 앱의 개발 주소와 운영 HTTPS 설정은 [모바일 안내](apps/ziper-mobile/README.md)를 참고하세요.
 
 ## 검증

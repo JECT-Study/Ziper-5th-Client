@@ -15,6 +15,7 @@ export function createDelegate(
     navigationPushV1: (input) => invoke('navigationPushV1', input),
     navigationReplaceV1: (input) => invoke('navigationReplaceV1', input),
     navigationBackV1: () => invoke('navigationBackV1'),
+    externalOpenV1: (input) => invoke('externalOpenV1', input),
     navigationSetWebHistoryV1: (input) => invoke('navigationSetWebHistoryV1', input),
     sheetActionsV1: (input) => invoke('sheetActionsV1', input),
     shareReadV1: () => invoke('shareReadV1'),

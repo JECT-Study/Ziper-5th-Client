@@ -58,6 +58,40 @@ function pendingLogin() {
   return { ...fixture(auth), auth, complete: resolve };
 }
 
+describe('external links', () => {
+  it('advertises only configured openers and deduplicates operations', async () => {
+    const { host, handler } = fixture();
+    const openExternal = vi.fn(async () => {});
+    expect(bridgeInfo(host).capabilities).not.toContain(capability.external);
+    Object.assign(host, { openExternal });
+    expect(bridgeInfo(host).capabilities).toContain(capability.external);
+    const input = { url: 'https://shop.example/item', operationId: 'external-1' };
+    expect(await handler.invoke('externalOpenV1', input)).toEqual(success({ done: true }));
+    expect(await handler.invoke('externalOpenV1', input)).toEqual(success({ done: true }));
+    expect(openExternal).toHaveBeenCalledExactlyOnceWith(input.url);
+    expect(
+      await handler.invoke('externalOpenV1', { ...input, url: 'javascript:alert(1)' }),
+    ).toMatchObject({ ok: false, error: { code: 'INVALID_REQUEST' } });
+  });
+  it('rejects inactive callers and opener failures without modifying document policy', async () => {
+    const { host, handler, deactivate } = fixture();
+    const openExternal = vi.fn(async () => {
+      throw new Error('OS rejected');
+    });
+    Object.assign(host, { openExternal });
+    expect(
+      await handler.invoke('externalOpenV1', { url: 'https://shop.example', operationId: 'fail' }),
+    ).toMatchObject({ ok: false, error: { code: 'INTERNAL' } });
+    deactivate();
+    expect(
+      await handler.invoke('externalOpenV1', {
+        url: 'https://shop.example',
+        operationId: 'inactive',
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } });
+    expect(openExternal).toHaveBeenCalledOnce();
+  });
+});
 const unsupported = { ok: false, error: { code: 'UNSUPPORTED' } };
 describe('strict contract and unsupported guards (real shared schemas)', () => {
   it('takes zero arguments for no-input RPC, not null or undefined workaround arguments', () => {

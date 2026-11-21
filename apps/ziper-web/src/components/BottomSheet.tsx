@@ -1,9 +1,11 @@
 import { useId, type ReactNode } from 'react';
 import { Dialog } from './Dialog';
+import { cx } from './cx';
 import { Icon } from './Icon';
 import * as styles from './BottomSheet.css';
 
 type BottomSheetProps = {
+  className?: string;
   open: boolean;
   title: string;
   onClose: () => void;
@@ -15,6 +17,7 @@ type BottomSheetProps = {
 
 /** 아래에서 올라오는 시트. 바깥(어두운 영역)이나 X 를 누르면 onClose 가 불린다. */
 export function BottomSheet({
+  className,
   open,
   title,
   onClose,
@@ -26,7 +29,7 @@ export function BottomSheet({
   if (!open) return null;
   return (
     <Dialog
-      className={styles.sheet}
+      className={cx(styles.sheet, className)}
       titleId={titleId}
       onClose={onClose}
       onOpenError={onOpenError}

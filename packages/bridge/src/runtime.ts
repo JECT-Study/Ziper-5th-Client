@@ -183,7 +183,8 @@ export function createRuntime(options: RuntimeOptions = {}): Runtime {
           ? (options.handshakeTimeoutMs ?? 3_000)
           : method === 'authLoginV1' ||
               method === 'authOpenBrowserV1' ||
-              method === 'sheetActionsV1'
+              method === 'sheetActionsV1' ||
+              method === 'externalOpenV1'
             ? (options.interactiveTimeoutMs ?? 180_000)
             : (options.callTimeoutMs ?? 5_000);
       return bounded(callOptions.timeoutMs ?? timeout, callOptions.signal, async (signal) => {
@@ -468,6 +469,22 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
             await syncHistory();
           },
         );
+      },
+    },
+    external: {
+      async open(url: string) {
+        check();
+        const input = { url, operationId: operationId() };
+        if (!methods.externalOpenV1.input.safeParse(input).success)
+          throw new BridgeError('INVALID_REQUEST');
+        // Keep the browser popup in the user's click stack; never fallback inside a WebView.
+        if (runtime.status === 'web') {
+          if (!web.openExternal) throw new BridgeError('UNSUPPORTED');
+          await web.openExternal(url);
+          check();
+          return;
+        }
+        await native(capability.external, 'externalOpenV1', input);
       },
     },
     incomingShare: {

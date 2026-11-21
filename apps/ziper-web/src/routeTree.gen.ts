@@ -14,6 +14,7 @@ import { Route as DesignSystemRouteImport } from './routes/design-system'
 import { Route as RegisterProductRouteImport } from './routes/register-product'
 import { Route as ShareProductRouteImport } from './routes/share-product'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
+import { Route as ProductsCardIdRouteImport } from './routes/products.$cardId'
 import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as SignupCompleteRouteImport } from './routes/signup/complete'
 import { Route as SignupTermsRouteImport } from './routes/signup/terms'
@@ -44,6 +45,11 @@ const LoginIndexRoute = LoginIndexRouteImport.update({
   path: '/login/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductsCardIdRoute = ProductsCardIdRouteImport.update({
+  id: '/products/$cardId',
+  path: '/products/$cardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupIndexRoute = SignupIndexRouteImport.update({
   id: '/signup/',
   path: '/signup/',
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/products/$cardId': typeof ProductsCardIdRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
   '/login/': typeof LoginIndexRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/products/$cardId': typeof ProductsCardIdRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
   '/login': typeof LoginIndexRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/design-system': typeof DesignSystemRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/products/$cardId': typeof ProductsCardIdRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
   '/login/': typeof LoginIndexRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/register-product'
     | '/share-product'
+    | '/products/$cardId'
     | '/signup/complete'
     | '/signup/terms'
     | '/login/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/register-product'
     | '/share-product'
+    | '/products/$cardId'
     | '/signup/complete'
     | '/signup/terms'
     | '/login'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/design-system'
     | '/register-product'
     | '/share-product'
+    | '/products/$cardId'
     | '/signup/complete'
     | '/signup/terms'
     | '/login/'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   DesignSystemRoute: typeof DesignSystemRoute
   RegisterProductRoute: typeof RegisterProductRoute
   ShareProductRoute: typeof ShareProductRoute
+  ProductsCardIdRoute: typeof ProductsCardIdRoute
   SignupCompleteRoute: typeof SignupCompleteRoute
   SignupTermsRoute: typeof SignupTermsRoute
   LoginIndexRoute: typeof LoginIndexRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/products/$cardId': {
+      id: '/products/$cardId'
+      path: '/products/$cardId'
+      fullPath: '/products/$cardId'
+      preLoaderRoute: typeof ProductsCardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup/': {
       id: '/signup/'
       path: '/signup'
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesignSystemRoute: DesignSystemRoute,
   RegisterProductRoute: RegisterProductRoute,
   ShareProductRoute: ShareProductRoute,
+  ProductsCardIdRoute: ProductsCardIdRoute,
   SignupCompleteRoute: SignupCompleteRoute,
   SignupTermsRoute: SignupTermsRoute,
   LoginIndexRoute: LoginIndexRoute,

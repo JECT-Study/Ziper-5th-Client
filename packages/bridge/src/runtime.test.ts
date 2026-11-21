@@ -119,6 +119,53 @@ function webServices(): WebServices & { auth: NonNullable<WebServices['auth']> }
   };
 }
 
+describe('external links', () => {
+  it('keeps a browser opener synchronous and validates before dispatch', async () => {
+    const runtime = makeRuntime();
+    await runtime.initialize();
+    const openExternal = vi.fn(async () => {});
+    const platform = createPlatform(runtime, { ...webServices(), openExternal });
+    const pending = platform.external.open('https://shop.example/item');
+    expect(openExternal).toHaveBeenCalledWith('https://shop.example/item');
+    await pending;
+    await expect(platform.external.open('javascript:alert(1)')).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+    expect(openExternal).toHaveBeenCalledOnce();
+  });
+  it('negotiates native external links without opening a browser fallback', async () => {
+    const { calls } = host();
+    const openExternal = vi.fn(async () => {});
+    const platform = createPlatform(makeRuntime(), { ...webServices(), openExternal });
+    await platform.external.open('https://shop.example/item');
+    expect(calls.find((call) => call.method === 'externalOpenV1')?.args[0]).toMatchObject({
+      url: 'https://shop.example/item',
+    });
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+  it('does not fallback or duplicate an unknown native effect', async () => {
+    host({ ackOnly: 'externalOpenV1' });
+    const openExternal = vi.fn(async () => {});
+    const platform = createPlatform(makeRuntime({ interactiveTimeoutMs: 15 }), {
+      ...webServices(),
+      openExternal,
+    });
+    await expect(platform.external.open('https://shop.example/item')).rejects.toMatchObject({
+      code: 'RESULT_UNKNOWN',
+    });
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+  it('reports unsupported on old native hosts instead of opening inside the WebView', async () => {
+    host({ capabilities: [] });
+    const openExternal = vi.fn(async () => {});
+    const platform = createPlatform(makeRuntime(), { ...webServices(), openExternal });
+    await expect(platform.external.open('https://shop.example/item')).rejects.toMatchObject({
+      code: 'UNSUPPORTED',
+    });
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+});
+
 describe('production runtime', () => {
   it('generates native operation IDs without the secure-context-only randomUUID API', async () => {
     const uuid = vi.spyOn(crypto, 'randomUUID').mockImplementation(() => {
