@@ -13,6 +13,7 @@ import checkCheck from '../../assets/product-detail/check-check.svg';
 import { ProductImage } from './product-image';
 import { ProductEditForm } from './product-edit-form';
 import { PurchasedProducts } from './purchased-products';
+import { useBackLayer } from '../../shared/use-back-layer';
 import * as styles from './product-detail.css';
 
 const won = new Intl.NumberFormat('ko-KR');
@@ -176,6 +177,13 @@ export function ProductDetailScreen({
   const title =
     view === 'edit' ? '상품 수정' : view === 'purchased' ? '구매 완료 목록' : '상품 상세';
   const back = view === 'edit' ? reload : view === 'purchased' ? () => setView('detail') : onBack;
+  // 확인 창·수정·결과 화면에서 Back 을 누르면 상세를 떠나지 않고 한 단계만 닫는다.
+  useBackLayer(view !== 'detail' || confirm, () => {
+    if (pending) return;
+    if (confirm) setConfirm(false);
+    else if (view === 'edit') reload();
+    else setView('detail');
+  });
   return (
     <main className={styles.page}>
       <HeaderSub
