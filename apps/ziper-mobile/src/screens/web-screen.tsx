@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import { Stack, useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Button, Linking, Platform, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BridgeDelegate, BridgeWebView } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
 import { failure, incomingShareEvent } from '@ziper/bridge/contract';
@@ -24,6 +25,8 @@ type WebScope = ReturnType<typeof createHandlers> & {
 
 export function WebScreen({ path }: { path: string }) {
   const { config, auth, shareInbox } = useMobileServices();
+  // 헤더가 없으니 상태 표시줄 아래부터 웹을 그린다. 아래쪽 여백은 웹이 safe-area 로 처리한다.
+  const { top } = useSafeAreaInsets();
   const router = useRouter();
   const navigation = useNavigation();
   const web = useRef<BridgeWebView>(null);
@@ -41,8 +44,8 @@ export function WebScreen({ path }: { path: string }) {
   const uri = serviceURL(config, path);
   const shareScreen = path === '/share-product';
   const pathname = path.split(/[?#]/, 1)[0];
-  const hasWebHeader =
-    shareScreen || pathname === '/register-product' || /^\/products\/[^/]+$/.test(pathname);
+  const edgeToEdge = shareScreen || pathname === '/register-product';
+  const hasWebHeader = edgeToEdge || /^\/products\/[^/]+$/.test(pathname);
   const openedShare = useRef(shareScreen ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
   const live = useRef({
@@ -218,11 +221,13 @@ export function WebScreen({ path }: { path: string }) {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    // 웹이 화면 전체(헤더 포함)를 그리므로 네이티브 헤더는 숨긴다. 공유·상품 등록 화면은 기존처럼 여백 없이 두고,
+    // 나머지는 상태 표시줄 아래부터 그린다.
+    <View style={{ flex: 1, paddingTop: edgeToEdge ? 0 : top, backgroundColor: '#ffffff' }}>
       <Stack.Screen
         options={{
           title: 'Ziper',
-          headerShown: !hasWebHeader || blocked || uri === null,
+          headerShown: blocked || uri === null,
           gestureEnabled: !intercept && !shareScreen,
           headerBackButtonMenuEnabled: false,
           headerBackVisible: !intercept,

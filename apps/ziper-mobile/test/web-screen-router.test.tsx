@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { act, renderRouter, screen } from 'expo-router/testing-library';
 import { DeviceEventEmitter, Linking, Platform } from 'react-native';
+import * as SafeArea from 'react-native-safe-area-context';
 import { fireEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -55,6 +56,23 @@ const routes = {
   web: WebRoute,
   '+native-intent': { redirectSystemPath },
 };
+
+it.each([
+  ['/products/1?preview=normal', 24],
+  ['/register-product?step=details', 0],
+  ['/share-product', 0],
+  ['/', 24],
+] as const)('preserves the top safe area for %s', async (path, paddingTop) => {
+  const insets = vi
+    .spyOn(SafeArea, 'useSafeAreaInsets')
+    .mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
+  try {
+    await renderRouter(routes, { initialUrl: '/web?path=' + encodeURIComponent(path) });
+    expect(screen.getByText(/^WebView:/).parent?.props.style).toMatchObject({ paddingTop });
+  } finally {
+    insets.mockRestore();
+  }
+});
 
 it('opens an external product through the real screen delegate without navigating its WebView', async () => {
   const open = vi.spyOn(Linking, 'openURL').mockResolvedValue(undefined);

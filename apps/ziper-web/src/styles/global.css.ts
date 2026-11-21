@@ -22,4 +22,7 @@ globalStyle('body', {
   backgroundColor: vars.color.background,
   color: vars.color.text.strong,
   fontFamily: vars.font.family,
+  // 앱 WebView 가 노치·홈 인디케이터 영역까지 그리므로 안전 영역만큼 띄운다.
+  paddingTop: 'env(safe-area-inset-top)',
+  paddingBottom: 'env(safe-area-inset-bottom)',
 });
