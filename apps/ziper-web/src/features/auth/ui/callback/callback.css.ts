@@ -1,8 +1,9 @@
 import { style } from '@vanilla-extract/css';
 import { vars } from '../../../../styles/theme.css';
+import { viewportHeight } from '../../../../styles/viewport';
 
 export const failed = style({
-  minHeight: '100svh',
+  minHeight: viewportHeight,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',

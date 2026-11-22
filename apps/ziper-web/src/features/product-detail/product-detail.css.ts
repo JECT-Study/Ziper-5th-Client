@@ -1,5 +1,6 @@
 import { globalStyle, style } from '@vanilla-extract/css';
 import { vars } from '../../styles/theme.css';
+import { viewportHeight } from '../../styles/viewport';
 import * as textField from '../../components/TextField.css';
 
 // Flow 5 uses a green/Noto palette not present in the shared lime/Pretendard design system.
@@ -15,9 +16,9 @@ const colors = {
 };
 export const page = style({
   maxWidth: 480,
-  minHeight: '100dvh',
+  minHeight: viewportHeight,
   margin: '0 auto',
-  paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+  paddingBottom: 24,
   fontFamily: "'Noto Sans KR', " + vars.font.family,
   lineHeight: 1.5,
   color: colors.text,
