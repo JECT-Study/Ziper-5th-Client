@@ -313,6 +313,6 @@ it.each(['sheet dismiss', 'bridge back', 'route blur'] as const)(
 
 it('refuses an external path supplied through a deep link', async () => {
   await renderRouter(routes, { initialUrl: '/web?path=%2F%2Fevil.test' });
-  expect(screen.getByText('Invalid service-relative page path.')).toBeTruthy();
+  expect(screen.getByText('잘못된 화면 주소예요.')).toBeTruthy();
   expect(mockWebView.delegate).toBeNull();
 });
