@@ -23,6 +23,8 @@ export default defineConfig({
     restoreMocks: true,
   },
   server: {
+    // localhost 가 ::1 로만 열리면 Android 에뮬레이터의 10.0.2.2(호스트 127.0.0.1)로 접속할 수 없다.
+    host: '127.0.0.1',
     port: 3000,
     strictPort: true,
     ws,
