@@ -222,8 +222,15 @@ export function WebScreen({ path }: { path: string }) {
 
   return (
     // 웹이 화면 전체(헤더 포함)를 그리므로 네이티브 헤더는 숨긴다. 공유·상품 등록 화면은 기존처럼 여백 없이 두고,
-    // 나머지는 상태 표시줄 아래부터 그린다.
-    <View style={{ flex: 1, paddingTop: edgeToEdge ? 0 : top, backgroundColor: '#ffffff' }}>
+    // 나머지는 상태 표시줄 아래부터 그린다. Android WebView 는 위치와 상관없이 창의 inset 을
+    // env(safe-area-inset-top) 으로 알려 주고 웹 body 가 그만큼 띄우므로, 네이티브 여백은 iOS 에만 준다.
+    <View
+      style={{
+        flex: 1,
+        paddingTop: edgeToEdge || Platform.OS === 'android' ? 0 : top,
+        backgroundColor: '#ffffff',
+      }}
+    >
       <Stack.Screen
         options={{
           title: 'Ziper',
