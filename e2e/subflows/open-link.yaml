@@ -1,0 +1,5 @@
+# 실행 중인 앱에 딥링크(LINK)를 연다.
+appId: com.ject.ziper
+---
+- openLink: ${LINK}
+- runFlow: confirm-link.yaml

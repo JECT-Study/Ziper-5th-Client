@@ -35,6 +35,7 @@ export function NativeActionSheet({
               {input.actions.map((action) => (
                 <SheetButton
                   key={action.id}
+                  testID={`sheet-action-${action.id}`}
                   label={action.label}
                   destructive={action.destructive}
                   onPress={() => onSelect(action.id)}
@@ -43,7 +44,7 @@ export function NativeActionSheet({
             </View>
           </ScrollView>
           <View style={styles.footer}>
-            <SheetButton label="취소" onPress={onCancel} />
+            <SheetButton testID="sheet-cancel" label="취소" onPress={onCancel} />
           </View>
         </View>
       </RNHostView>
@@ -51,17 +52,21 @@ export function NativeActionSheet({
   );
 }
 
+// testID 는 E2E(agent-device)가 네이티브 시트 버튼을 웹 요소와 구분해 찾는 데 쓴다.
 function SheetButton({
+  testID,
   label,
   destructive,
   onPress,
 }: {
+  testID: string;
   label: string;
   destructive?: boolean | undefined;
   onPress: () => void;
 }) {
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}

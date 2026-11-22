@@ -1,0 +1,9 @@
+# 앱을 새로 띄우고 dev client 를 Metro 에 붙인다. __expo_disable_* 는 런처·온보딩·FAB 를 건너뛴다.
+appId: com.ject.ziper
+---
+- stopApp
+- openLink: exp+ziper-mobile://?__expo_url=http%3A%2F%2Flocalhost%3A8081&__expo_disable_fab=1&__expo_disable_auto_launch=1&__expo_disable_onboarding=1
+- runFlow: confirm-link.yaml
+- extendedWaitUntil:
+    visible: 이메일로 가입하기
+    timeout: 90000

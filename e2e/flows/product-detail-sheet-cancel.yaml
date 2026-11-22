@@ -1,0 +1,18 @@
+# 네이티브 시트를 취소하면 웹 상세 화면이 그대로 남고 구매 확인 창이 뜨지 않는다.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/launch.yaml
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F1%3Fpreview%3Dnormal
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn:
+    id: sheet-cancel
+- assertNotVisible:
+    id: sheet-cancel
+- assertNotVisible: 이동하기
+- assertVisible: 상품 관리
