@@ -1,7 +1,11 @@
 import { BottomSheet, RNHostView } from '@expo/ui';
 import type { SheetInput } from '@ziper/bridge/contract';
 import { buttonHeight, colors, radius, space, typeScale } from '@ziper/design-tokens';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+
+// 시트는 내용 높이에 맞춰 열고(snapPoints 없음), 목록이 길면 목록만 스크롤한다.
+// snapPoints 에 'full' 을 넣으면 내용이 항상 화면 높이로 늘어나 'half' 상태에서 취소 버튼이 화면 밖으로 밀린다.
+const LIST_MAX_RATIO = 0.6;
 
 export function NativeActionSheet({
   input,
@@ -12,18 +16,18 @@ export function NativeActionSheet({
   onSelect: (id: string) => void;
   onCancel: () => void;
 }) {
+  const { height } = useWindowDimensions();
   return (
     <BottomSheet
       isPresented
       onDismiss={onCancel}
       shouldDismissOnBackPress
-      snapPoints={['half', 'full']}
       containerColor={colors.background}
       contentPadding={0}
     >
-      <RNHostView>
+      <RNHostView matchContents={{ vertical: true }}>
         <View style={styles.panel} accessibilityViewIsModal>
-          <ScrollView nestedScrollEnabled style={styles.list}>
+          <ScrollView nestedScrollEnabled style={{ maxHeight: height * LIST_MAX_RATIO }}>
             <Text accessible accessibilityRole="header" style={styles.title}>
               {input.title || '작업 선택'}
             </Text>
@@ -68,9 +72,8 @@ function SheetButton({
 }
 
 const styles = StyleSheet.create({
-  panel: { flex: 1, backgroundColor: colors.background },
+  panel: { backgroundColor: colors.background },
   title: { padding: space[16], color: colors.textStrong, ...typeScale.title1Bold },
-  list: { flex: 1 },
   rows: { gap: space[8], paddingHorizontal: space[16], paddingVertical: space[4] },
   footer: { padding: space[16] },
   button: {
