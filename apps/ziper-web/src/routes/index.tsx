@@ -1,8 +1,9 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { usePlatform } from '../bridge/provider';
-import { BottomNavigation, Button } from '../components';
-import { requireSignedIn, useLogout } from '../features/auth';
+import { BottomNavigation } from '../components';
+import { requireSignedIn } from '../features/auth';
+import { useTabNavigation } from '../shared/use-tab-navigation';
 import * as styles from '../styles/home.css';
 
 export const Route = createFileRoute('/')({
@@ -15,13 +16,7 @@ export const Route = createFileRoute('/')({
 function HomePage() {
   const { platform, status } = usePlatform();
   const [registration, setRegistration] = useState<'idle' | 'opening' | 'error'>('idle');
-  const navigate = useNavigate();
-  const { logout, pending: loggingOut } = useLogout();
-
-  async function logoutAndLeave() {
-    await logout();
-    navigate({ to: '/login', replace: true });
-  }
+  const selectTab = useTabNavigation();
 
   async function openRegistration() {
     setRegistration('opening');
@@ -43,13 +38,10 @@ function HomePage() {
             상품 추가 화면을 열지 못했어요.
           </p>
         )}
-        {/* TODO: 로그인 테스트용 임시 버튼. 마이페이지가 생기면 옮긴다. */}
-        <Button variant="secondary" size="small" loading={loggingOut} onClick={logoutAndLeave}>
-          로그아웃
-        </Button>
       </div>
       <BottomNavigation
         active="home"
+        onSelect={selectTab}
         onAdd={
           registration === 'opening' || status === 'initializing' ? undefined : openRegistration
         }
