@@ -12,23 +12,13 @@ export const page = style({
 
 export const content = style({
   flex: 1,
-  display: 'grid',
-  placeContent: 'center',
-  gap: vars.space[16],
-  padding: vars.space[24],
-  textAlign: 'center',
+  display: 'flex',
+  flexDirection: 'column',
+  paddingTop: vars.space[16],
 });
 
-export const title = style({
+export const error = style({
   margin: 0,
-  fontSize: 48,
-  letterSpacing: '-0.04em',
+  padding: `0 ${vars.space[16]}`,
+  color: vars.color.status.negative,
 });
-
-export const description = style({
-  margin: 0,
-  color: vars.color.text.default,
-  lineHeight: 1.6,
-});
-
-export const error = style({ margin: 0, color: vars.color.status.negative });

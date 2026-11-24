@@ -14,6 +14,8 @@ import { Route as DesignSystemRouteImport } from './routes/design-system'
 import { Route as MyRouteImport } from './routes/my'
 import { Route as RegisterProductRouteImport } from './routes/register-product'
 import { Route as ShareProductRouteImport } from './routes/share-product'
+import { Route as BoardsIndexRouteImport } from './routes/boards.index'
+import { Route as BoardsBoardIdRouteImport } from './routes/boards.$boardId'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as LoginEmailRouteImport } from './routes/login/email'
 import { Route as ProductsCardIdRouteImport } from './routes/products.$cardId'
@@ -45,6 +47,16 @@ const RegisterProductRoute = RegisterProductRouteImport.update({
 const ShareProductRoute = ShareProductRouteImport.update({
   id: '/share-product',
   path: '/share-product',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoardsIndexRoute = BoardsIndexRouteImport.update({
+  id: '/boards/',
+  path: '/boards/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoardsBoardIdRoute = BoardsBoardIdRouteImport.update({
+  id: '/boards/$boardId',
+  path: '/boards/$boardId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginIndexRoute = LoginIndexRouteImport.update({
@@ -89,10 +101,12 @@ export interface FileRoutesByFullPath {
   '/my': typeof MyRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
   '/products/$cardId': typeof ProductsCardIdRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
+  '/boards/': typeof BoardsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
   '/auth/callback/$provider': typeof AuthCallbackProviderRoute
@@ -103,10 +117,12 @@ export interface FileRoutesByTo {
   '/my': typeof MyRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
   '/products/$cardId': typeof ProductsCardIdRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
+  '/boards': typeof BoardsIndexRoute
   '/login': typeof LoginIndexRoute
   '/signup': typeof SignupIndexRoute
   '/auth/callback/$provider': typeof AuthCallbackProviderRoute
@@ -118,10 +134,12 @@ export interface FileRoutesById {
   '/my': typeof MyRoute
   '/register-product': typeof RegisterProductRoute
   '/share-product': typeof ShareProductRoute
+  '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
   '/products/$cardId': typeof ProductsCardIdRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
+  '/boards/': typeof BoardsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
   '/auth/callback/$provider': typeof AuthCallbackProviderRoute
@@ -134,10 +152,12 @@ export interface FileRouteTypes {
     | '/my'
     | '/register-product'
     | '/share-product'
+    | '/boards/$boardId'
     | '/login/email'
     | '/products/$cardId'
     | '/signup/complete'
     | '/signup/terms'
+    | '/boards/'
     | '/login/'
     | '/signup/'
     | '/auth/callback/$provider'
@@ -148,10 +168,12 @@ export interface FileRouteTypes {
     | '/my'
     | '/register-product'
     | '/share-product'
+    | '/boards/$boardId'
     | '/login/email'
     | '/products/$cardId'
     | '/signup/complete'
     | '/signup/terms'
+    | '/boards'
     | '/login'
     | '/signup'
     | '/auth/callback/$provider'
@@ -162,10 +184,12 @@ export interface FileRouteTypes {
     | '/my'
     | '/register-product'
     | '/share-product'
+    | '/boards/$boardId'
     | '/login/email'
     | '/products/$cardId'
     | '/signup/complete'
     | '/signup/terms'
+    | '/boards/'
     | '/login/'
     | '/signup/'
     | '/auth/callback/$provider'
@@ -177,10 +201,12 @@ export interface RootRouteChildren {
   MyRoute: typeof MyRoute
   RegisterProductRoute: typeof RegisterProductRoute
   ShareProductRoute: typeof ShareProductRoute
+  BoardsBoardIdRoute: typeof BoardsBoardIdRoute
   LoginEmailRoute: typeof LoginEmailRoute
   ProductsCardIdRoute: typeof ProductsCardIdRoute
   SignupCompleteRoute: typeof SignupCompleteRoute
   SignupTermsRoute: typeof SignupTermsRoute
+  BoardsIndexRoute: typeof BoardsIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
   AuthCallbackProviderRoute: typeof AuthCallbackProviderRoute
@@ -221,6 +247,20 @@ declare module '@tanstack/react-router' {
       path: '/share-product'
       fullPath: '/share-product'
       preLoaderRoute: typeof ShareProductRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/boards/': {
+      id: '/boards/'
+      path: '/boards'
+      fullPath: '/boards/'
+      preLoaderRoute: typeof BoardsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/boards/$boardId': {
+      id: '/boards/$boardId'
+      path: '/boards/$boardId'
+      fullPath: '/boards/$boardId'
+      preLoaderRoute: typeof BoardsBoardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login/': {
@@ -281,10 +321,12 @@ const rootRouteChildren: RootRouteChildren = {
   MyRoute: MyRoute,
   RegisterProductRoute: RegisterProductRoute,
   ShareProductRoute: ShareProductRoute,
+  BoardsBoardIdRoute: BoardsBoardIdRoute,
   LoginEmailRoute: LoginEmailRoute,
   ProductsCardIdRoute: ProductsCardIdRoute,
   SignupCompleteRoute: SignupCompleteRoute,
   SignupTermsRoute: SignupTermsRoute,
+  BoardsIndexRoute: BoardsIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
   AuthCallbackProviderRoute: AuthCallbackProviderRoute,
