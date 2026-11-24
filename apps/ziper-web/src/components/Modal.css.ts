@@ -24,4 +24,5 @@ export const contents = style({
 
 export const title = style({ margin: 0, ...typography.title2Bold });
 
-export const description = style({ margin: 0, ...typography.body2Medium });
+// 여러 줄 안내는 문구 속 줄바꿈을 그대로 보여준다.
+export const description = style({ margin: 0, ...typography.body2Medium, whiteSpace: 'pre-line' });
