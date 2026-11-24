@@ -95,3 +95,19 @@ export function allowedDocument(config: HostConfig, value: unknown): boolean {
     return false;
   }
 }
+
+// 웹이 새 창으로 여는 주소 중 기기 브라우저로 넘겨도 되는 곳. 지금은 랜딩의 약관 페이지뿐이다.
+const LANDING_ORIGINS = ['https://ziper.cc', 'https://www.ziper.cc'];
+
+export function externalPage(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    if (url.username || url.password) return null;
+    return LANDING_ORIGINS.includes(url.origin) && url.pathname.startsWith('/terms/')
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}

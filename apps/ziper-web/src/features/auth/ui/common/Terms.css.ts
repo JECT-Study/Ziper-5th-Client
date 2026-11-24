@@ -30,5 +30,6 @@ export const termLink = style({
   ...typography.body3Medium,
   fontFamily: 'inherit',
   color: vars.color.icon.default,
+  textDecoration: 'none',
   cursor: 'pointer',
 });

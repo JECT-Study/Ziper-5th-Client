@@ -43,7 +43,10 @@ export function SignupPage() {
 
   async function verifyCode() {
     try {
-      if (await form.verifyCode()) form.goTo('password');
+      if (await form.verifyCode()) {
+        showToast('인증이 완료되었어요');
+        form.goTo('password');
+      }
     } catch (error) {
       showError(error);
     }

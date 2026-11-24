@@ -1,12 +1,13 @@
 ---
-// TODO: 약관 본문(노션)이 정해지면 채운다. 웹 회원가입의 약관 "보기"가 이 주소(/terms/privacy)를 연다.
+// 웹·앱 회원가입의 약관 "보기"가 이 주소(/terms/privacy)를 연다. 본문은 src/content/terms/privacy.md 에서 고친다.
 import Layout from '../../layouts/Layout.astro';
-import * as styles from '../../styles/index.css';
+import { Content } from '../../content/terms/privacy.md';
+import * as styles from '../../styles/terms.css';
 ---
 
 <Layout title="개인정보 수집 및 이용 동의 | Ziper">
-  <main class={styles.main}>
-    <h1>개인정보 수집 및 이용 동의</h1>
-    <p class={styles.description}>준비 중이에요</p>
+  <main class={styles.page}>
+    <h1 class={styles.title}>개인정보 수집 및 이용 동의</h1>
+    <Content />
   </main>
 </Layout>

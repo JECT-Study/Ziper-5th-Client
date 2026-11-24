@@ -3,8 +3,22 @@ import type { Plugin } from 'vite';
 
 const API = 'https://api.ziper.cc';
 
-// 백엔드에 넘길 요청 헤더. Origin 은 빼야 한다(백엔드는 Origin 이 붙으면 값과 상관없이 403 을 준다).
-const FORWARD_HEADERS = ['content-type', 'accept', 'authorization', 'user-agent'];
+// 백엔드에 넘길 요청 헤더. 브라우저의 Origin(localhost 등)은 백엔드 허용 목록에 없어서 넘기지 않는다.
+const FORWARD_HEADERS = [
+  'content-type',
+  'accept',
+  'authorization',
+  'user-agent',
+  'cookie',
+  'x-refresh-token-mode',
+];
+
+// 쿠키 모드(로그인·재발급·로그아웃)는 백엔드가 Origin 을 허용 목록과 맞춰 본다. 배포 웹 주소로 대신 보낸다.
+const SESSION_ORIGIN = 'https://app.ziper.cc';
+
+// 백엔드 쿠키는 Secure 라서 http 주소(LAN IP, Android 에뮬레이터 10.0.2.2)에서는 브라우저가 저장하지 않는다.
+// 개발 서버에서만 Secure 를 빼서 돌려준다.
+const devCookie = (cookie: string) => cookie.replace(/;\s*Secure/gi, '');
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -27,6 +41,7 @@ export function apiDevProxy(): Plugin {
           const value = req.headers[name];
           if (typeof value === 'string') headers.set(name, value);
         }
+        if (headers.has('x-refresh-token-mode')) headers.set('origin', SESSION_ORIGIN);
         const method = req.method ?? 'GET';
         try {
           const response = await fetch(`${API}/api${req.url}`, {
@@ -37,6 +52,8 @@ export function apiDevProxy(): Plugin {
           res.statusCode = response.status;
           const type = response.headers.get('content-type');
           if (type) res.setHeader('content-type', type);
+          const cookies = response.headers.getSetCookie();
+          if (cookies.length) res.setHeader('set-cookie', cookies.map(devCookie));
           res.end(Buffer.from(await response.arrayBuffer()));
         } catch (error) {
           res.statusCode = 502;

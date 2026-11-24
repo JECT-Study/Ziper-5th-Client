@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cx } from './cx';
-import { Icon } from './Icon';
+import { Icon, Spinner } from './Icon';
 import * as styles from './TextField.css';
 
 type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
@@ -18,6 +18,8 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
   onClear?: () => void;
   /** 입력칸 오른쪽에 넣을 요소. 예: 인증 타이머 */
   trailing?: ReactNode;
+  /** 입력값을 서버에서 확인하는 중. 입력칸 오른쪽에 작은 스피너를 보여준다. 예: 닉네임 중복 확인 */
+  loading?: boolean;
 };
 
 export function TextField({
@@ -29,6 +31,7 @@ export function TextField({
   showCounter,
   onClear,
   trailing,
+  loading,
   type = 'text',
   className,
   id,
@@ -72,7 +75,20 @@ export function TextField({
           className={styles.input[variant]}
           aria-invalid={hasError || undefined}
           aria-describedby={description || undefined}
+          aria-busy={loading || undefined}
         />
+        {loading && <Spinner size={16} className={styles.spinner} />}
+        {/* Figma 순서: 비밀번호 보기 → 지우기 */}
+        {isPassword && (
+          <button
+            type="button"
+            className={styles.action}
+            onClick={() => setRevealed((v) => !v)}
+            aria-label={revealed ? '비밀번호 숨기기' : '비밀번호 보기'}
+          >
+            <Icon name={revealed ? 'eye-fill' : 'eye-slash-fill'} />
+          </button>
+        )}
         {onClear && value && !input.disabled && !input.readOnly && (
           <button
             type="button"
@@ -84,16 +100,6 @@ export function TextField({
             aria-label={fieldName ? `${fieldName} 지우기` : '입력 지우기'}
           >
             <Icon name="xmark-circle-fill" />
-          </button>
-        )}
-        {isPassword && (
-          <button
-            type="button"
-            className={styles.action}
-            onClick={() => setRevealed((v) => !v)}
-            aria-label={revealed ? '비밀번호 숨기기' : '비밀번호 보기'}
-          >
-            <Icon name={revealed ? 'eye-fill' : 'eye-slash-fill'} />
           </button>
         )}
         {trailing}

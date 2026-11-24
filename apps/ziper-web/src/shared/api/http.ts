@@ -1,4 +1,4 @@
-import { clearTokens, loadTokens, saveTokens, type Tokens } from './tokens';
+import { getAccessToken, setAccessToken } from './session';
 
 // 개발 서버는 /api 를 백엔드로 넘겨(vite.config.ts 프록시) CORS 를 피한다. 배포 웹은 백엔드를 바로 부른다.
 const BASE_URL = import.meta.env.DEV ? '' : 'https://api.ziper.cc';
@@ -24,16 +24,27 @@ type RequestOptions = {
   body?: unknown;
   /** Access Token 을 붙인다. 만료(401)되면 한 번 재발급하고 다시 보낸다. */
   auth?: boolean;
+  /**
+   * 로그인·가입·재발급·로그아웃 요청. Refresh Token 을 본문 대신 HttpOnly 쿠키로 주고받는다.
+   * 백엔드는 이 헤더가 있을 때만 쿠키를 쓰고, 허용된 Origin 인지도 함께 본다.
+   */
+  session?: boolean;
 };
 
-function send(path: string, { method = 'GET', body }: RequestOptions, accessToken?: string) {
+function send(
+  path: string,
+  { method = 'GET', body, session }: RequestOptions,
+  accessToken?: string | null,
+) {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  if (session) headers['X-Refresh-Token-Mode'] = 'cookie';
   return fetch(`${BASE_URL}${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: session ? 'include' : 'same-origin',
   });
 }
 
@@ -55,20 +66,23 @@ async function parse<T>(response: Response): Promise<T> {
 }
 
 // Refresh Token 은 쓰면 바로 바뀌어서, 요청 여러 개가 동시에 401 을 받아도 재발급은 한 번만 보낸다.
-let refreshing: Promise<string | null> | null = null;
+let refreshing: Promise<boolean> | null = null;
+// 이번 페이지에서 쿠키로 세션을 확인해 봤는지. 로그아웃 상태로 화면을 옮길 때마다 재발급을 보내지 않으려고 둔다.
+let checked = false;
 
 function refreshAccessToken() {
   refreshing ??= (async () => {
-    const refreshToken = loadTokens()?.refreshToken;
-    if (!refreshToken) return null;
     try {
-      const tokens = await parse<Tokens>(
-        await send('/api/v1/auth/reissue', { method: 'POST', body: { refreshToken } }),
+      const { accessToken } = await parse<{ accessToken: string }>(
+        await send('/api/v1/auth/reissue', { method: 'POST', session: true }),
       );
-      saveTokens(tokens);
-      return tokens.accessToken;
+      setAccessToken(accessToken);
+      return true;
     } catch {
-      return null;
+      setAccessToken(null);
+      return false;
+    } finally {
+      checked = true;
     }
   })().finally(() => {
     refreshing = null;
@@ -76,20 +90,29 @@ function refreshAccessToken() {
   return refreshing;
 }
 
+/** 로그인되어 있는지. 메모리에 Access Token 이 없으면(새로고침 등) 쿠키로 한 번 재발급해 본다. */
+export async function ensureSession(): Promise<boolean> {
+  if (getAccessToken()) return true;
+  if (checked) return false;
+  return refreshAccessToken();
+}
+
+/** 로그인·가입 응답의 Access Token 을 세션으로 쓴다. null 이면 로그아웃 상태로 둔다. */
+export function startSession(accessToken: string | null) {
+  setAccessToken(accessToken);
+  checked = true;
+}
+
 /**
  * API 요청. 실패하면 ApiError 를 던진다.
- * auth 요청이 재발급까지 실패하면 토큰을 지우고 401 을 던진다. 로그인 화면으로 보낼지는 쓰는 쪽이 정한다.
+ * auth 요청이 재발급까지 실패하면 401 을 던진다. 로그인 화면으로 보낼지는 쓰는 쪽이 정한다.
  */
 export async function request<T = void>(path: string, options: RequestOptions = {}): Promise<T> {
   if (!options.auth) return parse<T>(await send(path, options));
 
-  const response = await send(path, options, loadTokens()?.accessToken);
+  const response = await send(path, options, getAccessToken());
   if (response.status !== 401) return parse<T>(response);
 
-  const renewed = await refreshAccessToken();
-  if (!renewed) {
-    clearTokens();
-    return parse<T>(response);
-  }
-  return parse<T>(await send(path, options, renewed));
+  if (!(await refreshAccessToken())) return parse<T>(response);
+  return parse<T>(await send(path, options, getAccessToken()));
 }

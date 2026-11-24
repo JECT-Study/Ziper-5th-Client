@@ -83,11 +83,19 @@ export const action = style({
   color: vars.color.icon.default,
 });
 
+export const spinner = style({
+  display: 'inline-flex',
+  flexShrink: 0,
+  color: vars.color.icon.default,
+});
+
 const helperBase = style({
   display: 'flex',
   justifyContent: 'space-between',
   gap: vars.space[8],
   ...typography.body3Medium,
+  // 두 줄짜리 안내(예: 로그인 잠김)는 문구 속 줄바꿈을 그대로 보여준다.
+  whiteSpace: 'pre-line',
 });
 
 // box 는 입력칸과 도움말 사이가 4px 이라 root gap(8)에서 4 를 당긴다.

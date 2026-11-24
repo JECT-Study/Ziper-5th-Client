@@ -4,7 +4,6 @@ import tooltipTriangle from '../../../../assets/login/tooltip-triangle.svg';
 import welcomeImage from '../../../../assets/login/welcome.png';
 import { Button, Divider, SocialLoginButton, showToast } from '../../../../components';
 import { errorMessage } from '../../../../shared/api/http';
-import { SIGNUP_FLOW } from '../../model/guards';
 import { LoadingOverlay } from '../common/LoadingOverlay';
 import * as styles from './login.css';
 import { useSocialLogin } from './useSocialLogin';
@@ -21,8 +20,8 @@ export function LoginPage() {
     if (busy) return;
     try {
       const status = await login(provider);
-      // 처음 가입한 사람은 약관 동의 → 가입 완료 화면으로 간다.
-      if (status === 'signupRequired') navigate({ to: '/signup/terms', state: SIGNUP_FLOW });
+      // 처음 온 사람은 약관 동의 → 가입 완료 화면으로 간다.
+      if (status === 'signupRequired') navigate({ to: '/signup/terms' });
       else if (status === 'signedIn') navigate({ to: '/' });
     } catch (error) {
       const notReady = error instanceof BridgeError && NOT_READY.includes(error.code);
@@ -74,8 +73,7 @@ export function LoginPage() {
           <button
             type="button"
             className={styles.signInLink}
-            // TODO(JEC-66): 이메일 로그인 API 가 나오면 /login/email 로 보낸다.
-            onClick={() => showToast('이메일 로그인은 준비 중이에요')}
+            onClick={() => navigate({ to: '/login/email' })}
           >
             로그인 하기
           </button>

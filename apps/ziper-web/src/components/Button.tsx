@@ -13,6 +13,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const ICON_SIZE = { large: 24, medium: 16, small: 12 } as const;
+// 스피너는 아이콘보다 작게 둔다. 아이콘 크기 그대로면 글자 옆에서 너무 커 보인다.
+const SPINNER_SIZE = { large: 16, medium: 14, small: 10 } as const;
 
 export function Button({
   variant = 'primary',
@@ -39,7 +41,7 @@ export function Button({
         {loading ? (
           // 버튼 이름은 글자만 읽히도록 스피너는 보조기기에서 숨긴다(aria-busy 로 로딩을 알린다).
           <span className={styles.loadingIcon} aria-hidden="true">
-            <Spinner size={ICON_SIZE[size]} />
+            <Spinner size={SPINNER_SIZE[size]} />
           </span>
         ) : (
           leftIcon && <Icon name={leftIcon} size={ICON_SIZE[size]} />
