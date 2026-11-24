@@ -1,7 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { Button } from '../../../../components';
-import { SIGNUP_FLOW } from '../../model/guards';
 import { LoadingOverlay } from '../common/LoadingOverlay';
 import * as styles from './callback.css';
 import { useOAuthCodeExchange } from './useOAuthCodeExchange';
@@ -13,10 +12,9 @@ export function OAuthCallbackPage({ provider }: { provider: string }) {
 
   useEffect(() => {
     if (result.status === 'cancelled') navigate({ to: '/login', replace: true });
-    if (result.status !== 'signedIn') return;
-    // 처음 가입한 사람은 약관 동의 → 가입 완료 화면으로 간다.
-    if (result.isNewUser) navigate({ to: '/signup/terms', replace: true, state: SIGNUP_FLOW });
-    else navigate({ to: '/', replace: true });
+    // 처음 온 사람은 약관 동의 → 가입 완료 화면으로 간다.
+    if (result.status === 'signupRequired') navigate({ to: '/signup/terms', replace: true });
+    if (result.status === 'signedIn') navigate({ to: '/', replace: true });
   }, [result, navigate]);
 
   if (result.status !== 'failed') return <LoadingOverlay />;

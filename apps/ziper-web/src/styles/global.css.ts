@@ -5,6 +5,11 @@ globalStyle('*, *::before, *::after', {
   boxSizing: 'border-box',
 });
 
+// 모바일 WebView 는 누른 요소에 회색 강조를 깜빡 띄운다. 누름 상태는 각 컴포넌트가 직접 그린다.
+globalStyle('html', {
+  WebkitTapHighlightColor: 'transparent',
+});
+
 const clickable =
   ':where(a[href], button, summary, select, input:is([type="button"], [type="submit"], [type="reset"], [type="checkbox"], [type="radio"], [type="file"]), [role="button"], [role="link"], [role="tab"])';
 

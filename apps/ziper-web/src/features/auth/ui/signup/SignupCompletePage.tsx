@@ -16,7 +16,6 @@ export function SignupCompletePage() {
         </div>
         <h1 className={styles.title}>회원가입이 완료되었어요.</h1>
       </main>
-      {/* TODO: 기획상 이 시점에 기본 보드('전체 보드')가 만들어진다. */}
       <Footer className={styles.footer}>
         <Button onClick={() => navigate({ to: '/' })}>시작하기</Button>
       </Footer>

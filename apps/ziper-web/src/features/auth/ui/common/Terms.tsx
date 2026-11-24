@@ -2,6 +2,10 @@ import { Checkbox, Divider } from '../../../../components';
 import { TERMS, type Agreements } from '../../model/terms';
 import * as styles from './Terms.css';
 
+// 약관 본문은 랜딩(ziper-landing)의 /terms/{service|privacy|marketing} 페이지에 있다.
+// 앱 WebView 는 새 창을 직접 열지 않고, 이 주소만 기기 브라우저로 넘긴다(ziper-mobile web-screen).
+const TERMS_URL = 'https://ziper.cc/terms';
+
 /** 이용약관 동의 목록(전체 동의 + 항목별 동의). */
 export function Terms({
   agreed,
@@ -31,10 +35,15 @@ export function Terms({
           >
             {term.label}
           </Checkbox>
-          {/* TODO(JEC-85): 랜딩(ziper-landing)의 /terms/{service|privacy|marketing} 페이지로 연결한다. */}
-          <button type="button" className={styles.termLink}>
+          <a
+            className={styles.termLink}
+            href={`${TERMS_URL}/${term.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${term.label} 보기`}
+          >
             보기
-          </button>
+          </a>
         </div>
       ))}
     </section>

@@ -1,12 +1,34 @@
 // 인증 관련 백엔드 API. 화면·상태는 모르고 요청과 응답만 다룬다.
-import { ApiError, request } from '../../../shared/api/http';
-import { clearTokens, loadTokens, saveTokens, type Tokens } from '../../../shared/api/tokens';
+import { ApiError, request, startSession } from '../../../shared/api/http';
+import { clearPendingSignup, savePendingSignup } from '../model/pendingSignup';
 
-// 로그인·가입 API 는 토큰을 응답 본문으로 준다. 받으면 바로 저장한다.
+// 로그인·가입 API 는 Refresh Token 을 HttpOnly 쿠키로, Access Token 은 본문으로 준다.
 async function signIn(path: string, body: unknown) {
-  const result = await request<Tokens & { isNewUser?: boolean }>(path, { method: 'POST', body });
-  saveTokens(result);
-  return { isNewUser: Boolean(result.isNewUser), accessToken: result.accessToken };
+  const { accessToken } = await request<{ accessToken: string }>(path, {
+    method: 'POST',
+    body,
+    session: true,
+  });
+  startSession(accessToken);
+  return accessToken;
+}
+
+/** 소셜 로그인 결과. 처음 온 사람은 아직 회원이 아니라서, 약관 동의 후 가입할 때 쓸 가입 토큰(10분)만 받는다. */
+export type SocialLoginResult =
+  | { status: 'signedIn'; accessToken: string }
+  | { status: 'signupRequired'; signupToken: string };
+
+async function socialSignIn(path: string, body: unknown): Promise<SocialLoginResult> {
+  const result = await request<
+    | { authType: 'LOGIN'; accessToken: string }
+    | { authType: 'SIGNUP_REQUIRED'; signupToken: string }
+  >(path, { method: 'POST', body, session: true });
+  if (result.authType === 'SIGNUP_REQUIRED') {
+    savePendingSignup(result.signupToken);
+    return { status: 'signupRequired', signupToken: result.signupToken };
+  }
+  startSession(result.accessToken);
+  return { status: 'signedIn', accessToken: result.accessToken };
 }
 
 export async function isNicknameAvailable(nickname: string): Promise<boolean> {
@@ -62,26 +84,34 @@ export async function signUp(input: {
   });
 }
 
+export async function signInWithEmail(email: string, password: string): Promise<void> {
+  await signIn('/api/v1/auth/email/login', { email, password });
+}
+
 /** 앱 SDK 가 받은 토큰(Apple 은 ID Token, 카카오·네이버는 Access Token)으로 로그인한다. */
 export function signInWithSocialToken(provider: string, token: string) {
-  return signIn(`/api/v1/auth/oauth/${provider}`, { token });
+  return socialSignIn(`/api/v1/auth/oauth/${provider}`, { token });
 }
 
 /** 웹 로그인으로 받은 인가 코드를 백엔드가 프로바이더 토큰으로 바꿔 로그인한다. */
-export async function signInWithOAuthCode(
+export function signInWithOAuthCode(
   provider: string,
   input: { code: string; redirectUri: string; state: string },
 ) {
-  return signIn(`/api/v1/auth/oauth/${provider}/code`, input);
+  return socialSignIn(`/api/v1/auth/oauth/${provider}/code`, input);
 }
 
-/** 이 기기의 토큰을 먼저 지우고, 백엔드 세션도 끊는다. */
+/** 소셜 신규 가입자가 약관에 동의하면 이때 회원이 만들어지고 로그인된다. */
+export async function signUpWithSocial(signupToken: string, marketingAgreed: boolean) {
+  await signIn('/api/v1/auth/oauth/signup', {
+    signupToken,
+    agreements: { termsOfService: true, privacyPolicy: true, marketing: marketingAgreed },
+  });
+  clearPendingSignup();
+}
+
+/** 이 기기의 세션을 먼저 지우고, 백엔드 세션과 쿠키도 끊는다. */
 export async function signOut() {
-  const tokens = loadTokens();
-  clearTokens();
-  if (tokens)
-    await request('/api/v1/auth/logout', {
-      method: 'POST',
-      body: { refreshToken: tokens.refreshToken },
-    });
+  startSession(null);
+  await request('/api/v1/auth/logout', { method: 'POST', session: true });
 }

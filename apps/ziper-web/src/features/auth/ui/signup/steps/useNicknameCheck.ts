@@ -38,5 +38,5 @@ export function useNicknameCheck(value: string) {
           ? '중복 확인에 실패했어요. 잠시 후 다시 시도해주세요'
           : undefined;
 
-  return { available: state === 'available', error };
+  return { available: state === 'available', checking: state === 'checking', error };
 }

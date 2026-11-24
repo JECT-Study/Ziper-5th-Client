@@ -10,7 +10,7 @@ const FAILED = '로그인하지 못했어요. 다시 시도해주세요';
 type Result =
   | { status: 'pending' }
   | { status: 'cancelled' }
-  | { status: 'signedIn'; isNewUser: boolean }
+  | { status: 'signedIn' | 'signupRequired' }
   | { status: 'failed'; message: string };
 
 /** 웹 소셜 로그인에서 돌아온 주소의 인가 코드를 백엔드로 보내 로그인한다. 결과만 돌려준다. */
@@ -33,9 +33,9 @@ export function useOAuthCodeExchange(provider: string): Result {
       return setResult({ status: 'failed', message: FAILED });
 
     signInWithOAuthCode(provider, { code, state, redirectUri: redirectUriOf(provider as Provider) })
-      .then(({ isNewUser }) => {
+      .then(({ status }) => {
         saveLastProvider(provider);
-        setResult({ status: 'signedIn', isNewUser });
+        setResult({ status });
       })
       .catch((error) => setResult({ status: 'failed', message: errorMessage(error, FAILED) }));
   }, [provider]);

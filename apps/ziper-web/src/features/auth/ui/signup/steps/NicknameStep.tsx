@@ -15,7 +15,7 @@ export function NicknameStep({
   onNext: () => void;
 }) {
   // 중복 확인은 이 입력칸에만 딸린 검사라 폼 상태와 따로 둔다.
-  const { available, error } = useNicknameCheck(nickname);
+  const { available, checking, error } = useNicknameCheck(nickname);
 
   return (
     <StepScreen
@@ -31,15 +31,18 @@ export function NicknameStep({
     >
       <TextField
         label="닉네임"
-        placeholder="닉네임을 입력해주세요"
+        placeholder="닉네임을 입력해 주세요"
         value={nickname}
         onChange={(e) => onChange(e.target.value)}
         onClear={() => onChange('')}
+        loading={checking}
         maxLength={NICKNAME_MAX}
         showCounter
         error={error}
         success={available}
-        helperText={available ? '사용 가능한 닉네임입니다' : undefined}
+        helperText={
+          available ? '사용 가능한 닉네임입니다' : '영문 포함 최대 10자 이내로 입력해주세요.'
+        }
         autoFocus
       />
     </StepScreen>

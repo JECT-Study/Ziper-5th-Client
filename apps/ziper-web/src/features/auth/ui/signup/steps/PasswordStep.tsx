@@ -60,7 +60,7 @@ export function PasswordStep({
           label="비밀번호 확인"
           type="password"
           autoComplete="new-password"
-          placeholder="비밀번호를 한 번 더 입력해주세요"
+          placeholder="비밀번호를 다시 입력해주세요"
           value={passwordConfirm}
           onChange={(e) => onPasswordConfirmChange(e.target.value)}
           success={passwordsMatch}

@@ -11,7 +11,7 @@ import { backTarget, interceptNativeBack } from '../bridge/back';
 import { createHandlers } from '../bridge/handlers';
 import { createDelegate } from '../bridge/delegate';
 import { documentIdentity } from '../bridge/documents';
-import { allowedDocument, serviceURL } from '../bridge/security';
+import { allowedDocument, externalPage, serviceURL } from '../bridge/security';
 import { useMobileServices } from '../bridge/services';
 import { SheetSessions, type SheetSnapshot } from '../bridge/sheets';
 import { WebView } from '../bridge/webview';
@@ -258,8 +258,10 @@ export function WebScreen({ path }: { path: string }) {
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={(request) => allowedDocument(config, request.url)}
           renderError={() => <WebLoadError onRetry={() => web.current?.reload()} />}
-          onOpenWindow={() => {
-            /* Block popups instead of handing them to Linking. */
+          onOpenWindow={(event) => {
+            // 새 창은 막는다. 랜딩 약관 페이지만 기기 브라우저로 연다.
+            const page = externalPage(event.nativeEvent.targetUrl);
+            if (page) Linking.openURL(page).catch(() => {});
           }}
           onMessage={(event) => {
             const identity = documentIdentity(event.nativeEvent.data);

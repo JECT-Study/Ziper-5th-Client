@@ -1,15 +1,15 @@
 import { BridgeError, providers, type Session, type WebAuthService } from '@ziper/bridge/contract';
 import { signInWithSocialToken, signOut } from '../api/authApi';
-import { loadTokens, userIdOf } from '../../../shared/api/tokens';
+import { ensureSession } from '../../../shared/api/http';
+import { getAccessToken, userIdOf } from '../../../shared/api/session';
 import { isWebLoginConfigured, startWebLogin } from './webOAuth';
 
 // 브릿지는 "일회용 교환 코드"를 웹이 백엔드 세션으로 바꾸는 구조인데, 백엔드에는 그런 API 가 없다.
 // 그래서 앱은 교환 코드 자리에 SDK 토큰({ provider, token })을 담아 보내고, 웹이 그 토큰으로 로그인한다.
 
-// 소셜로 처음 가입한 사람은 signupRequired 로 알려서 약관 화면을 거치게 한다.
-function signedIn(accessToken: string, isNewUser = false): Session {
+function signedIn(accessToken: string): Session {
   return {
-    status: isNewUser ? 'signupRequired' : 'signedIn',
+    status: 'signedIn',
     profile: { id: userIdOf(accessToken) ?? 'unknown', displayName: null },
   };
 }
@@ -45,14 +45,17 @@ export const webAuth: WebAuthService = {
     },
     async exchange({ handoffCode }) {
       const { provider, token } = parseHandoff(handoffCode);
-      const { accessToken, isNewUser } = await signInWithSocialToken(provider, token);
-      return signedIn(accessToken, isNewUser);
+      const result = await signInWithSocialToken(provider, token);
+      // 처음 온 사람은 아직 회원이 아니다. signupRequired 로 알려서 약관 화면을 거치게 한다.
+      if (result.status === 'signupRequired') return { status: 'signupRequired', profile: null };
+      return signedIn(result.accessToken);
     },
     async current() {
-      const tokens = loadTokens();
-      return tokens ? signedIn(tokens.accessToken) : null;
+      if (!(await ensureSession())) return null;
+      const accessToken = getAccessToken();
+      return accessToken ? signedIn(accessToken) : null;
     },
-    // 토큰은 WebView 의 localStorage 에 있다. 앱 쪽에 따로 보관할 것이 없다.
+    // 세션은 WebView 의 쿠키(Refresh)와 메모리(Access)에 있다. 앱 쪽에 따로 보관할 것이 없다.
     async nativeHandoff() {
       return { handoffCode: 'web-session' };
     },
