@@ -13,6 +13,8 @@ type BottomSheetProps = {
   children: ReactNode;
   /** 하단 버튼 영역. 보통 <Footer layout="stack">. */
   footer?: ReactNode;
+  /** 제목 옆 X 버튼. 아래에 "닫기" 버튼이 따로 있는 메뉴 시트는 끈다. */
+  showClose?: boolean;
 };
 
 /** 아래에서 올라오는 시트. 바깥(어두운 영역)이나 X 를 누르면 onClose 가 불린다. */
@@ -24,6 +26,7 @@ export function BottomSheet({
   onOpenError,
   children,
   footer,
+  showClose = true,
 }: BottomSheetProps) {
   const titleId = useId();
   if (!open) return null;
@@ -43,9 +46,11 @@ export function BottomSheet({
           <h2 id={titleId} className={styles.title}>
             {title}
           </h2>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="닫기">
-            <Icon name="xmark-line" />
-          </button>
+          {showClose && (
+            <button type="button" className={styles.close} onClick={onClose} aria-label="닫기">
+              <Icon name="xmark-line" />
+            </button>
+          )}
         </div>
         {children}
       </div>

@@ -9,7 +9,12 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
+      // maximum-scale=1: iOS 는 16px 보다 작은 입력칸(디자인 14px)을 누르면 화면을 확대한다. 앱처럼 쓰는 화면이라 막는다.
+      // iOS Safari 는 이 값이 있어도 손가락으로 벌리는 확대는 허용한다.
+      {
+        name: 'viewport',
+        content: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover',
+      },
       { title: 'Ziper' },
       { name: 'description', content: 'Ziper 웹 스타터' },
     ],
