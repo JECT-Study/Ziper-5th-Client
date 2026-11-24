@@ -1,8 +1,8 @@
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import type { BottomTab } from '../components';
 
-// 아직 화면이 없는 탭(보드·재발견)은 빠져 있다. 화면이 생기면 주소를 더한다.
-const TAB_PATHS: Partial<Record<BottomTab, string>> = { home: '/', my: '/my' };
+// 아직 화면이 없는 탭(재발견)은 빠져 있다. 화면이 생기면 주소를 더한다.
+const TAB_PATHS: Partial<Record<BottomTab, string>> = { home: '/', board: '/boards', my: '/my' };
 
 /**
  * 하단 탭을 누르면 그 탭 화면으로 바꾼다. 보드 상세처럼 탭 아래 화면에서는 같은 탭을 눌러도 그 탭의 첫 화면으로 간다.

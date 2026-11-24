@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { usePlatform } from '../bridge/provider';
 import { BottomNavigation } from '../components';
 import { requireSignedIn } from '../features/auth';
+import { HomeBoards } from '../features/board';
 import { useTabNavigation } from '../shared/use-tab-navigation';
 import * as styles from '../styles/home.css';
 
@@ -31,8 +32,8 @@ function HomePage() {
   return (
     <main className={styles.page}>
       <div className={styles.content}>
-        <h1 className={styles.title}>Ziper</h1>
-        <p className={styles.description}>마음에 든 상품을 추가해 보세요.</p>
+        {/* 홈의 배너·최근 저장은 홈 작업에서 채운다. 여기서는 보드 영역만 둔다. */}
+        <HomeBoards />
         {registration === 'error' && (
           <p className={styles.error} role="alert">
             상품 추가 화면을 열지 못했어요.
