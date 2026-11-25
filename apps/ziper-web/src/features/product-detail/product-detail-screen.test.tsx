@@ -296,21 +296,24 @@ it('edits existing values and refreshes detail without creating another card', a
   const api = createPreviewApi('normal');
   const update = vi.spyOn(api, 'update');
   const { container } = await edit(api);
-  await input(container, '상품명', '수정한 전체 상품명');
+  const title = '가'.repeat(199) + '🍑';
+  await input(container, '상품명', title + '끝');
+  expect(button(container, '수정 완료').disabled).toBe(true);
+  await input(container, '상품명', title);
   await input(container, '가격 (원)', '0');
   await input(container, '해시태그', '#봄, 봄, 여름');
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
     '1',
     expect.objectContaining({
-      productTitle: '수정한 전체 상품명',
+      productTitle: title,
       price: 0,
       tags: ['봄', '여름'],
       boardIds: ['1', '2'],
     }),
   );
   expect(container.querySelector('h1')?.textContent).toBe('상품 상세');
-  expect(container.textContent).toContain('수정한 전체 상품명');
+  expect(container.textContent).toContain(title);
 });
 it('enforces the deployed price and tag rules before submitting', async () => {
   const { container } = await edit();

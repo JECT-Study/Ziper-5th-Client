@@ -1,0 +1,6 @@
+# 개발 바이너리를 새로 띄우고 Metro에 연결한다. 로그인 여부는 호출 흐름에서 확인한다.
+appId: com.ject.ziper
+---
+- stopApp
+- openLink: exp+ziper-mobile://?__expo_url=http%3A%2F%2Flocalhost%3A8081&__expo_disable_fab=1&__expo_disable_auto_launch=1&__expo_disable_onboarding=1
+- runFlow: confirm-link.yaml

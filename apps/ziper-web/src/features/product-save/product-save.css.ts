@@ -71,6 +71,8 @@ export const label = style({
 export const group = style({ display: 'grid', gap: vars.space[8], minWidth: 0 });
 export const linkField = style({ minWidth: 0 });
 globalStyle(`${linkField} input`, { textOverflow: 'ellipsis' });
+// Keep iOS WebView from zooming the form when a user focuses a 14px input.
+globalStyle(`${shell} input:is([type="text"], [type="url"]):not([readonly])`, { fontSize: 16 });
 
 export const productCard = style({
   minHeight: 105,
@@ -91,7 +93,11 @@ export const productImage = style({
   backgroundColor: vars.palette.gray200,
 });
 
-export const productInfo = style({ display: 'grid', gap: vars.space[2] });
+export const productInfo = style({
+  display: 'grid',
+  gap: vars.space[2],
+  selectors: { '&:only-child': { gridColumn: '1 / -1' } },
+});
 
 export const inline = style({
   display: 'grid',

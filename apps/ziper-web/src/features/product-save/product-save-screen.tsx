@@ -43,6 +43,7 @@ type ScreenProps = {
   api: ProductSaveApi;
   onClose: () => void | Promise<unknown>;
   onViewProduct?: (cardId: string) => Promise<unknown>;
+  entryMode?: 'auto' | 'manual' | 'web';
   initialDraft?: InitialDraft;
   savedMessage?: string;
 };
@@ -99,7 +100,7 @@ export function ScreenShell({
 
 type Ready = Extract<ProductLookup, { status: 'ready' }>;
 type ScreenData =
-  | (Ready & { boards: readonly BoardSummary[] })
+  | Ready
   | { status: 'loading' | 'error' | 'duplicate' | 'unsupported' | 'auth-required' };
 
 type SaveStatus = ProductSaveResult | 'idle' | 'unknown';
@@ -118,28 +119,32 @@ type InitialDraft = {
   boardIds: string[];
 };
 
-export function ProductSaveScreen({ url, api, ...formProps }: ScreenProps) {
+export function ProductSaveScreen({
+  url,
+  api,
+  paused = false,
+  ...formProps
+}: ScreenProps & { paused?: boolean }) {
   const { onClose } = formProps;
   const [loaded, setLoaded] = useState<ScreenData>({ status: 'loading' });
   const [attempt, retry] = useState(0);
+  // Resume only unfinished lookups; a completed form keeps its fields and edits.
+  const pausedLookup = paused && loaded.status === 'loading';
   useEffect(() => {
-    if (!url) return;
+    if (!url || pausedLookup) return;
     const request = new AbortController();
     const { signal } = request;
     const load = async () => {
       try {
         const lookup = await api.lookup(url, signal);
-        if (signal.aborted) return;
-        const result =
-          lookup.status === 'ready' ? { ...lookup, boards: await api.listBoards(signal) } : lookup;
-        if (!signal.aborted) setLoaded(result);
+        if (!signal.aborted) setLoaded(lookup);
       } catch {
         if (!signal.aborted) setLoaded({ status: 'error' });
       }
     };
     void load();
     return () => request.abort();
-  }, [api, url, attempt]);
+  }, [api, url, attempt, pausedLookup]);
 
   if (!url)
     return (
@@ -154,7 +159,13 @@ export function ProductSaveScreen({ url, api, ...formProps }: ScreenProps) {
       {loaded.status === 'unsupported' && <UnsupportedLink />}
       {loaded.status === 'duplicate' && <p role="alert">{saveErrors.duplicate}</p>}
       {loaded.status === 'auth-required' && <p role="status">{authMessage}</p>}
-      {loaded.status === 'loading' && <p role="status">상품 정보를 불러오는 중이에요.</p>}
+      {loaded.status === 'loading' && (
+        <p role="status">
+          {formProps.entryMode === 'auto'
+            ? '쇼핑몰에서 상품 정보를 가져오는 중이에요.'
+            : '상품 링크를 확인하는 중이에요.'}
+        </p>
+      )}
       {loaded.status === 'error' && (
         <>
           <p role="alert">상품 정보를 불러오지 못했어요.</p>
@@ -190,24 +201,79 @@ function ProductForm({
   api,
   onClose,
   onViewProduct,
+  entryMode,
   initialDraft,
   savedMessage = '보드에 상품을 저장했어요.',
 }: Omit<ScreenProps, 'url'> & {
-  lookup: Ready & { boards: readonly BoardSummary[] };
+  lookup: Ready;
   sourceURL: string;
 }) {
   const { url, shop, product } = lookup;
   const linkedImage = product?.imageURL;
+  const manualHint =
+    entryMode === 'web'
+      ? '웹에서는 자동 입력을 지원하지 않아요. 상품 정보를 직접 입력해 주세요.'
+      : entryMode === 'auto'
+        ? '상품 정보를 자동으로 가져오지 못했어요. 직접 입력해서 저장할 수 있어요.'
+        : entryMode === 'manual'
+          ? '이 링크는 자동 입력을 지원하지 않아요. 직접 입력해서 저장할 수 있어요.'
+          : null;
   const [name, setName] = useState(product?.name || initialDraft?.name || '');
   const [price, setPrice] = useState(product?.price != null ? won.format(product.price) : '');
-  const [image, setImage] = useState<CardImage | null>(
+  const [selectedImage, setImage] = useState<CardImage | null>(
     linkedImage ? { kind: 'linked-product', url: linkedImage } : (initialDraft?.image ?? null),
   );
+  const [{ attempt, status: imageStatus }, setImageLoad] = useState<{
+    attempt: number;
+    status: 'loading' | 'ready' | 'failed';
+  }>({ attempt: 0, status: 'loading' });
+  const linkedImageSelected =
+    selectedImage?.kind === 'linked-product' && selectedImage.url === linkedImage;
+  const image = linkedImageSelected && imageStatus !== 'ready' ? null : selectedImage;
+  const loadingImage = Boolean(linkedImage && imageStatus === 'loading');
+  useEffect(() => {
+    if (!loadingImage) return;
+    const timer = setTimeout(() => settleImage(attempt, false), 4_000);
+    return () => clearTimeout(timer);
+  }, [attempt, loadingImage]);
+
+  function settleImage(completedAttempt: number, loaded: boolean) {
+    setImageLoad((current) => {
+      if (current.attempt !== completedAttempt || current.status !== 'loading') return current;
+      if (loaded) return { attempt: completedAttempt, status: 'ready' };
+      if (completedAttempt === 0) return { attempt: 1, status: 'loading' };
+      return { attempt: completedAttempt, status: 'failed' };
+    });
+  }
   const [memo, setMemo] = useState(initialDraft?.memo ?? '');
   const [tags, setTags] = useState(initialTags);
   const [selectedTags, setSelectedTags] = useState(initialDraft?.tags ?? []);
   const [tag, setTag] = useState<string | null>(null);
-  const [boards, setBoards] = useState(lookup.boards);
+  const [boards, setBoards] = useState<readonly BoardSummary[] | 'loading' | 'error'>('loading');
+  const [boardAttempt, retryBoards] = useState(0);
+  useEffect(() => {
+    const request = new AbortController();
+    const { signal } = request;
+    const timer = setTimeout(() => {
+      request.abort();
+      setBoards('error');
+    }, 8_000);
+    async function loadBoards() {
+      try {
+        const list = await api.listBoards(signal);
+        if (!signal.aborted) setBoards(list);
+      } catch {
+        if (!signal.aborted) setBoards('error');
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    void loadBoards();
+    return () => {
+      clearTimeout(timer);
+      request.abort();
+    };
+  }, [api, boardAttempt]);
   const [selectedBoards, setSelectedBoards] = useState(initialDraft?.boardIds ?? []);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [boardError, setBoardError] = useState(false);
@@ -221,15 +287,20 @@ function ProductForm({
   const newBoardName = boardName?.trim();
   const canAddTag = Boolean(tagName && !tags.includes(tagName));
   const canCreateBoard = Boolean(
-    newBoardName && !boards.some((board) => board.name === newBoardName),
+    newBoardName &&
+    typeof boards !== 'string' &&
+    !boards.some((board) => board.name === newBoardName),
   );
   const numericPrice = parseWholeWon(price);
   const invalidPrice = numericPrice === null || numericPrice > 1_000_000_000;
+  const invalidName = [...name.trim()].length > 200;
   const canSave = Boolean(
     name.trim() &&
+    !invalidName &&
     !invalidPrice &&
     image &&
     selectedTags.length &&
+    typeof boards !== 'string' &&
     selectedBoards.length &&
     (saveStatus === 'idle' || saveStatus === 'failed'),
   );
@@ -268,7 +339,7 @@ function ProductForm({
     setBoardError(false);
     try {
       const board = await api.createBoard(newBoardName);
-      setBoards((list) => [board, ...list]);
+      setBoards((list) => (typeof list === 'string' ? list : [board, ...list]));
       setSelectedBoards((list) => [...list, board.id]);
       closeBoardEntry();
       boardList.current?.scrollTo(0, 0);
@@ -344,22 +415,43 @@ function ProductForm({
       >
         <div className={styles.fields}>
           <SharedLink url={url} />
+          {!product && manualHint && (
+            <p className={styles.feedback} role="status">
+              {manualHint}
+            </p>
+          )}
           {product && (
             <div className={styles.productCard}>
-              {linkedImage && (
+              {linkedImage && imageStatus !== 'failed' && (
                 <img
+                  key={attempt}
                   className={styles.productImage}
                   src={linkedImage}
                   alt=""
                   referrerPolicy="no-referrer"
+                  onLoad={() => settleImage(attempt, true)}
+                  onError={() => settleImage(attempt, false)}
                 />
               )}
               <div className={styles.productInfo}>
                 <p className={styles.feedback}>
-                  자동으로 가져온 정보예요. 저장 전에 확인해 주세요.
+                  {loadingImage
+                    ? '상품 이미지를 불러오는 중이에요.'
+                    : product.name &&
+                        product.price !== null &&
+                        linkedImage &&
+                        imageStatus === 'ready'
+                      ? '자동으로 가져온 정보예요. 저장 전에 확인해 주세요.'
+                      : '일부 정보만 가져왔어요. 비어 있는 항목을 입력해 주세요.'}
                 </p>
+                {linkedImage && imageStatus === 'failed' && (
+                  <p className={styles.feedback}>
+                    상품 이미지를 불러오지 못했어요. 직접 추가해 주세요.
+                  </p>
+                )}
                 {linkedImage &&
-                  (image?.kind === 'linked-product' ? (
+                  imageStatus === 'ready' &&
+                  (linkedImageSelected ? (
                     <span className={styles.feedback}>상품 이미지 사용 중</span>
                   ) : (
                     <Button
@@ -379,7 +471,7 @@ function ProductForm({
             value={name}
             onChange={(event) => setName(event.target.value)}
             onClear={() => setName('')}
-            maxLength={200}
+            error={invalidName && '상품명은 200자까지 저장할 수 있어요. 줄여 주세요.'}
             required
           />
           <TextField
@@ -460,58 +552,82 @@ function ProductForm({
           <section className={styles.group} aria-label="보드 선택">
             <p className={styles.label}>보드 선택 (1개 이상)</p>
             <div className={styles.boardPanel}>
-              {boards.length > 0 ? (
-                <ul className={styles.boardList} ref={boardList}>
-                  {boards.map((board) => (
-                    <li className={styles.boardRow} key={board.id}>
-                      <Checkbox
-                        className={styles.boardCheck}
-                        checked={selectedBoards.includes(board.id)}
-                        onChange={() => setSelectedBoards(toggle(selectedBoards, board.id))}
-                      >
-                        {board.name}
-                        <span aria-hidden="true" className={styles.boardCount}>
-                          {board.productCount}개
-                        </span>
-                      </Checkbox>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={styles.feedback}>첫 보드를 만들어 주세요.</p>
-              )}
-              <div className={styles.boardActions}>
-                {boardName === null ? (
-                  <button
-                    type="button"
-                    className={styles.addBoard}
-                    ref={(button) => restoreTrigger('board', button)}
-                    onClick={() => setBoardName('')}
-                  >
-                    <Icon name="plus-small-line" size={16} />새 보드 만들기
-                  </button>
-                ) : (
-                  <InlineEntry
-                    label="새 보드 이름"
-                    value={boardName}
-                    maxLength={10}
-                    action="완료"
-                    variant="secondary"
-                    placeholder="보드 이름"
-                    helperText="최대 10자까지 입력 가능해요"
-                    loading={pending === 'board'}
-                    disabled={!canCreateBoard}
-                    onChange={setBoardName}
-                    onConfirm={() => void createBoard()}
-                    onCancel={closeBoardEntry}
-                  />
-                )}
-                {boardError && (
+              {boards === 'loading' ? (
+                <p className={styles.feedback} role="status">
+                  보드를 불러오는 중이에요.
+                </p>
+              ) : boards === 'error' ? (
+                <>
                   <p className={styles.error} role="alert">
-                    보드를 만들지 못했어요.
+                    보드를 불러오지 못했어요.
                   </p>
-                )}
-              </div>
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={() => {
+                      setBoards('loading');
+                      retryBoards((n) => n + 1);
+                    }}
+                  >
+                    보드 다시 불러오기
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {boards.length > 0 ? (
+                    <ul className={styles.boardList} ref={boardList}>
+                      {boards.map((board) => (
+                        <li className={styles.boardRow} key={board.id}>
+                          <Checkbox
+                            className={styles.boardCheck}
+                            checked={selectedBoards.includes(board.id)}
+                            onChange={() => setSelectedBoards(toggle(selectedBoards, board.id))}
+                          >
+                            {board.name}
+                            <span aria-hidden="true" className={styles.boardCount}>
+                              {board.productCount}개
+                            </span>
+                          </Checkbox>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className={styles.feedback}>첫 보드를 만들어 주세요.</p>
+                  )}
+                  <div className={styles.boardActions}>
+                    {boardName === null ? (
+                      <button
+                        type="button"
+                        className={styles.addBoard}
+                        ref={(button) => restoreTrigger('board', button)}
+                        onClick={() => setBoardName('')}
+                      >
+                        <Icon name="plus-small-line" size={16} />새 보드 만들기
+                      </button>
+                    ) : (
+                      <InlineEntry
+                        label="새 보드 이름"
+                        value={boardName}
+                        maxLength={10}
+                        action="완료"
+                        variant="secondary"
+                        placeholder="보드 이름"
+                        helperText="최대 10자까지 입력 가능해요"
+                        loading={pending === 'board'}
+                        disabled={!canCreateBoard}
+                        onChange={setBoardName}
+                        onConfirm={() => void createBoard()}
+                        onCancel={closeBoardEntry}
+                      />
+                    )}
+                    {boardError && (
+                      <p className={styles.error} role="alert">
+                        보드를 만들지 못했어요.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </section>
         </div>

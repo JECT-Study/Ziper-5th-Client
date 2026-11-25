@@ -9,6 +9,7 @@ const FORWARD_HEADERS = [
   'accept',
   'authorization',
   'user-agent',
+  'if-none-match',
   'cookie',
   'x-refresh-token-mode',
 ];
@@ -50,8 +51,10 @@ export function apiDevProxy(): Plugin {
             body: method === 'GET' || method === 'HEAD' ? undefined : await readBody(req),
           });
           res.statusCode = response.status;
-          const type = response.headers.get('content-type');
-          if (type) res.setHeader('content-type', type);
+          for (const name of ['content-type', 'etag', 'cache-control', 'retry-after']) {
+            const value = response.headers.get(name);
+            if (value) res.setHeader(name, value);
+          }
           const cookies = response.headers.getSetCookie();
           if (cookies.length) res.setHeader('set-cookie', cookies.map(devCookie));
           res.end(Buffer.from(await response.arrayBuffer()));

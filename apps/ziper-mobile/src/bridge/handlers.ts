@@ -32,6 +32,10 @@ export type HostServices = Readonly<{
   setDepth: (depth: number) => void;
   sheets: SheetSessions;
   shareInbox?: Pick<ShareInbox, 'read' | 'dismiss'>;
+  extraction?: {
+    run(input: Input<'extractProductV1'>): Promise<Output<'extractProductV1'>>;
+    cancel(): void;
+  };
 }>;
 
 // Detect stripped extra properties as well as schema failures, including nested objects.
@@ -87,6 +91,10 @@ export function bridgeInfo(host: HostServices): BridgeInfo {
   if (host.openExternal) {
     names.push('externalOpenV1');
     capabilities.push(capability.external);
+  }
+  if (host.extraction) {
+    names.push('extractProductV1');
+    capabilities.push(capability.productExtraction);
   }
   const auth = host.auth;
   if (auth) {
@@ -233,6 +241,13 @@ export function createHandlers(host: HostServices) {
           );
           break;
         }
+        case 'extractProductV1': {
+          if (!host.extraction) return failure('UNSUPPORTED');
+          const extracted = await host.extraction.run(input as Input<'extractProductV1'>);
+          if (disposed || !host.active()) return failure('PERMISSION_DENIED');
+          result = success(extracted);
+          break;
+        }
         case 'shareReadV1':
           if (!host.shareInbox) return failure('UNSUPPORTED');
           result = success(host.shareInbox.read());
@@ -265,11 +280,13 @@ export function createHandlers(host: HostServices) {
     // Blur revokes replies across refocus; cancelling SDK effects remains the service's job.
     suspend() {
       authEpoch++;
+      host.extraction?.cancel();
       host.sheets.cancel();
     },
     dispose() {
       disposed = true;
       operations.clear();
+      host.extraction?.cancel();
       host.sheets.dispose();
     },
   };

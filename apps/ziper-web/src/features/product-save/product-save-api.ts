@@ -1,5 +1,5 @@
 import type { BoardSummary, ProductSaveApi } from '@ziper/api/product-save';
-import { ApiError, request } from '../../shared/api/http';
+import { ApiError, parseResponse, request, requestResponse } from '../../shared/api/http';
 import {
   id,
   idNumber,
@@ -22,17 +22,50 @@ function boardSummary(value: unknown): BoardSummary {
   return { id: id(board.boardId), name: text(board.name), productCount: count };
 }
 
+async function checkProductUrl(input: string, signal: AbortSignal) {
+  signal.throwIfAborted();
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal.reason);
+  signal.addEventListener('abort', cancel, { once: true });
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  const stopped = new Promise<never>((_, reject) => {
+    controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
+      once: true,
+    });
+  });
+  try {
+    const check = async (retried = false): Promise<unknown> => {
+      let response: Response | undefined;
+      try {
+        response = await requestResponse(`${products}/url-check`, {
+          method: 'POST',
+          auth: true,
+          signal: controller.signal,
+          body: { url: input },
+        });
+        return await parseResponse(response);
+      } catch (error) {
+        controller.signal.throwIfAborted();
+        const gateway = response?.status === 502 || response?.status === 504;
+        // A 200 parse only throws if reading the body fails; schema checks happen below.
+        const interrupted = response ? response.status === 200 : error instanceof TypeError;
+        // URL check is read-only, unlike product registration. Keep the same URL and deadline.
+        if (!retried && (gateway || interrupted) && !response?.headers.has('Retry-After'))
+          return check(true);
+        throw error;
+      }
+    };
+    return object(await Promise.race([check(), stopped]));
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', cancel);
+  }
+}
+
 export const productSaveApi: ProductSaveApi = {
   async lookup(input, signal) {
     try {
-      const result = object(
-        await request(`${products}/url-check`, {
-          method: 'POST',
-          auth: true,
-          signal,
-          body: { url: input },
-        }),
-      );
+      const result = await checkProductUrl(input, signal);
       if (nullable(id, result.existingCardId)) return { status: 'duplicate' };
       return {
         status: 'ready',

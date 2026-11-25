@@ -23,8 +23,12 @@ type RequestOptions = {
   method?: string;
   body?: unknown;
   signal?: AbortSignal;
+  cache?: RequestCache;
+  headers?: Record<string, string>;
   /** Access Token 을 붙인다. 만료(401)되면 한 번 재발급하고 다시 보낸다. */
   auth?: boolean;
+  /** Pause a caller's network budget while waiting for the separately bounded cookie rotation. */
+  onRefreshWait?: () => (() => void) | undefined;
   /**
    * 로그인·가입·재발급·로그아웃 요청. Refresh Token 을 본문 대신 HttpOnly 쿠키로 주고받는다.
    * 백엔드는 이 헤더가 있을 때만 쿠키를 쓰고, 허용된 Origin 인지도 함께 본다.
@@ -34,10 +38,10 @@ type RequestOptions = {
 
 function send(
   path: string,
-  { method = 'GET', body, session, signal }: RequestOptions,
+  { method = 'GET', body, session, signal, cache, headers: extraHeaders }: RequestOptions,
   accessToken?: string | null,
 ) {
-  const headers: Record<string, string> = {};
+  const headers = { ...extraHeaders };
   const multipart = body instanceof FormData;
   if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -46,12 +50,13 @@ function send(
     method,
     headers,
     signal,
+    cache,
     body: multipart || body === undefined ? body : JSON.stringify(body),
     credentials: session ? 'include' : 'same-origin',
   });
 }
 
-async function parse<T>(response: Response): Promise<T> {
+export async function parseResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
   let data: unknown;
   try {
@@ -75,17 +80,26 @@ let checked = false;
 
 function refreshAccessToken() {
   refreshing ??= (async () => {
+    // Bound the shared rotation independently, within the URL-check wait that can follow rules.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5_000);
     try {
-      const { accessToken } = await parse<{ accessToken: string }>(
-        await send('/api/v1/auth/reissue', { method: 'POST', session: true }),
+      const { accessToken } = await parseResponse<{ accessToken: string }>(
+        await send('/api/v1/auth/reissue', {
+          method: 'POST',
+          session: true,
+          signal: controller.signal,
+        }),
       );
       setAccessToken(accessToken);
       return true;
     } catch {
       setAccessToken(null);
+      controller.signal.throwIfAborted(); // A timeout is not a confirmed sign-out.
       return false;
     } finally {
-      checked = true;
+      clearTimeout(timer);
+      checked = !controller.signal.aborted;
     }
   })().finally(() => {
     refreshing = null;
@@ -110,14 +124,40 @@ export function startSession(accessToken: string | null) {
  * API 요청. 실패하면 ApiError 를 던진다.
  * auth 요청이 재발급까지 실패하면 401 을 던진다. 로그인 화면으로 보낼지는 쓰는 쪽이 정한다.
  */
-export async function request<T = void>(path: string, options: RequestOptions = {}): Promise<T> {
-  if (!options.auth) return parse<T>(await send(path, options));
+export async function requestResponse(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Response> {
+  if (!options.auth) return send(path, options);
 
   const response = await send(path, options, getAccessToken());
-  if (response.status !== 401) return parse<T>(response);
+  if (response.status !== 401) return response;
 
-  options.signal?.throwIfAborted();
-  const renewed = await refreshAccessToken();
-  options.signal?.throwIfAborted();
-  return parse<T>(renewed ? await send(path, options, getAccessToken()) : response);
+  const { signal } = options;
+  signal?.throwIfAborted();
+  const refresh = refreshAccessToken();
+  let renewed: boolean;
+  if (!signal) renewed = await refresh;
+  else {
+    // A caller's deadline must not cancel token rotation shared with other requests.
+    const resume = options.onRefreshWait?.();
+    let cancel!: () => void;
+    const aborted = new Promise<never>((_, reject) => {
+      cancel = () => reject(signal.reason);
+      signal.addEventListener('abort', cancel, { once: true });
+      if (signal.aborted) cancel();
+    });
+    try {
+      renewed = await Promise.race([refresh, aborted]);
+      signal.throwIfAborted();
+    } finally {
+      signal.removeEventListener('abort', cancel);
+      resume?.();
+    }
+  }
+  return renewed ? send(path, options, getAccessToken()) : response;
+}
+
+export async function request<T = void>(path: string, options?: RequestOptions): Promise<T> {
+  return parseResponse<T>(await requestResponse(path, options));
 }

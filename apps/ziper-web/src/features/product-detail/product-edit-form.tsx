@@ -73,9 +73,10 @@ export function ProductEditForm({
     image === 'keep' && !product.imageUrl && !product.imageFileId && !product.fallbackIcon;
   const invalidBoards =
     !boards || !boardIds.length || boardIds.some((id) => !boards.some((board) => board.id === id));
+  const titleLength = [...title.trim()].length;
   const valid =
-    title.trim().length > 0 &&
-    title.trim().length <= 200 &&
+    titleLength > 0 &&
+    titleLength <= 200 &&
     memo.length <= 100 &&
     !invalidPrice &&
     parsedTags.length > 0 &&
@@ -136,8 +137,8 @@ export function ProductEditForm({
           label="상품명"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          maxLength={200}
-          showCounter
+          helperText={`${titleLength}/200`}
+          error={titleLength > 200 && '상품명은 200자까지 저장할 수 있어요. 줄여 주세요.'}
           required
         />
         <TextField
