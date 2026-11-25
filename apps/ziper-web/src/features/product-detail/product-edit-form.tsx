@@ -7,6 +7,7 @@ import {
 } from '@ziper/api/product-detail';
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { Button, ChipFilter, TextField } from '../../components';
+import { useLoad } from '../../shared/use-load';
 import {
   codePointLength,
   normalizeTag,
@@ -48,32 +49,26 @@ export function ProductEditForm({
   const [memo, setMemo] = useState(product.memo);
   const [tags, setTags] = useState(product.tags.join(', '));
   const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.id));
-  const [boards, setBoards] = useState<readonly ProductBoard[] | null>(null);
   const [image, setImage] = useState<'keep' | FallbackIcon>('keep');
   const [status, setStatus] = useState<'idle' | 'saving' | 'unknown'>('idle');
   const [error, setError] = useState('');
-  const [attempt, retry] = useState(0);
   const busy = useRef(false);
   const alive = useRef(false);
   useEffect(() => {
     alive.current = true;
-    const request = new AbortController();
-    void api
-      .listBoards(request.signal)
-      .then((value) => {
-        if (!request.signal.aborted) {
-          setBoards(value);
-          setBoardIds((ids) => ids.filter((id) => value.some((board) => board.id === id)));
-        }
-      })
-      .catch(() => {
-        if (!request.signal.aborted) setError('보드 목록을 불러오지 못했어요.');
-      });
     return () => {
       alive.current = false;
-      request.abort();
     };
-  }, [api, attempt]);
+  }, []);
+  const [loadedBoards, retryBoards] = useLoad((signal) => api.listBoards(signal), [api], {
+    // Drop boards that no longer exist so they can't block the update.
+    onReady: (list) =>
+      setBoardIds((ids) => ids.filter((id) => list.some((board) => board.id === id))),
+  });
+  const boards: readonly ProductBoard[] | null =
+    loadedBoards.status === 'ready' ? loadedBoards.value : null;
+  const shownError =
+    error || (loadedBoards.status === 'error' ? '보드 목록을 불러오지 못했어요.' : '');
 
   const parsedTags = [...new Set(tags.split(',').map(normalizeTag).filter(Boolean))];
   const amount = parseWholeWon(price);
@@ -240,7 +235,7 @@ export function ProductEditForm({
             variant="secondary"
             onClick={() => {
               setError('');
-              retry((n) => n + 1);
+              retryBoards();
             }}
           >
             보드 목록 다시 불러오기
@@ -250,9 +245,9 @@ export function ProductEditForm({
           <p className={styles.error}>현재 보드를 1개 이상 선택해 주세요.</p>
         )}
       </fieldset>
-      {error && (
+      {shownError && (
         <p className={styles.error} role="alert">
-          {error}
+          {shownError}
         </p>
       )}
       <div className={styles.buttonRow}>

@@ -1,4 +1,5 @@
 import { productExtractionRules, type Shops } from '@ziper/product-extraction/schema';
+import { isGatewayFailure, withDeadline } from '../../shared/api/deadline';
 import { requestResponse } from '../../shared/api/http';
 
 const rulesKey = 'ziper.product-extraction-rules.v1';
@@ -48,13 +49,7 @@ function saveRules(entry: RulesCache | null) {
 // never blocks it, so this returns [] instead of throwing (except for an explicit abort).
 export async function extractionRules(signal: AbortSignal): Promise<Shops> {
   const cache = loadRules();
-  signal.throwIfAborted();
-  const controller = new AbortController();
-  const cancel = () => controller.abort(signal.reason);
-  signal.addEventListener('abort', cancel, { once: true });
-  const deadline = performance.now() + rulesNetworkBudgetMs;
-  let timer = setTimeout(() => controller.abort(), rulesNetworkBudgetMs);
-  let pausedForRefresh = false;
+  const budget = withDeadline(signal, rulesNetworkBudgetMs);
   // Another save screen can confirm, replace or invalidate rules while this GET is pending.
   const cachedIfFresh = (entry = loadRules()) => {
     const age = entry ? Date.now() - entry.confirmedAt : Infinity;
@@ -65,25 +60,16 @@ export async function extractionRules(signal: AbortSignal): Promise<Shops> {
       requestResponse('/api/v1/products/extraction-rules', {
         auth: true,
         cache: 'no-store',
-        onRefreshWait() {
-          // Fresh rules can already serve this lookup. Only a cold start needs the auth wait.
-          if (pausedForRefresh || cachedIfFresh().length) return;
-          const remaining = deadline - performance.now();
-          if (remaining <= 0) return;
-          pausedForRefresh = true;
-          clearTimeout(timer);
-          return () => {
-            timer = setTimeout(() => controller.abort(), remaining);
-          };
-        },
+        // Fresh rules can already serve this lookup. Only a cold start needs the auth wait.
+        onRefreshWait: () => (cachedIfFresh().length ? undefined : budget.pause()),
         headers: cache?.etag ? { 'If-None-Match': cache.etag } : undefined,
-        signal: controller.signal,
+        signal: budget.signal,
       });
     for (let attempt = 0; ; attempt++) {
-      controller.signal.throwIfAborted();
+      budget.signal.throwIfAborted();
       const canRetry = (response?: Response) =>
         attempt === 0 &&
-        !controller.signal.aborted &&
+        !budget.signal.aborted &&
         !response?.headers.has('Retry-After') &&
         !cachedIfFresh(cache).length &&
         !cachedIfFresh().length;
@@ -95,15 +81,10 @@ export async function extractionRules(signal: AbortSignal): Promise<Shops> {
         if (error instanceof TypeError && canRetry()) continue;
         throw error;
       }
-      controller.signal.throwIfAborted();
+      budget.signal.throwIfAborted();
       // Production CORS does not expose Retry-After, so only retry a 503 if we can check it.
-      if (
-        (response.status === 502 ||
-          response.status === 504 ||
-          (response.status === 503 && response.type !== 'cors')) &&
-        canRetry(response)
-      )
-        continue;
+      const unavailable = response.status === 503 && response.type !== 'cors';
+      if ((isGatewayFailure(response) || unavailable) && canRetry(response)) continue;
       if (response.status === 304 && cache?.etag) {
         const current = loadRules();
         if (current?.etag !== cache.etag) return cachedIfFresh(current);
@@ -123,7 +104,7 @@ export async function extractionRules(signal: AbortSignal): Promise<Shops> {
         if (response.status === 200 && canRetry(response)) continue;
         throw error;
       }
-      controller.signal.throwIfAborted();
+      budget.signal.throwIfAborted();
       let data: unknown;
       try {
         data = JSON.parse(body);
@@ -146,8 +127,8 @@ export async function extractionRules(signal: AbortSignal): Promise<Shops> {
     signal.throwIfAborted();
     // A stalled shared rotation needs a user retry, not a URL check that rotates the cookie again.
     if (
-      pausedForRefresh &&
-      !controller.signal.aborted &&
+      budget.paused &&
+      !budget.signal.aborted &&
       error instanceof DOMException &&
       error.name === 'AbortError'
     )
@@ -155,7 +136,6 @@ export async function extractionRules(signal: AbortSignal): Promise<Shops> {
     // An unavailable rules service must not prevent manual saving.
     return cachedIfFresh();
   } finally {
-    clearTimeout(timer);
-    signal.removeEventListener('abort', cancel);
+    budget.dispose();
   }
 }

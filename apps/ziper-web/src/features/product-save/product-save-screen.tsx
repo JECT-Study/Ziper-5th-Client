@@ -1,5 +1,4 @@
 import type {
-  BoardSummary,
   CardImage,
   ProductLookup,
   ProductSaveApi,
@@ -30,7 +29,9 @@ import {
   titleLengthMessage,
   type FallbackIcon,
 } from '@ziper/api/product-fields';
+import { useLoad } from '../../shared/use-load';
 import { InlineEntry } from './inline-entry';
+import { useLinkedImage } from './use-linked-image';
 import * as styles from './product-save.css';
 
 const initialTags: readonly string[] = seasonTags;
@@ -232,57 +233,25 @@ function ProductForm({
   const [selectedImage, setImage] = useState<CardImage | null>(
     linkedImage ? { kind: 'linked-product', url: linkedImage } : (initialDraft?.image ?? null),
   );
-  const [{ attempt, status: imageStatus }, setImageLoad] = useState<{
-    attempt: number;
-    status: 'loading' | 'ready' | 'failed';
-  }>({ attempt: 0, status: 'loading' });
+  const {
+    attempt,
+    status: imageStatus,
+    loading: loadingImage,
+    settle: settleImage,
+  } = useLinkedImage(linkedImage);
   const linkedImageSelected =
     selectedImage?.kind === 'linked-product' && selectedImage.url === linkedImage;
   const image = linkedImageSelected && imageStatus !== 'ready' ? null : selectedImage;
-  const loadingImage = Boolean(linkedImage && imageStatus === 'loading');
-  useEffect(() => {
-    if (!loadingImage) return;
-    const timer = setTimeout(() => settleImage(attempt, false), 4_000);
-    return () => clearTimeout(timer);
-  }, [attempt, loadingImage]);
-
-  function settleImage(completedAttempt: number, loaded: boolean) {
-    setImageLoad((current) => {
-      if (current.attempt !== completedAttempt || current.status !== 'loading') return current;
-      if (loaded) return { attempt: completedAttempt, status: 'ready' };
-      if (completedAttempt === 0) return { attempt: 1, status: 'loading' };
-      return { attempt: completedAttempt, status: 'failed' };
-    });
-  }
   const [memo, setMemo] = useState(initialDraft?.memo ?? '');
   const [tags, setTags] = useState(initialTags);
   const [selectedTags, setSelectedTags] = useState(initialDraft?.tags ?? []);
   const [tag, setTag] = useState<string | null>(null);
-  const [boards, setBoards] = useState<readonly BoardSummary[] | 'loading' | 'error'>('loading');
-  const [boardAttempt, retryBoards] = useState(0);
-  useEffect(() => {
-    const request = new AbortController();
-    const { signal } = request;
-    const timer = setTimeout(() => {
-      request.abort();
-      setBoards('error');
-    }, 8_000);
-    async function loadBoards() {
-      try {
-        const list = await api.listBoards(signal);
-        if (!signal.aborted) setBoards(list);
-      } catch {
-        if (!signal.aborted) setBoards('error');
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    void loadBoards();
-    return () => {
-      clearTimeout(timer);
-      request.abort();
-    };
-  }, [api, boardAttempt]);
+  const [loadedBoards, retryBoards, updateBoards] = useLoad(
+    (signal) => api.listBoards(signal),
+    [api],
+    { timeoutMs: 8_000 },
+  );
+  const boards = loadedBoards.status === 'ready' ? loadedBoards.value : loadedBoards.status;
   const [selectedBoards, setSelectedBoards] = useState(initialDraft?.boardIds ?? []);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [boardError, setBoardError] = useState(false);
@@ -348,7 +317,7 @@ function ProductForm({
     setBoardError(false);
     try {
       const board = await api.createBoard(newBoardName);
-      setBoards((list) => (typeof list === 'string' ? list : [board, ...list]));
+      updateBoards((list) => [board, ...list]);
       setSelectedBoards((list) => [...list, board.id]);
       closeBoardEntry();
       boardList.current?.scrollTo(0, 0);
@@ -568,14 +537,7 @@ function ProductForm({
                   <p className={styles.error} role="alert">
                     보드를 불러오지 못했어요.
                   </p>
-                  <Button
-                    variant="secondary"
-                    size="small"
-                    onClick={() => {
-                      setBoards('loading');
-                      retryBoards((n) => n + 1);
-                    }}
-                  >
+                  <Button variant="secondary" size="small" onClick={retryBoards}>
                     보드 다시 불러오기
                   </Button>
                 </>

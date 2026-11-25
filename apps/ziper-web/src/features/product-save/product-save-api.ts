@@ -1,4 +1,5 @@
 import type { BoardSummary, ProductSaveApi } from '@ziper/api/product-save';
+import { isGatewayFailure, withDeadline } from '../../shared/api/deadline';
 import { ApiError, parseResponse, request, requestResponse } from '../../shared/api/http';
 import {
   id,
@@ -23,42 +24,36 @@ function boardSummary(value: unknown): BoardSummary {
 }
 
 async function checkProductUrl(input: string, signal: AbortSignal) {
-  signal.throwIfAborted();
-  const controller = new AbortController();
-  const cancel = () => controller.abort(signal.reason);
-  signal.addEventListener('abort', cancel, { once: true });
-  const timer = setTimeout(() => controller.abort(), 5_000);
+  const budget = withDeadline(signal, 5_000);
   const stopped = new Promise<never>((_, reject) => {
-    controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
-      once: true,
-    });
+    budget.signal.addEventListener('abort', () => reject(budget.signal.reason), { once: true });
   });
+  const check = async (retried = false): Promise<unknown> => {
+    let response: Response | undefined;
+    try {
+      response = await requestResponse(`${products}/url-check`, {
+        method: 'POST',
+        auth: true,
+        signal: budget.signal,
+        body: { url: input },
+      });
+      return await parseResponse(response);
+    } catch (error) {
+      budget.signal.throwIfAborted();
+      // A 200 parse only throws if reading the body fails; schema checks happen below.
+      const transient = response
+        ? isGatewayFailure(response) ||
+          (response.status === 200 && !response.headers.has('Retry-After'))
+        : error instanceof TypeError;
+      // URL check is read-only, unlike product registration. Keep the same URL and deadline.
+      if (!retried && transient) return check(true);
+      throw error;
+    }
+  };
   try {
-    const check = async (retried = false): Promise<unknown> => {
-      let response: Response | undefined;
-      try {
-        response = await requestResponse(`${products}/url-check`, {
-          method: 'POST',
-          auth: true,
-          signal: controller.signal,
-          body: { url: input },
-        });
-        return await parseResponse(response);
-      } catch (error) {
-        controller.signal.throwIfAborted();
-        const gateway = response?.status === 502 || response?.status === 504;
-        // A 200 parse only throws if reading the body fails; schema checks happen below.
-        const interrupted = response ? response.status === 200 : error instanceof TypeError;
-        // URL check is read-only, unlike product registration. Keep the same URL and deadline.
-        if (!retried && (gateway || interrupted) && !response?.headers.has('Retry-After'))
-          return check(true);
-        throw error;
-      }
-    };
     return object(await Promise.race([check(), stopped]));
   } finally {
-    clearTimeout(timer);
-    signal.removeEventListener('abort', cancel);
+    budget.dispose();
   }
 }
 
