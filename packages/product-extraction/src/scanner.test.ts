@@ -1671,3 +1671,76 @@ it('rejects unrelated Zigzag JSON-LD and keeps the matching product when both ap
     JSON.stringify({ url, name: product.name, price: 34200, imageURL: image }),
   );
 });
+
+it('waits for the Musinsa detail record instead of the brand-prefixed card title while streaming', () => {
+  vi.useFakeTimers();
+  const url = 'https://www.musinsa.com/products/02177448';
+  const cover = '/images/goods_img/20211028/2177448/2177448_16353844_500.jpg';
+  const page = document.implementation.createHTMLDocument();
+  let loading = true;
+  Object.defineProperty(page, 'readyState', { get: () => (loading ? 'loading' : 'complete') });
+  page.head.innerHTML = `
+    <meta property="og:title" content="얼모스트블루(ALMOSTBLUE) 블러쉬 체크 머플러 - 사이즈 &amp; 후기 | 무신사">
+    <meta property="og:image" content="https://image.msscdn.net${cover}">
+    <meta property="product:price:amount" content="29250">`;
+  const postMessage = vi.fn<(data: string) => void>();
+  const view = {
+    get top() {
+      return view;
+    },
+    ReactNativeWebView: { postMessage },
+  };
+  const rules: Shops = [
+    {
+      hosts: ['www.musinsa.com'],
+      imageHosts: ['image.msscdn.net'],
+      imageStrategy: 'SERVER_MIRROR',
+      fields: {
+        title: ["meta[property='og:title']@content", 'ldjson:name', 'title'],
+        price: ["meta[property='product:price:amount']@content"],
+        image: ["meta[property='og:image']@content"],
+      },
+    },
+  ];
+  new Function('window', 'location', 'document', productScanScript(rules))(
+    view,
+    new URL(url),
+    page,
+  );
+  // A slow Android WebView can keep streaming the body well past the head.
+  vi.advanceTimersByTime(3_000);
+  const script = page.createElement('script');
+  script.id = '__NEXT_DATA__';
+  script.textContent = JSON.stringify({
+    page: '/products/[productId]',
+    query: { productId: '02177448' },
+    props: {
+      pageProps: {
+        hasDetail: true,
+        dehydratedState: {
+          queries: [
+            {
+              queryKey: ['Detail', 2177448],
+              state: {
+                data: {
+                  data: {
+                    goodsNo: 2177448,
+                    goodsNm: '블러쉬 체크 머플러',
+                    goodsPrice: { salePrice: 29250, currency: 'KRW' },
+                    thumbnailImageUrl: cover,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  });
+  page.body.append(script);
+  loading = false;
+  vi.advanceTimersByTime(300);
+  const names = postMessage.mock.calls.map(([data]) => JSON.parse(data).name);
+  expect(names).toContain('블러쉬 체크 머플러');
+  expect(names).not.toContain('얼모스트블루(ALMOSTBLUE) 블러쉬 체크 머플러');
+});

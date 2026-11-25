@@ -165,8 +165,9 @@ export const sampleSource = String.raw`
       waitingForHeading = !heading;
       if (heading && name.endsWith(' ' + heading)) name = heading;
     }
-    if (waitingForHeading && document.readyState === 'loading') {
-      // A streamed head can precede the verified title by several seconds.
+    if ((waitingForHeading || musinsaId) && !detailName && document.readyState === 'loading') {
+      // A streamed head can precede the verified title by several seconds. Musinsa's card
+      // title carries the brand, and its Detail record arrives only with the body.
       name = '';
     } else if (pageId && !detailName && name && (waitingForHeading || document.readyState === 'loading')) {
       sharingTitleSeenAt ??= Date.now();
