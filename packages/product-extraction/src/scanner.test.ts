@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { isProductExtractionURL } from './link';
 import { readProductMessage } from './message';
-import { productScanScript } from './scanner';
+import { productScanScript } from './scanner/index';
 import type { Shops } from './schema';
 
 const shops: Shops = [

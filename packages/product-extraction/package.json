@@ -5,7 +5,7 @@
   "exports": {
     "./link": "./src/link.ts",
     "./schema": "./src/schema.ts",
-    "./scanner": "./src/scanner.ts",
+    "./scanner": "./src/scanner/index.ts",
     "./message": "./src/message.ts"
   },
   "scripts": {
