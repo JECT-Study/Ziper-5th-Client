@@ -68,33 +68,123 @@ export function validArguments(method: Method, args: unknown[]): boolean {
   );
 }
 
+type Scope = Readonly<{
+  host: HostServices;
+  operations: OperationLedger;
+  /** Whether this scope may still act: not disposed and its screen is active. */
+  live: () => boolean;
+}>;
+type Handler<M extends Method> = (input: Input<M>, scope: Scope) => Promise<unknown> | unknown;
+type Feature = {
+  /** Omitted when the host always provides it. */
+  available?: (host: HostServices) => boolean;
+  /** Methods paired with the capability each one adds; null for none. */
+  methods: { [M in Method]?: readonly [Handler<M>, capability: string | null] };
+};
+
+// Runs a side effect once per operation ID, so a retried request gets the first result.
+function once<T>(
+  method: Method,
+  request: { operationId: string },
+  scope: Scope,
+  run: () => Result<T> | Promise<Result<T>>,
+) {
+  return scope.operations.run<T>(
+    request.operationId,
+    `${method}:${JSON.stringify(request)}`,
+    async () => (scope.live() ? run() : failure('PERMISSION_DENIED')),
+  );
+}
+
+function navigate<M extends 'navigationPushV1' | 'navigationReplaceV1'>(method: M): Handler<M> {
+  const kind = method === 'navigationPushV1' ? 'push' : 'replace';
+  return (request, scope) => {
+    if (!serviceURL(scope.host.config, request.path)) return failure('INVALID_REQUEST');
+    return once(method, request, scope, () => {
+      scope.host.navigate(kind, request.path);
+      return success({ handled: true });
+    });
+  };
+}
+
+// Every non-auth method. Auth runs separately because it serializes provider handoffs.
+const features: readonly Feature[] = [
+  {
+    methods: {
+      getBridgeInfoV1: [(_, { host }) => success(bridgeInfo(host)), null],
+      navigationPushV1: [navigate('navigationPushV1'), capability.push],
+      navigationReplaceV1: [navigate('navigationReplaceV1'), capability.replace],
+      // A synchronous pop may dispose this scope; still report the completed navigation.
+      navigationBackV1: [(_, { host }) => success({ handled: host.back() }), capability.back],
+      navigationSetWebHistoryV1: [
+        ({ depth }, { host }) => {
+          host.setDepth(depth);
+          return success({ done: true });
+        },
+        capability.history,
+      ],
+      sheetActionsV1: [
+        (request, scope) =>
+          once('sheetActionsV1', request, scope, () => scope.host.sheets.open(request)),
+        capability.sheet,
+      ],
+    },
+  },
+  {
+    available: (host) => Boolean(host.shareInbox),
+    methods: {
+      shareReadV1: [(_, { host }) => success(host.shareInbox!.read()), capability.incomingShare],
+      shareDismissV1: [
+        ({ id }, { host }) => {
+          host.shareInbox!.dismiss(id);
+          return success({ done: true });
+        },
+        null,
+      ],
+    },
+  },
+  {
+    available: (host) => Boolean(host.openExternal),
+    methods: {
+      externalOpenV1: [
+        (request, scope) =>
+          once('externalOpenV1', request, scope, async () => {
+            await scope.host.openExternal!(request.url);
+            return success({ done: true });
+          }),
+        capability.external,
+      ],
+    },
+  },
+  {
+    available: (host) => Boolean(host.extraction),
+    methods: {
+      extractProductV1: [
+        async (input, scope) => {
+          const extracted = await scope.host.extraction!.run(input);
+          return scope.live() ? success(extracted) : failure('PERMISSION_DENIED');
+        },
+        capability.productExtraction,
+      ],
+    },
+  },
+];
+
+function handlerFor<M extends Method>(host: HostServices, method: M) {
+  const feature = features.find((candidate) => Object.hasOwn(candidate.methods, method));
+  if (!feature || (feature.available && !feature.available(host))) return null;
+  return feature.methods[method]![0] as Handler<M>;
+}
+
 export function bridgeInfo(host: HostServices): BridgeInfo {
-  const names: Method[] = [
-    'getBridgeInfoV1',
-    'navigationPushV1',
-    'navigationReplaceV1',
-    'navigationBackV1',
-    'navigationSetWebHistoryV1',
-    'sheetActionsV1',
-  ];
-  const capabilities: string[] = [
-    capability.push,
-    capability.replace,
-    capability.back,
-    capability.history,
-    capability.sheet,
-  ];
-  if (host.shareInbox) {
-    names.push('shareReadV1', 'shareDismissV1');
-    capabilities.push(capability.incomingShare);
-  }
-  if (host.openExternal) {
-    names.push('externalOpenV1');
-    capabilities.push(capability.external);
-  }
-  if (host.extraction) {
-    names.push('extractProductV1');
-    capabilities.push(capability.productExtraction);
+  const names: Method[] = [];
+  const capabilities: string[] = [];
+  for (const feature of features) {
+    if (feature.available && !feature.available(host)) continue;
+    for (const [method, [, name]] of Object.entries(feature.methods)) {
+      names.push(method as Method);
+      if (name) capabilities.push(name);
+    }
   }
   const auth = host.auth;
   if (auth) {
@@ -199,77 +289,13 @@ export function createHandlers(host: HostServices) {
           if (!logout) authBusy = false;
         }
       }
-      let result: unknown;
-      switch (method) {
-        case 'getBridgeInfoV1':
-          result = success(bridgeInfo(host));
-          break;
-        // A synchronous pop may dispose this scope; still report the completed navigation.
-        case 'navigationBackV1':
-          result = success({ handled: host.back() });
-          break;
-        case 'navigationSetWebHistoryV1':
-          host.setDepth((input as Input<'navigationSetWebHistoryV1'>).depth);
-          result = success({ done: true });
-          break;
-        case 'navigationPushV1':
-        case 'navigationReplaceV1': {
-          const request = input as Input<'navigationPushV1'>;
-          if (!serviceURL(host.config, request.path)) return failure('INVALID_REQUEST');
-          result = await operations.run(
-            request.operationId,
-            `${method}:${JSON.stringify(input)}`,
-            async () => {
-              if (disposed || !host.active()) return failure('PERMISSION_DENIED');
-              host.navigate(method === 'navigationPushV1' ? 'push' : 'replace', request.path);
-              return success({ handled: true });
-            },
-          );
-          break;
-        }
-        case 'externalOpenV1': {
-          if (!host.openExternal) return failure('UNSUPPORTED');
-          const request = input as Input<'externalOpenV1'>;
-          result = await operations.run(
-            request.operationId,
-            `${method}:${JSON.stringify(input)}`,
-            async () => {
-              if (disposed || !host.active()) return failure('PERMISSION_DENIED');
-              await host.openExternal!(request.url);
-              return success({ done: true });
-            },
-          );
-          break;
-        }
-        case 'extractProductV1': {
-          if (!host.extraction) return failure('UNSUPPORTED');
-          const extracted = await host.extraction.run(input as Input<'extractProductV1'>);
-          if (disposed || !host.active()) return failure('PERMISSION_DENIED');
-          result = success(extracted);
-          break;
-        }
-        case 'shareReadV1':
-          if (!host.shareInbox) return failure('UNSUPPORTED');
-          result = success(host.shareInbox.read());
-          break;
-        case 'shareDismissV1':
-          if (!host.shareInbox) return failure('UNSUPPORTED');
-          host.shareInbox.dismiss((input as Input<'shareDismissV1'>).id);
-          result = success({ done: true });
-          break;
-        case 'sheetActionsV1': {
-          const request = input as Input<'sheetActionsV1'>;
-          result = await operations.run(
-            request.operationId,
-            `${method}:${JSON.stringify(input)}`,
-            () =>
-              disposed || !host.active()
-                ? Promise.resolve(failure('PERMISSION_DENIED'))
-                : host.sheets.open(request),
-          );
-          break;
-        }
-      }
+      const handle = handlerFor(host, method);
+      if (!handle) return failure('UNSUPPORTED');
+      const result = await handle(input, {
+        host,
+        operations,
+        live: () => !disposed && host.active(),
+      });
       return checkedResult(method, result);
     } catch {
       return failure('INTERNAL');
