@@ -17,6 +17,7 @@ import { SheetSessions, type SheetSnapshot } from '../bridge/sheets';
 import { WebView } from '../bridge/webview';
 import { NativeActionSheet } from './native-action-sheet';
 import { WebLoadError } from './web-load-error';
+import { useProductExtraction } from '../product-extraction/use-product-extraction';
 
 type WebScope = ReturnType<typeof createHandlers> & {
   uri: string;
@@ -26,6 +27,7 @@ type WebScope = ReturnType<typeof createHandlers> & {
 
 export function WebScreen({ path }: { path: string }) {
   const { config, auth, shareInbox } = useMobileServices();
+  const { extraction, extractionView } = useProductExtraction();
   // 헤더가 없으니 상태 표시줄 아래부터 웹을 그린다. 아래쪽 여백은 웹이 safe-area 로 처리한다.
   const { top } = useSafeAreaInsets();
   const router = useRouter();
@@ -143,6 +145,7 @@ export function WebScreen({ path }: { path: string }) {
             await Linking.openURL(url);
           },
           sheets,
+          extraction: edgeToEdge ? extraction : undefined,
           shareInbox: shareScreen
             ? {
                 // This screen keeps its original share even after acknowledgement or reload.
@@ -180,7 +183,7 @@ export function WebScreen({ path }: { path: string }) {
         scopes.deactivate();
       }
     };
-  }, [uri, blocked, scopes, shareInbox, shareScreen, hasWebHeader]);
+  }, [uri, blocked, scopes, shareInbox, shareScreen, hasWebHeader, edgeToEdge, extraction]);
 
   const delegate = useMemo<BridgeDelegate<NativeBridge>>(() => {
     // Retained delegates resolve the active scope per call, never capture disposed handlers.
@@ -214,7 +217,7 @@ export function WebScreen({ path }: { path: string }) {
   const blockDocument = () => {
     if (live.current.uri !== uri) return;
     live.current.blocked = true;
-    scopes.current?.sheets.cancel();
+    scopes.current?.suspend();
     depthRef.current = 0;
     setDepth(0);
     web.current?.stopLoading();
@@ -288,6 +291,7 @@ export function WebScreen({ path }: { path: string }) {
           webviewDebuggingEnabled={false}
         />
       )}
+      {extractionView}
       {sheet && (
         <NativeActionSheet
           key={sheet.key}

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { isProductExtractionURL, isShareURL } from '@ziper/product-extraction/link';
+import { productExtractionRules, productMetadata } from '@ziper/product-extraction/schema';
 
 export const providers = ['naver', 'kakao', 'apple'] as const;
 
@@ -17,6 +19,7 @@ export const capability = {
   sheet: 'sheet.actions.v1',
   incomingShare: 'share.incoming.v1',
   external: 'external.open.v1',
+  productExtraction: 'product.extract.v1',
 } as const;
 
 export function isInternalPath(path: unknown): path is string {
@@ -140,22 +143,6 @@ const done = z.object({ done: z.literal(true) });
 
 export const incomingShareEvent = 'ziper:incoming-share';
 
-export function isShareURL(value: string): boolean {
-  if (value.length > 4096 || /[\s\\]/u.test(value)) return false;
-  if ([...value].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
-    return false;
-  const scheme = /^https?:\/\//i.exec(value)?.[0];
-  if (!scheme) return false;
-  // Check userinfo in the authority only; the React Native URL implementation can match @ in the path.
-  const authority = value.slice(scheme.length).split(/[/?#]/, 1)[0];
-  if (!authority || authority.includes('@')) return false;
-  try {
-    return Boolean(new URL(scheme.toLowerCase() + value.slice(scheme.length)).hostname);
-  } catch {
-    return false;
-  }
-}
-
 const incomingShare = z.object({
   id: idSchema,
   url: z.string().refine(isShareURL).nullable(),
@@ -177,6 +164,14 @@ export const methods = {
   externalOpenV1: {
     input: z.object({ url: z.string().refine(isShareURL), operationId: idSchema }).strict(),
     output: done,
+  },
+  extractProductV1: {
+    input: productExtractionRules
+      .extend({
+        url: z.string().refine((value) => isProductExtractionURL(value, true)),
+      })
+      .strict(),
+    output: productMetadata.nullable(),
   },
   shareReadV1: { input: z.undefined(), output: incomingShare.nullable() },
   shareDismissV1: { input: z.object({ id: idSchema }).strict(), output: done },

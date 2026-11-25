@@ -1,6 +1,5 @@
+import { unknownOutcome } from '@ziper/api/outcome';
 import {
-  ProductDetailError,
-  type FallbackIcon,
   type ProductBoard,
   type ProductDetail,
   type ProductDetailApi,
@@ -8,8 +7,27 @@ import {
 } from '@ziper/api/product-detail';
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { Button, ChipFilter, TextField } from '../../components';
-import { parseWholeWon } from '../product-save/price';
+import { useLoad } from '../../shared/use-load';
+import {
+  codePointLength,
+  normalizeTag,
+  parseWholeWon,
+  priceRangeMessage,
+  productLimits,
+  fallbackIcons,
+  seasonTags,
+  titleLengthMessage,
+  type FallbackIcon,
+} from '@ziper/api/product-fields';
 import * as styles from './product-detail.css';
+
+const iconLabels: Record<FallbackIcon, string> = {
+  TOP: '상의',
+  PANTS: '바지',
+  SKIRT: '스커트',
+  ACCESSORY: '패션잡화',
+  BEAUTY: '뷰티',
+};
 
 export function ProductEditForm({
   product,
@@ -31,52 +49,40 @@ export function ProductEditForm({
   const [memo, setMemo] = useState(product.memo);
   const [tags, setTags] = useState(product.tags.join(', '));
   const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.id));
-  const [boards, setBoards] = useState<readonly ProductBoard[] | null>(null);
   const [image, setImage] = useState<'keep' | FallbackIcon>('keep');
   const [status, setStatus] = useState<'idle' | 'saving' | 'unknown'>('idle');
   const [error, setError] = useState('');
-  const [attempt, retry] = useState(0);
   const busy = useRef(false);
   const alive = useRef(false);
   useEffect(() => {
     alive.current = true;
-    const request = new AbortController();
-    void api
-      .listBoards(request.signal)
-      .then((value) => {
-        if (!request.signal.aborted) {
-          setBoards(value);
-          setBoardIds((ids) => ids.filter((id) => value.some((board) => board.id === id)));
-        }
-      })
-      .catch(() => {
-        if (!request.signal.aborted) setError('보드 목록을 불러오지 못했어요.');
-      });
     return () => {
       alive.current = false;
-      request.abort();
     };
-  }, [api, attempt]);
+  }, []);
+  const [loadedBoards, retryBoards] = useLoad((signal) => api.listBoards(signal), [api], {
+    // Drop boards that no longer exist so they can't block the update.
+    onReady: (list) =>
+      setBoardIds((ids) => ids.filter((id) => list.some((board) => board.id === id))),
+  });
+  const boards: readonly ProductBoard[] | null =
+    loadedBoards.status === 'ready' ? loadedBoards.value : null;
+  const shownError =
+    error || (loadedBoards.status === 'error' ? '보드 목록을 불러오지 못했어요.' : '');
 
-  const parsedTags = [
-    ...new Set(
-      tags
-        .split(',')
-        .map((tag) => tag.trim().replace(/^#+/, '').trim())
-        .filter(Boolean),
-    ),
-  ];
+  const parsedTags = [...new Set(tags.split(',').map(normalizeTag).filter(Boolean))];
   const amount = parseWholeWon(price);
-  const invalidPrice = amount === null || amount > 1_000_000_000;
-  const invalidTags = parsedTags.some((tag) => [...tag].length > 6);
+  const invalidPrice = amount === null;
+  const invalidTags = parsedTags.some((tag) => codePointLength(tag) > productLimits.tagLength);
   const missingImage =
     image === 'keep' && !product.imageUrl && !product.imageFileId && !product.fallbackIcon;
   const invalidBoards =
     !boards || !boardIds.length || boardIds.some((id) => !boards.some((board) => board.id === id));
+  const titleLength = codePointLength(title.trim());
   const valid =
-    title.trim().length > 0 &&
-    title.trim().length <= 200 &&
-    memo.length <= 100 &&
+    titleLength > 0 &&
+    titleLength <= productLimits.titleLength &&
+    memo.length <= productLimits.memoLength &&
     !invalidPrice &&
     parsedTags.length > 0 &&
     !invalidTags &&
@@ -102,30 +108,29 @@ export function ProductEditForm({
       imageFileId: image === 'keep' ? product.imageFileId : null,
       fallbackIcon: image === 'keep' ? product.fallbackIcon : image,
     };
-    try {
-      const updated = await api.update(product.cardId, input);
-      if (alive.current) onSaved(updated);
-    } catch (reason) {
-      if (!alive.current) return;
-      onBusyChange(false);
-      if (reason instanceof ProductDetailError) {
-        setError(
-          reason.code === 'auth-required'
-            ? '로그인한 뒤 다시 수정해 주세요.'
-            : reason.code === 'not-found' || reason.code === 'forbidden'
-              ? '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.'
-              : (reason.detail ?? '수정하지 못했어요. 다시 시도해 주세요.'),
-        );
-        const retryable = reason.code === 'failed' || reason.code === 'auth-required';
-        setStatus(retryable ? 'idle' : 'unknown');
-        busy.current = !retryable;
-        if (!retryable) onReconcile();
-      } else {
-        setStatus('unknown');
-        onReconcile();
-        setError('수정 결과를 확인할 수 없어요. 다시 제출하지 말고 상세 화면에서 확인해 주세요.');
-      }
+    const result = await api.update(product.cardId, input).catch(() => unknownOutcome);
+    if (!alive.current) return;
+    if (result.status === 'done') return onSaved(result.value);
+    onBusyChange(false);
+    if (result.status === 'unknown') {
+      setStatus('unknown');
+      onReconcile();
+      setError('수정 결과를 확인할 수 없어요. 다시 제출하지 말고 상세 화면에서 확인해 주세요.');
+      return;
     }
+    const { reason, detail } = result;
+    setError(
+      reason === 'auth-required'
+        ? '로그인한 뒤 다시 수정해 주세요.'
+        : reason === 'not-found' || reason === 'forbidden'
+          ? '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.'
+          : (detail ?? '수정하지 못했어요. 다시 시도해 주세요.'),
+    );
+    // A missing or forbidden product needs the detail screen to reload, not another submit.
+    const retryable = reason === 'failed' || reason === 'auth-required';
+    setStatus(retryable ? 'idle' : 'unknown');
+    busy.current = !retryable;
+    if (!retryable) onReconcile();
   }
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
@@ -136,8 +141,8 @@ export function ProductEditForm({
           label="상품명"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          maxLength={200}
-          showCounter
+          helperText={`${titleLength}/${productLimits.titleLength}`}
+          error={titleLength > productLimits.titleLength && titleLengthMessage}
           required
         />
         <TextField
@@ -147,9 +152,7 @@ export function ProductEditForm({
           value={price}
           onChange={(event) => setPrice(event.target.value)}
           required
-          error={
-            price.trim() !== '' && invalidPrice && '0원부터 10억원까지의 정수를 입력해 주세요.'
-          }
+          error={price.trim() !== '' && invalidPrice && priceRangeMessage}
           helperText="0원부터 10억원까지 입력할 수 있어요."
         />
         <TextField
@@ -157,11 +160,11 @@ export function ProductEditForm({
           label="한 줄 메모"
           value={memo}
           onChange={(event) => setMemo(event.target.value)}
-          maxLength={100}
+          maxLength={productLimits.memoLength}
           showCounter
         />
         <div className={styles.chips} role="group" aria-label="계절 태그">
-          {['봄', '여름', '가을', '겨울'].map((season) => (
+          {seasonTags.map((season) => (
             <ChipFilter
               key={season}
               className={styles.choice}
@@ -196,11 +199,11 @@ export function ProductEditForm({
             onChange={(event) => setImage(event.target.value as typeof image)}
           >
             <option value="keep">기존 이미지 유지</option>
-            <option value="TOP">상의</option>
-            <option value="PANTS">바지</option>
-            <option value="SKIRT">스커트</option>
-            <option value="ACCESSORY">패션잡화</option>
-            <option value="BEAUTY">뷰티</option>
+            {fallbackIcons.map((icon) => (
+              <option key={icon} value={icon}>
+                {iconLabels[icon]}
+              </option>
+            ))}
           </select>
         </label>
         {missingImage && <p className={styles.error}>카드 이미지 도안을 선택해 주세요.</p>}
@@ -231,7 +234,7 @@ export function ProductEditForm({
             variant="secondary"
             onClick={() => {
               setError('');
-              retry((n) => n + 1);
+              retryBoards();
             }}
           >
             보드 목록 다시 불러오기
@@ -241,9 +244,9 @@ export function ProductEditForm({
           <p className={styles.error}>현재 보드를 1개 이상 선택해 주세요.</p>
         )}
       </fieldset>
-      {error && (
+      {shownError && (
         <p className={styles.error} role="alert">
-          {error}
+          {shownError}
         </p>
       )}
       <div className={styles.buttonRow}>

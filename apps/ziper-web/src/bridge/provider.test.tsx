@@ -126,6 +126,7 @@ it('keeps root runtime and retained callbacks alive across real TanStack route n
   expect(Object.keys(facade).sort()).toEqual([
     'auth',
     'external',
+    'extractProduct',
     'incomingShare',
     'navigation',
     'sheets',

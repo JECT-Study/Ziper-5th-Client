@@ -5,7 +5,7 @@ import * as SafeArea from 'react-native-safe-area-context';
 import { fireEvent } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { success } from '@ziper/bridge/contract';
+import { capability, success } from '@ziper/bridge/contract';
 import type { BridgeDelegate } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
 import RootLayout from '../src/app/_layout';
@@ -41,6 +41,30 @@ vi.mock('../src/bridge/webview', async () => {
     },
   };
 });
+const mockExtraction = vi.hoisted(() => ({
+  props: undefined as import('react-native-webview').WebViewProps | undefined,
+  instance: undefined as symbol | undefined,
+  injectJavaScript: vi.fn(),
+}));
+vi.mock('react-native-webview', async () => {
+  const { useImperativeHandle, useState } = await import('react');
+  const { Text } = await import('react-native');
+  return {
+    WebView: ({
+      ref,
+      ...props
+    }: import('react-native-webview').WebViewProps & {
+      ref?: import('react').Ref<{ injectJavaScript: (script: string) => void }>;
+    }) => {
+      const [instance] = useState(() => Symbol());
+      mockExtraction.instance = instance;
+      mockExtraction.props = props;
+      useImperativeHandle(ref, () => ({ injectJavaScript: mockExtraction.injectJavaScript }), []);
+      return <Text>Product extractor</Text>;
+    },
+  };
+});
+
 const mockSheet = vi.hoisted(() => ({ onDismiss: undefined as (() => void) | undefined }));
 vi.mock('@expo/ui', () => ({
   BottomSheet: ({ children, onDismiss }: { children: ReactNode; onDismiss: () => void }) => {
@@ -119,7 +143,47 @@ it('keeps a cold-start share across native screens and only lets the focused scr
   expect(await product.shareReadV1()).toEqual(success(null));
 });
 
+it('advertises product extraction and runs it through the screen bridge', async () => {
+  await renderRouter(routes, { initialUrl: '/web?path=%2Fregister-product' });
+  const page = mockWebView.delegate!;
+  expect(await page.getBridgeInfoV1()).toMatchObject({
+    value: { capabilities: expect.arrayContaining([capability.productExtraction]) },
+  });
+  const url = 'https://m.a-bly.com/goods/7';
+  const product = {
+    url,
+    name: '가디건',
+    price: 39_000,
+    imageURL: 'https://d3ha2047wt6x28.cloudfront.net/sample.jpg',
+  };
+  let result: ReturnType<typeof page.extractProductV1> | undefined;
+  await act(() => {
+    result = page.extractProductV1({
+      url,
+      shops: [
+        {
+          hosts: ['m.a-bly.com'],
+          fields: { title: ['title'], price: [], image: [] },
+          imageHosts: ['d3ha2047wt6x28.cloudfront.net'],
+          imageStrategy: 'SERVER_MIRROR',
+        },
+      ],
+    });
+  });
+  await act(() => {
+    mockExtraction.props?.onLoad?.({ nativeEvent: { url } } as never);
+    mockExtraction.props?.onMessage?.({
+      nativeEvent: { url, data: JSON.stringify(product) },
+    } as never);
+  });
+  await expect(result).resolves.toEqual(success(product));
+  expect(screen.queryByText('Product extractor', { includeHiddenElements: true })).toBeNull();
+});
+
 afterEach(() => {
+  mockExtraction.props = undefined;
+  mockExtraction.instance = undefined;
+  mockExtraction.injectJavaScript.mockClear();
   mockWebView.delegate = null;
   mockSheet.onDismiss = undefined;
   vi.useRealTimers();

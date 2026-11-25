@@ -13,6 +13,7 @@
   "dependencies": {
     "@webview-bridge/react-native": "1.9.0",
     "@webview-bridge/web": "1.9.0",
+    "@ziper/product-extraction": "workspace:*",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import { isShareURL } from '@ziper/bridge/contract';
+import { isShareURL } from '@ziper/product-extraction/link';
 
 export function invalidResponse(): never {
   throw new Error('Invalid API response');

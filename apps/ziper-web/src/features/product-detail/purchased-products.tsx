@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { ProductDetail, ProductPurchases } from '@ziper/api/product-detail';
 import { Button } from '../../components';
+import { useLoad } from '../../shared/use-load';
 import checkCircle from '../../assets/product-detail/check-circle.svg';
 import { ProductImage } from './product-image';
 import * as styles from './product-detail.css';
@@ -13,21 +13,9 @@ export function PurchasedProducts({
   api: ProductPurchases;
   affectedBoardCount: number | null;
 }) {
-  const [products, setProducts] = useState<readonly ProductDetail[] | null>(null);
-  const [error, setError] = useState(false);
-  const [attempt, retry] = useState(0);
-  useEffect(() => {
-    const request = new AbortController();
-    void api
-      .list(request.signal)
-      .then((value) => {
-        if (!request.signal.aborted) setProducts(value);
-      })
-      .catch(() => {
-        if (!request.signal.aborted) setError(true);
-      });
-    return () => request.abort();
-  }, [api, attempt]);
+  const [loaded, retry] = useLoad((signal) => api.list(signal), [api]);
+  const products: readonly ProductDetail[] | null = loaded.status === 'ready' ? loaded.value : null;
+  const error = loaded.status === 'error';
 
   return (
     <div className={styles.results}>
@@ -46,14 +34,7 @@ export function PurchasedProducts({
           <p role="alert" className={styles.error}>
             구매 완료 목록을 불러오지 못했어요. 완료된 구매 처리는 유지돼요.
           </p>
-          <Button
-            onClick={() => {
-              setError(false);
-              retry((n) => n + 1);
-            }}
-          >
-            목록 다시 불러오기
-          </Button>
+          <Button onClick={retry}>목록 다시 불러오기</Button>
         </>
       ) : products ? (
         <>

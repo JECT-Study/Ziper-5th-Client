@@ -1,3 +1,4 @@
+import { done, rejected, unknownOutcome } from '@ziper/api/outcome';
 import { useMemo } from 'react';
 import {
   ProductDetailError,
@@ -54,26 +55,26 @@ export function createPreviewApi(mode: string): ProductDetailApi & { purchases: 
       return sampleProduct.boards;
     },
     async update(_id, input) {
-      if (mode === 'failed') throw new ProductDetailError('failed');
-      if (mode === 'unknown') throw new Error('response lost');
+      if (mode === 'failed') return rejected('failed');
+      if (mode === 'unknown') return unknownOutcome;
       const { boardIds, ...fields } = input;
       product = {
         ...product,
         ...fields,
         boards: sampleProduct.boards.filter((board) => boardIds.includes(board.id)),
       };
-      return product;
+      return done(product);
     },
     purchases: {
       async complete() {
-        if (mode === 'failed') throw new ProductDetailError('failed');
-        if (mode === 'unknown') throw new Error('response lost');
+        if (mode === 'failed') return rejected('failed');
+        if (mode === 'unknown') return unknownOutcome;
         product = { ...product, status: 'PURCHASED' };
-        return {
+        return done({
           cardId: product.cardId,
-          status: 'PURCHASED',
+          status: 'PURCHASED' as const,
           affectedBoardCount: product.boards.length,
-        };
+        });
       },
       async list(signal) {
         signal.throwIfAborted();

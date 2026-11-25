@@ -1,0 +1,62 @@
+# 실제 쇼핑몰에 요청하는 수동 실행용 시나리오. PRODUCT_URL은 실행 시 전달한다.
+appId: com.ject.ziper
+env:
+  EXPECTED_PRICE: ''
+  EXPECTED_TITLE: ''
+  SCREENSHOT_PATH: ''
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 상품 추가
+    timeout: 45000
+- tapOn: 상품 추가
+- extendedWaitUntil:
+    visible: 상품 링크
+    timeout: 18000
+- tapOn:
+    text: 상품 링크
+    retryTapIfNoChange: true
+# Android can lose the first characters if the IME is still opening.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - waitForAnimationToEnd
+- inputText: ${PRODUCT_URL}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: '^https?://.+'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - pressKey: Enter
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+      - tapOn: 상품 정보 입력하기
+# Capture the terminal form even when extraction failed. Allow rules, short-link, URL check and image deadlines.
+- extendedWaitUntil:
+    visible: '자동으로 가져온 정보예요.*|일부 정보만 가져왔어요.*|상품 정보를 (자동으로 가져오지|불러오지) 못했어요.*|지원하지 않는 상품 링크예요.*|이 링크는 자동 입력을 지원하지 않아요.*'
+    timeout: 32000
+- runFlow:
+    when:
+      true: ${SCREENSHOT_PATH}
+    commands:
+      - takeScreenshot: ${SCREENSHOT_PATH}
+- assertVisible: 자동으로 가져온 정보예요. 저장 전에 확인해 주세요.
+- assertVisible: 상품 이미지 사용 중
+- runFlow:
+    when:
+      true: ${EXPECTED_PRICE}
+    commands:
+      - assertVisible: ${EXPECTED_PRICE}
+- runFlow:
+    when:
+      true: ${EXPECTED_TITLE}
+    commands:
+      - assertVisible: ${EXPECTED_TITLE}

@@ -1,11 +1,11 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { isShareURL } from '@ziper/bridge/contract';
+import { findSharedURL } from '@ziper/product-extraction/link';
 import { Suspense, useState, type SubmitEvent } from 'react';
 import { usePlatform } from '../bridge/provider';
 import { Button, TextField } from '../components';
-import { productSaveApi } from '../features/product-save/product-save-api';
+import { ConnectedProductSave } from '../features/product-save/connected-product-save';
 import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
-import { ProductSaveScreen, ScreenShell } from '../features/product-save/product-save-screen';
+import { ScreenShell } from '../features/product-save/product-save-screen';
 import * as saveStyles from '../features/product-save/product-save.css';
 import * as styles from '../features/product-save/register-product.css';
 
@@ -29,8 +29,7 @@ function RegisterProduct() {
   const [submittedURL, setSubmittedURL] = useState<string | null>(null);
   const [validationVisible, setValidationVisible] = useState(false);
   const [transition, setTransition] = useState<'idle' | 'opening' | 'error'>('idle');
-  const url = draft.trim();
-  const invalidURL = !isShareURL(url);
+  const url = findSharedURL(draft);
 
   function updateDraft(value: string) {
     setDraft(value);
@@ -42,7 +41,7 @@ function RegisterProduct() {
   async function next(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (transition === 'opening') return;
-    if (invalidURL) {
+    if (!url) {
       setValidationVisible(true);
       return;
     }
@@ -83,10 +82,9 @@ function RegisterProduct() {
         <ProductSavePreview key={preview} mode={preview} url={submittedURL} onClose={close} />
       </Suspense>
     ) : (
-      <ProductSaveScreen
+      <ConnectedProductSave
         key={submittedURL}
         url={submittedURL}
-        api={productSaveApi}
         onClose={close}
         onViewProduct={(cardId) => platform.navigation.replace('/products/' + cardId)}
       />
@@ -103,7 +101,11 @@ function RegisterProduct() {
               <br />
               링크를 붙여넣어 주세요
             </h2>
-            <p className={styles.description}>쇼핑몰 상품 페이지의 주소를 입력해 주세요.</p>
+            <p className={styles.description}>
+              {status === 'web'
+                ? '웹에서는 링크를 붙여넣은 뒤 상품 정보를 직접 입력해 주세요.'
+                : '쇼핑몰 상품 페이지의 주소를 입력해 주세요.'}
+            </p>
           </div>
           <TextField
             variant="box"
@@ -111,14 +113,21 @@ function RegisterProduct() {
             label="상품 링크"
             type="url"
             inputMode="url"
+            enterKeyHint="go"
             autoCapitalize="none"
             autoComplete="off"
             spellCheck={false}
             readOnly={transition === 'opening'}
             placeholder="https://"
             value={draft}
-            error={validationVisible && invalidURL && '올바른 상품 링크를 입력해 주세요.'}
-            onBlur={() => setValidationVisible(Boolean(url))}
+            error={validationVisible && !url && '올바른 상품 링크를 입력해 주세요.'}
+            onBlur={() => setValidationVisible(Boolean(draft.trim()))}
+            onPaste={(event) => {
+              const pastedURL = findSharedURL(event.clipboardData.getData('text'));
+              if (!pastedURL) return;
+              event.preventDefault();
+              updateDraft(pastedURL);
+            }}
             onChange={(event) => updateDraft(event.target.value)}
             onClear={() => updateDraft('')}
           />
@@ -129,8 +138,8 @@ function RegisterProduct() {
               다음 화면을 열지 못했어요. 다시 시도해 주세요.
             </p>
           )}
-          <Button type="submit" disabled={!url} loading={transition === 'opening'}>
-            상품 정보 입력하기
+          <Button type="submit" disabled={!draft.trim()} loading={transition === 'opening'}>
+            {status === 'web' ? '직접 입력하기' : '상품 정보 입력하기'}
           </Button>
         </footer>
       </form>

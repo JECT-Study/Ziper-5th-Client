@@ -34,7 +34,7 @@ export interface BridgeProviderConfig {
 
 type PublicPlatform = Pick<
   Platform,
-  'auth' | 'navigation' | 'sheets' | 'incomingShare' | 'external'
+  'auth' | 'navigation' | 'sheets' | 'incomingShare' | 'external' | 'extractProduct'
 >;
 
 const Context = createContext<{ platform: PublicPlatform; status: RuntimeStatus } | null>(null);
@@ -75,6 +75,7 @@ export function BridgeProvider({
       },
       sheets: { actions: async (input) => get().sheets.actions(input) },
       external: { open: async (url) => get().external.open(url) },
+      extractProduct: async (input, signal) => get().extractProduct(input, signal),
       incomingShare: {
         read: async () => get().incomingShare.read(),
         dismiss: async (id) => get().incomingShare.dismiss(id),

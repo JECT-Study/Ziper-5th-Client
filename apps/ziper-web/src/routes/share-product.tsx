@@ -3,9 +3,9 @@ import { Suspense } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { usePlatform } from '../bridge/provider';
 import { useIncomingShare } from '../features/product-save/incoming-share';
-import { productSaveApi } from '../features/product-save/product-save-api';
+import { ConnectedProductSave } from '../features/product-save/connected-product-save';
 import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
-import { ProductSaveScreen, ScreenShell } from '../features/product-save/product-save-screen';
+import { ScreenShell } from '../features/product-save/product-save-screen';
 
 export const Route = createFileRoute('/share-product')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -50,10 +50,9 @@ function Incoming() {
 
   if (share)
     return (
-      <ProductSaveScreen
+      <ConnectedProductSave
         key={share.id}
         url={share.url}
-        api={productSaveApi}
         onClose={close}
         onViewProduct={async (cardId) => {
           if (!(await dismiss())) throw new BridgeError('PERMISSION_DENIED');

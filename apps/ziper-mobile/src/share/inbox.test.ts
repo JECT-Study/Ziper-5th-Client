@@ -11,6 +11,17 @@ it('prefers a typed URL over text and preserves short-link parameters', () => {
   expect(inbox.read()?.url).toBe('https://musinsa.example/s?a=1&b=2#item');
 });
 
+it.each([
+  ['https://www.musinsa.com/products/149708.', 'https://www.musinsa.com/products/149708'],
+  ['https://zigzag.kr/catalog/products/130810007)', 'https://zigzag.kr/catalog/products/130810007'],
+  ['https://m.a-bly.com/goods/12756683?option=a!', 'https://m.a-bly.com/goods/12756683?option=a!'],
+  ['https://applink.a-bly.com/69ptirx.', 'https://applink.a-bly.com/69ptirx.'],
+])('handles a standalone OS share like a pasted link: %s', (input, expected) => {
+  const inbox = createShareInbox();
+  inbox.add([url(input)]);
+  expect(inbox.read()?.url).toBe(expected);
+});
+
 it('extracts the link from a shopping message and rejects unsupported payloads', () => {
   const inbox = createShareInbox();
   inbox.add([text('상품 확인 (https://example.com/item?ref=1).')]);
@@ -22,6 +33,15 @@ it('extracts the link from a shopping message and rejects unsupported payloads',
     text('링크 없음'),
   ]);
   expect(inbox.read()).toMatchObject({ url: null });
+});
+
+it('selects an Ably product link rather than a preceding unrelated link in a share message', () => {
+  const inbox = createShareInbox();
+  const product = 'https://applink.a-bly.com/69ptirx';
+  inbox.add([
+    text(`에이블리 이벤트 https://m.a-bly.com/events/b6929265\n상품 바로가기 (${product})`),
+  ]);
+  expect(inbox.read()?.url).toBe(product);
 });
 
 it('preserves a bare URL in a text share, including trailing punctuation in the URL', () => {

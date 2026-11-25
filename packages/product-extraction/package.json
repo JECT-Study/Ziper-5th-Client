@@ -1,0 +1,17 @@
+{
+  "name": "@ziper/product-extraction",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./link": "./src/link.ts",
+    "./schema": "./src/schema.ts",
+    "./scanner": "./src/scanner/index.ts",
+    "./message": "./src/message.ts"
+  },
+  "scripts": {
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}

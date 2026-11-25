@@ -20,6 +20,7 @@ import {
   type WebAuthService,
   type WebServices,
 } from './contract';
+import { productExtractionMaxDuration } from '@ziper/product-extraction/link';
 
 export interface RuntimeOptions {
   handshakeTimeoutMs?: number;
@@ -486,6 +487,16 @@ export function createPlatform(runtime: Runtime, web: WebServices) {
         }
         await native(capability.external, 'externalOpenV1', input);
       },
+    },
+    async extractProduct(input: Input<'extractProductV1'>, signal: AbortSignal) {
+      check();
+      await runtime.initialize();
+      check();
+      if (!runtime.supports(capability.productExtraction, 'extractProductV1')) return null;
+      return runtime.invoke('extractProductV1', input, {
+        signal,
+        timeoutMs: productExtractionMaxDuration(input.url) + 1_000,
+      });
     },
     incomingShare: {
       read() {

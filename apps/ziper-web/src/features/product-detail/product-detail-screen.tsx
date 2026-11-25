@@ -3,6 +3,7 @@ import {
   type ProductDetail,
   type ProductDetailApi,
 } from '@ziper/api/product-detail';
+import { unknownOutcome } from '@ziper/api/outcome';
 import { useEffect, useRef, useState } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { BottomSheet, Button, HeaderSub, Toast } from '../../components';
@@ -14,6 +15,7 @@ import { ProductImage } from './product-image';
 import { ProductEditForm } from './product-edit-form';
 import { PurchasedProducts } from './purchased-products';
 import { useBackLayer } from '../../shared/use-back-layer';
+import { useLoad } from '../../shared/use-load';
 import * as styles from './product-detail.css';
 
 const won = new Intl.NumberFormat('ko-KR');
@@ -39,9 +41,6 @@ export function ProductDetailScreen({
   openExternal: (url: string) => Promise<void>;
   platformReady?: boolean;
 }) {
-  const [product, setProduct] = useState<ProductDetail | null>(null);
-  const [loadError, setLoadError] = useState('');
-  const [attempt, retry] = useState(0);
   const [view, setView] = useState<'detail' | 'edit' | 'purchased'>('detail');
   const [pending, setPending] = useState<'menu' | 'purchase' | 'original' | 'edit' | null>(null);
   const [confirm, setConfirm] = useState(false);
@@ -52,37 +51,35 @@ export function ProductDetailScreen({
   const [affectedBoardCount, setAffectedBoardCount] = useState<number | null>(null);
   const busy = useRef(false);
   const alive = useRef(false);
+  const [loaded, retry, updateProduct] = useLoad(
+    (signal) => api.get(cardId, signal),
+    [api, cardId],
+    {
+      onReady() {
+        setUncertain(false);
+        busy.current = false;
+        setPending(null);
+        setError('');
+      },
+    },
+  );
+  const product: ProductDetail | null = loaded.status === 'ready' ? loaded.value : null;
+  const loadError =
+    loaded.status !== 'error'
+      ? ''
+      : loaded.error instanceof ProductDetailError
+        ? loadErrors[loaded.error.code]
+        : loadErrors.failed;
   const purchases = api.purchases;
   const canPurchase = Boolean(purchases) && product?.status === 'PLANNED';
   const removed = product?.linkStatus === 'REMOVED';
 
   useEffect(() => {
     alive.current = true;
-    const request = new AbortController();
-    setProduct(null);
-    setLoadError('');
-    void api
-      .get(cardId, request.signal)
-      .then((value) => {
-        if (!request.signal.aborted) {
-          setProduct(value);
-          setUncertain(false);
-          busy.current = false;
-          setPending(null);
-          setError('');
-        }
-      })
-      .catch((reason) => {
-        if (!request.signal.aborted)
-          setLoadError(
-            reason instanceof ProductDetailError ? loadErrors[reason.code] : loadErrors.failed,
-          );
-      });
     return () => {
       alive.current = false;
-      request.abort();
     };
-  }, [api, cardId, attempt]);
+  }, []);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(''), 3000);
@@ -123,23 +120,25 @@ export function ProductDetailScreen({
     if (!product || !purchases || !canPurchase || busy.current || uncertain) return;
     begin('purchase');
     try {
-      const result = await purchases.complete(product.cardId);
-      if (!alive.current) return;
-      setProduct({ ...product, status: result.status });
-      setAffectedBoardCount(result.affectedBoardCount);
-      setConfirm(false);
-      setView('purchased');
-    } catch (reason) {
+      const result = await purchases.complete(product.cardId).catch(() => unknownOutcome);
       if (!alive.current) return;
       setConfirm(false);
-      const known = reason instanceof ProductDetailError;
-      setUncertain(!known || reason.code === 'not-found' || reason.code === 'forbidden');
+      if (result.status === 'done') {
+        const { status, affectedBoardCount } = result.value;
+        updateProduct((current) => ({ ...current, status }));
+        setAffectedBoardCount(affectedBoardCount);
+        setView('purchased');
+        return;
+      }
+      const reason = result.status === 'rejected' ? result.reason : null;
+      // Without a confirmed failure, or for a product that changed underneath, reload first.
+      setUncertain(!reason || reason === 'not-found' || reason === 'forbidden');
       setError(
-        known
-          ? reason.code === 'failed'
+        !reason
+          ? '구매 처리 결과를 확인할 수 없어요. 다시 처리하지 말고 현재 상태를 확인해 주세요.'
+          : reason === 'failed'
             ? '구매 완료로 변경하지 못했어요. 다시 시도해 주세요.'
-            : loadErrors[reason.code]
-          : '구매 처리 결과를 확인할 수 없어요. 다시 처리하지 말고 현재 상태를 확인해 주세요.',
+            : loadErrors[reason],
       );
     } finally {
       finish();
@@ -173,7 +172,7 @@ export function ProductDetailScreen({
     setConfirm(false);
     setUncertain(false);
     setError('');
-    retry((n) => n + 1);
+    retry();
   }
 
   function closeLayer() {
@@ -236,7 +235,7 @@ export function ProductDetailScreen({
             api={api}
             onSaved={(updated) => {
               setPending(null);
-              setProduct(updated);
+              updateProduct(() => updated);
               setView('detail');
               setToast('상품 정보를 수정했어요.');
             }}

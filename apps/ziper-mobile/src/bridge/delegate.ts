@@ -18,6 +18,7 @@ export function createDelegate(
     externalOpenV1: (input) => invoke('externalOpenV1', input),
     navigationSetWebHistoryV1: (input) => invoke('navigationSetWebHistoryV1', input),
     sheetActionsV1: (input) => invoke('sheetActionsV1', input),
+    extractProductV1: (input) => invoke('extractProductV1', input),
     shareReadV1: () => invoke('shareReadV1'),
     shareDismissV1: (input) => invoke('shareDismissV1', input),
   };

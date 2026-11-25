@@ -1,4 +1,5 @@
-import { isShareURL, type IncomingShare } from '@ziper/bridge/contract';
+import type { IncomingShare } from '@ziper/bridge/contract';
+import { findSharedURL, isShareURL } from '@ziper/product-extraction/link';
 import type { SharePayload } from 'expo-sharing';
 
 export const expoShareWakeURL = 'ziper://expo-sharing';
@@ -7,16 +8,12 @@ function sharedURL(payloads: readonly SharePayload[]): string | null {
   for (const { shareType, value } of payloads) {
     if (shareType !== 'url') continue;
     const url = value.trim();
-    if (isShareURL(url)) return url;
+    if (isShareURL(url)) return findSharedURL(url);
   }
   for (const { shareType, value } of payloads) {
-    if (shareType !== 'text' || value.length > 16384) continue;
-    const plainURL = value.trim();
-    if (isShareURL(plainURL)) return plainURL;
-    for (const [match] of value.matchAll(/https?:\/\/[^\s<>"'`]+/giu)) {
-      const url = match.replace(/[)\]}>.,!?。！？，]+$/u, '');
-      if (isShareURL(url)) return url;
-    }
+    if (shareType !== 'text') continue;
+    const url = findSharedURL(value);
+    if (url) return url;
   }
   return null;
 }

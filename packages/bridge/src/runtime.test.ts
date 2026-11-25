@@ -322,6 +322,28 @@ describe('production runtime', () => {
     },
   );
 
+  it.each([
+    ['https://www.musinsa.com/products/7', 9_000],
+    ['https://m.a-bly.com/goods/3798513', 13_000],
+    ['https://musinsa.onelink.me/PvkC/sample', 13_000],
+  ])('gives native extraction time to finish for %s', async (url, deadline) => {
+    vi.useFakeTimers();
+    host({ ackOnly: 'extractProductV1' });
+    const runtime = makeRuntime();
+    await runtime.initialize();
+    const platform = createPlatform(runtime, webServices());
+    let settled = false;
+    const result = platform.extractProduct({ url, shops: [] }, new AbortController().signal);
+    void result.catch(() => {
+      settled = true;
+    });
+    const rejected = expect(result).rejects.toMatchObject({ code: 'RESULT_UNKNOWN' });
+    await vi.advanceTimersByTimeAsync(deadline - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await rejected;
+  });
+
   it('configures interactive timeouts separately from normal calls, with per-call overrides', async () => {
     vi.useFakeTimers();
     host({ ackOnly: 'sheetActionsV1' });
