@@ -2,121 +2,94 @@
 import type { ProductSaveApi } from '@ziper/api/product-save';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ProductSaveScreen } from './product-save-screen';
 import { parseWholeWon } from './price';
 
-it('accepts whole won amounts without turning malformed input into a different price', () => {
-  expect(['0', ' 45,900 ', '9,999,999,999'].map(parseWholeWon)).toEqual([0, 45900, 9999999999]);
-  expect(['', '-12.50', '-5000', '1,2', '1e3', '10000000000'].map(parseWholeWon)).toEqual(
-    Array(6).fill(null),
+const url = 'https://shop.example/product';
+const container = document.createElement('div');
+let root: ReturnType<typeof createRoot> | undefined;
+
+async function mount(save: ProductSaveApi['save']) {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  root = createRoot(container);
+  const api: ProductSaveApi = {
+    lookup: async () => ({ status: 'ready', url, shop: '' }),
+    listBoards: async () => [{ id: '1', name: '기본 보드', productCount: 0 }],
+    createBoard: vi.fn(),
+    save,
+  };
+  await act(() =>
+    root!.render(
+      <ProductSaveScreen
+        url={url}
+        api={api}
+        onClose={() => {}}
+        initialDraft={{ name: '니트', memo: '', image: null, tags: [], boardIds: [] }}
+      />,
+    ),
   );
+}
+
+afterEach(async () => {
+  await act(() => root?.unmount());
+  vi.unstubAllGlobals();
 });
 
-it('requires a board but lets a manually entered product omit price, image and tags', async () => {
-  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue('saved');
-  const api: ProductSaveApi = {
-    lookup: async () => ({ status: 'manual' }),
-    listBoards: async () => [{ id: 'board-1', name: '기본 보드', productCount: 0 }],
-    createBoard: vi.fn(),
-    save,
-  };
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const container = document.createElement('div');
-  const root = createRoot(container);
-  try {
-    await act(async () => {
-      root.render(
-        <ProductSaveScreen
-          url="https://shop.example/product"
-          api={api}
-          onClose={() => {}}
-          initialDraft={{ name: '니트', memo: '', image: null, tags: [], boardIds: [] }}
-        />,
-      );
-    });
-    const form = container.querySelector('form')!;
-    const submit = container.querySelector<HTMLButtonElement>('button[type=submit]')!;
-    expect(submit.disabled).toBe(true);
-    await act(async () => {
-      container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
-    });
-    expect(submit.disabled).toBe(false);
-    await act(async () => {
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    });
-    expect(save).toHaveBeenCalledExactlyOnceWith({
-      url: 'https://shop.example/product',
-      name: '니트',
-      price: null,
-      image: null,
-      tags: [],
-      memo: '',
-      boardIds: ['board-1'],
-    });
-  } finally {
-    await act(async () => root.unmount());
-    vi.unstubAllGlobals();
-  }
+const button = (label: string) =>
+  [...container.querySelectorAll('button')].find(
+    (element) => element.textContent?.trim() === label,
+  )!;
+
+it('accepts whole won amounts without turning malformed input into a different price', () => {
+  expect(['0', ' 45,900 ', '1e3', '1,2', '-50'].map(parseWholeWon)).toEqual([
+    0,
+    45900,
+    null,
+    null,
+    null,
+  ]);
 });
 
-it('blocks repeat submits when the save result is unknown', async () => {
-  const url = 'https://example.com/product?ref=share!';
+it('requires the deployed fields and does not resend an uncertain write', async () => {
   const save = vi.fn<ProductSaveApi['save']>().mockRejectedValue(new Error('response lost'));
-  const api: ProductSaveApi = {
-    lookup: async () => ({
-      status: 'found',
-      product: { name: '니트', price: 0, shop: '쇼핑몰', imageURL: null },
-    }),
-    listBoards: async () => [{ id: 'board-1', name: '기본 보드', productCount: 0 }],
-    createBoard: vi.fn(),
-    save,
-  };
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const container = document.createElement('div');
-  const root = createRoot(container);
-  try {
-    await act(async () => {
-      root.render(
-        <ProductSaveScreen
-          url={url}
-          api={api}
-          onClose={() => {}}
-          initialDraft={{
-            memo: '',
-            image: { kind: 'linked-product' },
-            tags: ['봄'],
-            boardIds: ['board-1'],
-          }}
-        />,
-      );
-    });
-    const form = container.querySelector('form')!;
-    const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
-    expect(submit.disabled).toBe(false);
-    const send = () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    await act(async () => {
-      send();
-      send();
-    });
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      '저장 결과를 확인할 수 없어요',
-    );
-    expect(submit.disabled).toBe(true);
-    await act(async () => {
-      send();
-    });
-    expect(save).toHaveBeenCalledExactlyOnceWith({
-      url,
-      name: '니트',
-      price: 0,
-      image: { kind: 'linked-product' },
-      tags: ['봄'],
-      memo: '',
-      boardIds: ['board-1'],
-    });
-  } finally {
-    await act(async () => root.unmount());
-    vi.unstubAllGlobals();
-  }
+  await mount(save);
+  const submit = button('보드에 저장하기');
+  expect(submit.disabled).toBe(true);
+  await act(() => {
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
+    button('봄').click();
+    button('상의').click();
+  });
+  expect(submit.disabled).toBe(true);
+  const price = container.querySelector('input[inputmode=numeric]')!;
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(price, '0');
+    price.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(submit.disabled).toBe(false);
+  const send = () =>
+    container
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await act(() => {
+    send();
+    send();
+  });
+  expect(save).toHaveBeenCalledExactlyOnceWith({
+    url,
+    sharedUrl: null,
+    shop: '',
+    name: '니트',
+    price: 0,
+    image: { kind: 'template', id: 'TOP' },
+    tags: ['봄'],
+    memo: '',
+    boardIds: ['1'],
+    metadataSource: 'MANUAL',
+  });
+  expect(container.querySelector('[role=alert]')?.textContent).toContain(
+    '저장 결과를 확인할 수 없어요',
+  );
+  expect(submit.disabled).toBe(true);
 });

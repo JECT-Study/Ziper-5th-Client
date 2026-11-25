@@ -25,7 +25,7 @@ export default function ProductSavePreview({
           : {
               name: '오버핏 울 블렌드 니트 가디건',
               memo: '가을용 가디건',
-              image: { kind: 'template', id: 'tops' },
+              image: { kind: 'template', id: 'TOP' },
               tags: ['여름'],
               boardIds: mode === 'manual' ? ['default'] : ['default', 'fall'],
             }
@@ -46,15 +46,16 @@ function createPreviewApi(mode: PreviewMode): ProductSaveApi {
     })),
   ];
   return {
-    async lookup() {
+    async lookup(url) {
       if (mode === 'offline') throw new Error('Preview lookup unavailable');
-      if (mode === 'manual') return { status: 'manual' };
+      if (mode === 'manual') return { status: 'ready', url, shop: '' };
       if (mode === 'unsupported') return { status: 'unsupported' };
       if (mode === 'auth') return { status: 'auth-required' };
       return {
-        status: 'found',
+        status: 'ready',
+        url,
+        shop: '무신사',
         product: {
-          shop: '무신사',
           name: '오버핏 울 블렌드 니트 가디건',
           price: 39000,
           imageURL: previewCard,
@@ -73,7 +74,7 @@ function createPreviewApi(mode: PreviewMode): ProductSaveApi {
       if (mode === 'duplicate') return 'duplicate';
       if (mode === 'failed') return 'failed';
       if (mode === 'unknown') throw new Error('Preview save result unavailable');
-      return 'saved';
+      return { cardId: '1' };
     },
   };
 }

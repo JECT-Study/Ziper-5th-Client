@@ -92,9 +92,6 @@ export const productImage = style({
 });
 
 export const productInfo = style({ display: 'grid', gap: vars.space[2] });
-export const shop = style({ ...typography.body3Medium, color: vars.color.text.default });
-export const productName = style({ ...typography.body2Medium, overflowWrap: 'anywhere' });
-export const price = style({ ...typography.title2Bold });
 
 export const inline = style({
   display: 'grid',

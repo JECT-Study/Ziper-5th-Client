@@ -38,14 +38,15 @@ function send(
   accessToken?: string | null,
 ) {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const multipart = body instanceof FormData;
+  if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   if (session) headers['X-Refresh-Token-Mode'] = 'cookie';
   return fetch(`${BASE_URL}${path}`, {
     method,
     headers,
     signal,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: multipart || body === undefined ? body : JSON.stringify(body),
     credentials: session ? 'include' : 'same-origin',
   });
 }
