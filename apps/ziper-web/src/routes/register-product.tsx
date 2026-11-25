@@ -3,6 +3,7 @@ import { isShareURL } from '@ziper/bridge/contract';
 import { Suspense, useState, type SubmitEvent } from 'react';
 import { usePlatform } from '../bridge/provider';
 import { Button, TextField } from '../components';
+import { productSaveApi } from '../features/product-save/product-save-api';
 import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
 import { ProductSaveScreen, ScreenShell } from '../features/product-save/product-save-screen';
 import * as saveStyles from '../features/product-save/product-save.css';
@@ -82,7 +83,13 @@ function RegisterProduct() {
         <ProductSavePreview key={preview} mode={preview} url={submittedURL} onClose={close} />
       </Suspense>
     ) : (
-      <ProductSaveScreen url={submittedURL} onClose={close} />
+      <ProductSaveScreen
+        key={submittedURL}
+        url={submittedURL}
+        api={productSaveApi}
+        onClose={close}
+        onViewProduct={(cardId) => platform.navigation.replace('/products/' + cardId)}
+      />
     );
   }
 

@@ -1,7 +1,7 @@
 import type {
   BoardSummary,
   CardImage,
-  ProductPreview,
+  ProductLookup,
   ProductSaveApi,
   ProductSaveResult,
 } from '@ziper/api/product-save';
@@ -26,11 +26,11 @@ import * as styles from './product-save.css';
 
 const initialTags = ['봄', '여름', '가을', '겨울'];
 const templates = [
-  { id: 'tops', label: '상의', src: tops },
-  { id: 'pants', label: '하의', src: pants },
-  { id: 'skirt', label: '스커트', src: skirt },
-  { id: 'accessory', label: '패션잡화', src: accessory },
-  { id: 'beauty', label: '뷰티', src: beauty },
+  { id: 'TOP', label: '상의', src: tops },
+  { id: 'PANTS', label: '하의', src: pants },
+  { id: 'SKIRT', label: '스커트', src: skirt },
+  { id: 'ACCESSORY', label: '패션잡화', src: accessory },
+  { id: 'BEAUTY', label: '뷰티', src: beauty },
 ] as const;
 const imageModes = [
   { value: 'upload', label: '이미지 불러오기' },
@@ -40,8 +40,9 @@ const won = new Intl.NumberFormat('ko-KR');
 
 type ScreenProps = {
   url: string | null;
-  api?: ProductSaveApi;
+  api: ProductSaveApi;
   onClose: () => void | Promise<unknown>;
+  onViewProduct?: (cardId: string) => Promise<unknown>;
   initialDraft?: InitialDraft;
   savedMessage?: string;
 };
@@ -96,14 +97,15 @@ export function ScreenShell({
   );
 }
 
+type Ready = Extract<ProductLookup, { status: 'ready' }>;
 type ScreenData =
-  | { status: 'ready'; product?: ProductPreview; boards: readonly BoardSummary[] }
-  | { status: 'loading' | 'error' | 'unsupported' | 'auth-required' };
+  | (Ready & { boards: readonly BoardSummary[] })
+  | { status: 'loading' | 'error' | 'duplicate' | 'unsupported' | 'auth-required' };
 
-type SaveStatus = ProductSaveResult | 'idle' | 'saving' | 'unknown';
+type SaveStatus = ProductSaveResult | 'idle' | 'unknown';
 const authMessage = '로그인한 뒤 상품을 저장할 수 있어요.';
-const saveErrors: Partial<Record<SaveStatus, string>> = {
-  duplicate: '선택한 보드에 이미 저장된 상품이에요.',
+const saveErrors: Partial<Record<Extract<SaveStatus, string>, string>> = {
+  duplicate: '이미 저장한 상품 링크예요.',
   failed: '저장하지 못했어요. 다시 시도해 주세요.',
   unknown: '저장 결과를 확인할 수 없어요. 다시 저장하기 전 보드를 확인해 주세요.',
   'auth-required': authMessage,
@@ -116,29 +118,21 @@ type InitialDraft = {
   boardIds: string[];
 };
 
-export function ProductSaveScreen({ url, api, onClose, initialDraft, savedMessage }: ScreenProps) {
+export function ProductSaveScreen({ url, api, ...formProps }: ScreenProps) {
+  const { onClose } = formProps;
   const [loaded, setLoaded] = useState<ScreenData>({ status: 'loading' });
   const [attempt, retry] = useState(0);
   useEffect(() => {
-    if (!api || !url) return;
+    if (!url) return;
     const request = new AbortController();
     const { signal } = request;
     const load = async () => {
       try {
         const lookup = await api.lookup(url, signal);
         if (signal.aborted) return;
-        if (lookup.status === 'found' || lookup.status === 'manual') {
-          const boards = await api.listBoards(signal);
-          if (!signal.aborted) {
-            setLoaded({
-              status: 'ready',
-              product: lookup.status === 'found' ? lookup.product : undefined,
-              boards,
-            });
-          }
-        } else {
-          setLoaded({ status: lookup.status });
-        }
+        const result =
+          lookup.status === 'ready' ? { ...lookup, boards: await api.listBoards(signal) } : lookup;
+        if (!signal.aborted) setLoaded(result);
       } catch {
         if (!signal.aborted) setLoaded({ status: 'error' });
       }
@@ -153,39 +147,12 @@ export function ProductSaveScreen({ url, api, onClose, initialDraft, savedMessag
         <UnsupportedLink />
       </ScreenShell>
     );
-  if (!api) {
-    return (
-      <ScreenShell onClose={onClose}>
-        <div className={styles.form}>
-          <div className={styles.fields}>
-            <SharedLink url={url} />
-            <p className={styles.feedback} role="status">
-              상품 저장 서비스는 아직 연결되지 않았어요.
-            </p>
-          </div>
-          <footer className={styles.footer}>
-            <Button disabled>보드에 저장하기</Button>
-          </footer>
-        </div>
-      </ScreenShell>
-    );
-  }
-  if (loaded.status === 'ready') {
-    return (
-      <ProductForm
-        url={url}
-        product={loaded.product}
-        initialBoards={loaded.boards}
-        api={api}
-        onClose={onClose}
-        initialDraft={initialDraft}
-        savedMessage={savedMessage}
-      />
-    );
-  }
+  if (loaded.status === 'ready')
+    return <ProductForm {...formProps} lookup={loaded} sourceURL={url} api={api} />;
   return (
     <ScreenShell onClose={onClose}>
       {loaded.status === 'unsupported' && <UnsupportedLink />}
+      {loaded.status === 'duplicate' && <p role="alert">{saveErrors.duplicate}</p>}
       {loaded.status === 'auth-required' && <p role="status">{authMessage}</p>}
       {loaded.status === 'loading' && <p role="status">상품 정보를 불러오는 중이에요.</p>}
       {loaded.status === 'error' && (
@@ -218,56 +185,55 @@ function SharedLink({ url }: { url: string }) {
 }
 
 function ProductForm({
-  url,
-  product,
-  initialBoards,
+  lookup,
+  sourceURL,
   api,
   onClose,
+  onViewProduct,
   initialDraft,
   savedMessage = '보드에 상품을 저장했어요.',
-}: Omit<ScreenProps, 'url' | 'api'> & {
-  url: string;
-  api: ProductSaveApi;
-  product?: ProductPreview;
-  initialBoards: readonly BoardSummary[];
+}: Omit<ScreenProps, 'url'> & {
+  lookup: Ready & { boards: readonly BoardSummary[] };
+  sourceURL: string;
 }) {
-  const [name, setName] = useState(initialDraft?.name ?? '');
-  const [price, setPrice] = useState('');
+  const { url, shop, product } = lookup;
+  const linkedImage = product?.imageURL;
+  const [name, setName] = useState(product?.name || initialDraft?.name || '');
+  const [price, setPrice] = useState(product?.price != null ? won.format(product.price) : '');
   const [image, setImage] = useState<CardImage | null>(
-    product?.imageURL ? { kind: 'linked-product' } : (initialDraft?.image ?? null),
+    linkedImage ? { kind: 'linked-product', url: linkedImage } : (initialDraft?.image ?? null),
   );
   const [memo, setMemo] = useState(initialDraft?.memo ?? '');
   const [tags, setTags] = useState(initialTags);
   const [selectedTags, setSelectedTags] = useState(initialDraft?.tags ?? []);
   const [tag, setTag] = useState<string | null>(null);
-  const [boards, setBoards] = useState(initialBoards);
+  const [boards, setBoards] = useState(lookup.boards);
   const [selectedBoards, setSelectedBoards] = useState(initialDraft?.boardIds ?? []);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [boardError, setBoardError] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [pending, setPending] = useState<'board' | 'save' | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [opening, setOpening] = useState<'idle' | 'busy' | 'error'>('idle');
   const boardList = useRef<HTMLUListElement>(null);
   const focusTrigger = useRef<'tag' | 'board' | null>(null);
   const busy = useRef(false);
-  const tagName = tag?.trim();
+  const tagName = tag?.trim().replace(/^#+/, '').trim();
   const newBoardName = boardName?.trim();
   const canAddTag = Boolean(tagName && !tags.includes(tagName));
   const canCreateBoard = Boolean(
     newBoardName && !boards.some((board) => board.name === newBoardName),
   );
-  const manualPrice = parseWholeWon(price);
-  const numericPrice = product ? product.price : manualPrice;
-  const invalidPrice = product
-    ? numericPrice !== null && (!Number.isSafeInteger(numericPrice) || numericPrice < 0)
-    : Boolean(price.trim() && manualPrice === null);
+  const numericPrice = parseWholeWon(price);
+  const invalidPrice = numericPrice === null || numericPrice > 1_000_000_000;
   const canSave = Boolean(
-    (product?.name ?? name).trim() &&
+    name.trim() &&
     !invalidPrice &&
+    image &&
+    selectedTags.length &&
     selectedBoards.length &&
-    saveStatus !== 'unknown' &&
-    saveStatus !== 'auth-required',
+    (saveStatus === 'idle' || saveStatus === 'failed'),
   );
-  const saveError = saveErrors[saveStatus];
+  const saveError = typeof saveStatus === 'string' && saveErrors[saveStatus];
 
   function toggle(selection: string[], value: string) {
     return selection.includes(value)
@@ -298,7 +264,7 @@ function ProductForm({
   async function createBoard() {
     if (!newBoardName || !canCreateBoard || busy.current) return;
     busy.current = true;
-    setCreating(true);
+    setPending('board');
     setBoardError(false);
     try {
       const board = await api.createBoard(newBoardName);
@@ -309,21 +275,25 @@ function ProductForm({
     } catch {
       setBoardError(true);
     } finally {
-      setCreating(false);
+      setPending(null);
       busy.current = false;
     }
   }
 
   async function save() {
-    if (!canSave || busy.current || saveStatus === 'saved') return;
+    if (!canSave || !image || numericPrice === null || busy.current) return;
     busy.current = true;
-    setSaveStatus('saving');
+    setPending('save');
+    setSaveStatus('idle');
     try {
       setSaveStatus(
         await api.save({
           url,
-          name: (product?.name ?? name).trim(),
+          sharedUrl: sourceURL === url ? null : sourceURL,
+          shop,
+          name: name.trim(),
           price: numericPrice,
+          metadataSource: product ? 'CLIENT' : 'MANUAL',
           image,
           tags: selectedTags,
           memo: memo.trim(),
@@ -333,20 +303,38 @@ function ProductForm({
     } catch {
       setSaveStatus('unknown');
     } finally {
+      setPending(null);
       busy.current = false;
     }
   }
 
-  const formBusy = creating || saveStatus === 'saving';
-  if (saveStatus === 'saved') {
+  if (typeof saveStatus === 'object') {
     return (
-      <ScreenShell onClose={onClose}>
+      <ScreenShell onClose={onClose} busy={opening === 'busy'}>
         <Toast>{savedMessage}</Toast>
+        {onViewProduct && (
+          <footer className={styles.footer}>
+            {opening === 'error' && <p role="alert">상품 상세를 열지 못했어요.</p>}
+            <Button
+              loading={opening === 'busy'}
+              onClick={async () => {
+                setOpening('busy');
+                try {
+                  await onViewProduct(saveStatus.cardId);
+                } catch {
+                  setOpening('error');
+                }
+              }}
+            >
+              상품 상세 보기
+            </Button>
+          </footer>
+        )}
       </ScreenShell>
     );
   }
   return (
-    <ScreenShell onClose={onClose} busy={formBusy}>
+    <ScreenShell onClose={onClose} busy={pending !== null}>
       <form
         className={styles.form}
         onSubmit={(event) => {
@@ -356,54 +344,63 @@ function ProductForm({
       >
         <div className={styles.fields}>
           <SharedLink url={url} />
-          {product ? (
+          {product && (
             <div className={styles.productCard}>
-              {product.imageURL ? (
+              {linkedImage && (
                 <img
                   className={styles.productImage}
-                  src={product.imageURL}
+                  src={linkedImage}
                   alt=""
                   referrerPolicy="no-referrer"
                 />
-              ) : (
-                <span className={styles.productImage} />
               )}
               <div className={styles.productInfo}>
-                <span className={styles.shop}>{product.shop}</span>
-                <span className={styles.productName}>{product.name}</span>
-                {product.price !== null && (
-                  <strong className={styles.price}>{won.format(product.price)}원</strong>
-                )}
+                <p className={styles.feedback}>
+                  자동으로 가져온 정보예요. 저장 전에 확인해 주세요.
+                </p>
+                {linkedImage &&
+                  (image?.kind === 'linked-product' ? (
+                    <span className={styles.feedback}>상품 이미지 사용 중</span>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => setImage({ kind: 'linked-product', url: linkedImage })}
+                    >
+                      상품 이미지 사용
+                    </Button>
+                  ))}
               </div>
             </div>
-          ) : (
-            <>
-              <TextField
-                label="상품명"
-                variant="box"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onClear={() => setName('')}
-                maxLength={200}
-              />
-              <TextField
-                label="가격"
-                variant="box"
-                value={price}
-                inputMode="numeric"
-                placeholder="ex)10,000원"
-                error={invalidPrice && '가격은 0원 이상의 정수로 입력해 주세요.'}
-                onChange={(event) => setPrice(event.target.value)}
-                onBlur={() => {
-                  if (manualPrice !== null) setPrice(won.format(manualPrice));
-                }}
-                onClear={() => setPrice('')}
-              />
-              <CardImagePicker image={image} setImage={setImage} />
-            </>
           )}
+          <TextField
+            label="상품명"
+            variant="box"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onClear={() => setName('')}
+            maxLength={200}
+            required
+          />
+          <TextField
+            label="가격"
+            variant="box"
+            value={price}
+            inputMode="numeric"
+            placeholder="ex)10,000원"
+            error={
+              Boolean(price.trim()) && invalidPrice && '0원부터 10억원까지의 정수를 입력해 주세요.'
+            }
+            onChange={(event) => setPrice(event.target.value)}
+            onBlur={() => {
+              if (!invalidPrice && numericPrice !== null) setPrice(won.format(numericPrice));
+            }}
+            onClear={() => setPrice('')}
+            required
+          />
+          <CardImagePicker image={image} setImage={setImage} />
           <section className={styles.group} aria-label="해시태그">
-            <p className={styles.label}>해시태그</p>
+            <p className={styles.label}>해시태그 (1개 이상)</p>
             <div className={styles.tags}>
               {tags.map((value) => (
                 <span className={styles.customTag} key={value}>
@@ -461,7 +458,7 @@ function ProductForm({
             maxLength={100}
           />
           <section className={styles.group} aria-label="보드 선택">
-            <p className={styles.label}>보드 선택</p>
+            <p className={styles.label}>보드 선택 (1개 이상)</p>
             <div className={styles.boardPanel}>
               {boards.length > 0 ? (
                 <ul className={styles.boardList} ref={boardList}>
@@ -502,7 +499,7 @@ function ProductForm({
                     variant="secondary"
                     placeholder="보드 이름"
                     helperText="최대 10자까지 입력 가능해요"
-                    loading={creating}
+                    loading={pending === 'board'}
                     disabled={!canCreateBoard}
                     onChange={setBoardName}
                     onConfirm={() => void createBoard()}
@@ -524,7 +521,11 @@ function ProductForm({
               {saveError}
             </p>
           )}
-          <Button type="submit" loading={saveStatus === 'saving'} disabled={!canSave || creating}>
+          <Button
+            type="submit"
+            loading={pending === 'save'}
+            disabled={!canSave || pending !== null}
+          >
             보드에 저장하기
           </Button>
         </footer>
@@ -556,7 +557,7 @@ function CardImagePicker({
   }, [file]);
   return (
     <section className={styles.group} aria-label="카드 이미지">
-      <p className={styles.label}>카드 이미지</p>
+      <p className={styles.label}>카드 이미지 (필수)</p>
       <SegmentedControl
         className={styles.imageModes}
         items={[...imageModes]}
@@ -598,7 +599,8 @@ function CardImagePicker({
               event.currentTarget.value = '';
               if (
                 !['image/jpeg', 'image/png', 'image/webp'].includes(next.type) ||
-                next.size > 10 * 1024 * 1024
+                next.size === 0 ||
+                next.size > 5 * 1024 * 1024
               ) {
                 setInvalidImage(true);
                 return;
@@ -618,7 +620,7 @@ function CardImagePicker({
           )}
           {invalidImage && (
             <p className={styles.error} role="alert">
-              10MB 이하의 JPG, PNG, WebP 이미지를 선택해 주세요.
+              5MB 이하의 JPG, PNG, WebP 이미지를 선택해 주세요.
             </p>
           )}
         </>

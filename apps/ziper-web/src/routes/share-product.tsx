@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { usePlatform } from '../bridge/provider';
 import { useIncomingShare } from '../features/product-save/incoming-share';
+import { productSaveApi } from '../features/product-save/product-save-api';
 import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
 import { ProductSaveScreen, ScreenShell } from '../features/product-save/product-save-screen';
 
@@ -30,24 +31,36 @@ function Incoming() {
   const share = useIncomingShare({ keepFirst: true });
   const navigate = useNavigate();
 
-  async function close() {
-    if (status !== 'native') {
-      await navigate({ to: '/' });
-      return;
+  async function dismiss() {
+    if (!share) return true;
+    try {
+      await platform.incomingShare.dismiss(share.id);
+      return true;
+    } catch (error) {
+      // If the screen is already gone the native Back handler owns the same dismissal.
+      if (error instanceof BridgeError && error.code === 'PERMISSION_DENIED') return false;
+      throw error;
     }
-    if (share) {
-      try {
-        await platform.incomingShare.dismiss(share.id);
-      } catch (error) {
-        // If the screen is already gone the native Back handler owns the same dismissal.
-        if (error instanceof BridgeError && error.code === 'PERMISSION_DENIED') return;
-        throw error;
-      }
-    }
-    await platform.navigation.back();
   }
 
-  if (share) return <ProductSaveScreen key={share.id} url={share.url} onClose={close} />;
+  async function close() {
+    if (status !== 'native') await navigate({ to: '/' });
+    else if (await dismiss()) await platform.navigation.back();
+  }
+
+  if (share)
+    return (
+      <ProductSaveScreen
+        key={share.id}
+        url={share.url}
+        api={productSaveApi}
+        onClose={close}
+        onViewProduct={async (cardId) => {
+          if (!(await dismiss())) throw new BridgeError('PERMISSION_DENIED');
+          await platform.navigation.replace('/products/' + cardId);
+        }}
+      />
+    );
   const loading = status === 'initializing' || (status === 'native' && share === undefined);
   return (
     <ScreenShell onClose={close}>
