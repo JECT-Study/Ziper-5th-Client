@@ -33,9 +33,9 @@ export function ProductDetailScreen({
   platformReady = true,
 }: {
   cardId: string;
-  api?: ProductDetailApi;
+  api: ProductDetailApi;
   onBack?: () => void | Promise<unknown>;
-  manage?: (purchased: boolean) => Promise<'edit' | 'purchase' | null>;
+  manage?: (canPurchase: boolean) => Promise<'edit' | 'purchase' | null>;
   openExternal: (url: string) => Promise<void>;
   platformReady?: boolean;
 }) {
@@ -52,31 +52,32 @@ export function ProductDetailScreen({
   const [affectedBoardCount, setAffectedBoardCount] = useState<number | null>(null);
   const busy = useRef(false);
   const alive = useRef(false);
+  const purchases = api.purchases;
+  const canPurchase = Boolean(purchases) && product?.status === 'PLANNED';
+  const removed = product?.linkStatus === 'REMOVED';
 
   useEffect(() => {
     alive.current = true;
     const request = new AbortController();
     setProduct(null);
     setLoadError('');
-    if (api) {
-      void api
-        .get(cardId, request.signal)
-        .then((value) => {
-          if (!request.signal.aborted) {
-            setProduct(value);
-            setUncertain(false);
-            busy.current = false;
-            setPending(null);
-            setError('');
-          }
-        })
-        .catch((reason) => {
-          if (!request.signal.aborted)
-            setLoadError(
-              reason instanceof ProductDetailError ? loadErrors[reason.code] : loadErrors.failed,
-            );
-        });
-    }
+    void api
+      .get(cardId, request.signal)
+      .then((value) => {
+        if (!request.signal.aborted) {
+          setProduct(value);
+          setUncertain(false);
+          busy.current = false;
+          setPending(null);
+          setError('');
+        }
+      })
+      .catch((reason) => {
+        if (!request.signal.aborted)
+          setLoadError(
+            reason instanceof ProductDetailError ? loadErrors[reason.code] : loadErrors.failed,
+          );
+      });
     return () => {
       alive.current = false;
       request.abort();
@@ -88,35 +89,41 @@ export function ProductDetailScreen({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  function begin(action: 'menu' | 'purchase' | 'original') {
+    busy.current = true;
+    setPending(action);
+    setError('');
+  }
+
+  function finish() {
+    busy.current = false;
+    if (alive.current) setPending(null);
+  }
+
   async function openMenu() {
     if (!product || busy.current || !platformReady || uncertain) return;
     if (!manage) {
       setMenuOpen(true);
       return;
     }
-    busy.current = true;
-    setPending('menu');
-    setError('');
+    begin('menu');
     try {
-      const action = await manage(product.status === 'PURCHASED');
+      const action = await manage(canPurchase);
       if (!alive.current) return;
       if (action === 'edit') setView('edit');
-      if (action === 'purchase' && product.status === 'PLANNED') setConfirm(true);
+      if (action === 'purchase' && canPurchase) setConfirm(true);
     } catch {
       if (alive.current) setError('상품 관리 메뉴를 열지 못했어요. 다시 시도해 주세요.');
     } finally {
-      busy.current = false;
-      if (alive.current) setPending(null);
+      finish();
     }
   }
 
   async function purchase() {
-    if (!product || !api || busy.current || uncertain || product.status === 'PURCHASED') return;
-    busy.current = true;
-    setPending('purchase');
-    setError('');
+    if (!product || !purchases || !canPurchase || busy.current || uncertain) return;
+    begin('purchase');
     try {
-      const result = await api.purchase(product.cardId);
+      const result = await purchases.complete(product.cardId);
       if (!alive.current) return;
       setProduct({ ...product, status: result.status });
       setAffectedBoardCount(result.affectedBoardCount);
@@ -135,35 +142,30 @@ export function ProductDetailScreen({
           : '구매 처리 결과를 확인할 수 없어요. 다시 처리하지 말고 현재 상태를 확인해 주세요.',
       );
     } finally {
-      busy.current = false;
-      if (alive.current) setPending(null);
+      finish();
     }
   }
 
   async function original() {
-    if (!product || !api || !product.isLinkValid || busy.current || !platformReady) return;
-    busy.current = true;
-    setPending('original');
-    setError('');
+    if (!product || removed || busy.current || !platformReady) return;
+    begin('original');
+    let opened = false;
     try {
-      // Open from the click, before awaiting the event API, to avoid browser popup blocking.
+      // Call the opener in the click stack, before contacting the API.
       await openExternal(product.productUrl);
-      if (!alive.current) return;
-      try {
-        await api.openOriginal(product.cardId);
-      } catch {
-        if (alive.current) setError('쇼핑몰은 열었지만 방문 기록을 반영하지 못했어요.');
-      }
+      opened = true;
+      if (alive.current) await api.openOriginal(product.cardId);
     } catch (reason) {
-      if (alive.current)
-        setError(
-          reason instanceof BridgeError && reason.code === 'RESULT_UNKNOWN'
+      if (!alive.current) return;
+      setError(
+        opened
+          ? '쇼핑몰은 열었지만 방문 기록을 반영하지 못했어요.'
+          : reason instanceof BridgeError && reason.code === 'RESULT_UNKNOWN'
             ? '쇼핑몰 열기 결과를 확인할 수 없어요. 이미 열린 창이 있는지 확인해 주세요.'
             : '원본 쇼핑몰을 열지 못했어요. 다시 시도해 주세요.',
-        );
+      );
     } finally {
-      busy.current = false;
-      if (alive.current) setPending(null);
+      finish();
     }
   }
   function reload() {
@@ -174,15 +176,19 @@ export function ProductDetailScreen({
     retry((n) => n + 1);
   }
 
+  function closeLayer() {
+    if (confirm) setConfirm(false);
+    // A normal cancel must not record another detail view.
+    else if (view === 'edit' && uncertain) reload();
+    else setView('detail');
+  }
+
   const title =
     view === 'edit' ? '상품 수정' : view === 'purchased' ? '구매 완료 목록' : '상품 상세';
-  const back = view === 'edit' ? reload : view === 'purchased' ? () => setView('detail') : onBack;
-  // 확인 창·수정·결과 화면에서 Back 을 누르면 상세를 떠나지 않고 한 단계만 닫는다.
-  useBackLayer(view !== 'detail' || confirm, () => {
-    if (pending) return;
-    if (confirm) setConfirm(false);
-    else if (view === 'edit') reload();
-    else setView('detail');
+  const hasLayer = view !== 'detail' || confirm;
+  const back = hasLayer ? closeLayer : onBack;
+  useBackLayer(hasLayer, () => {
+    if (!pending) closeLayer();
   });
   return (
     <main className={styles.page}>
@@ -214,11 +220,7 @@ export function ProductDetailScreen({
         }
       />
       <div className={styles.body}>
-        {!api ? (
-          <p className={styles.feedback} role="status">
-            상품 상세 서비스는 아직 연결되지 않았어요.
-          </p>
-        ) : loadError ? (
+        {loadError ? (
           <>
             <p className={styles.error} role="alert">
               {loadError}
@@ -239,13 +241,14 @@ export function ProductDetailScreen({
               setToast('상품 정보를 수정했어요.');
             }}
             onBusyChange={(value) => setPending(value ? 'edit' : null)}
-            onCancel={reload}
+            onReconcile={() => setUncertain(true)}
+            onCancel={closeLayer}
           />
-        ) : view === 'purchased' ? (
-          <PurchasedProducts api={api} affectedBoardCount={affectedBoardCount} />
+        ) : view === 'purchased' && purchases ? (
+          <PurchasedProducts api={purchases} affectedBoardCount={affectedBoardCount} />
         ) : (
           <>
-            <ProductImage key={product.imageUrl + ':' + product.fallbackIcon} product={product} />
+            <ProductImage product={product} />
             <div className={styles.info}>
               <p className={styles.caption}>{product.shop || '쇼핑몰 정보 없음'}</p>
               <h2 className={styles.name}>{product.productTitle}</h2>
@@ -284,21 +287,19 @@ export function ProductDetailScreen({
                 ✓ 구매 완료한 상품이에요
               </p>
             )}
+            {product.linkStatus === 'SOLD_OUT' && (
+              <p className={styles.caption}>품절된 상품이에요.</p>
+            )}
             <Button
               className={styles.action}
-              disabled={!product.isLinkValid || Boolean(pending) || !platformReady}
+              disabled={removed || Boolean(pending) || !platformReady}
               loading={pending === 'original'}
               onClick={() => void original()}
             >
-              {product.isLinkValid ? '↗ 원본 쇼핑몰 가기' : '원본 상품 접근불가'}
+              {removed ? '원본 상품 접근불가' : '↗ 원본 쇼핑몰 가기'}
             </Button>
-            {!product.isLinkValid && (
-              <p className={styles.caption}>
-                원본 상품 링크가 삭제되거나 차단되었어요.
-                <br />이 상품은 재발견에서 제외돼요.
-              </p>
-            )}
-            {product.status === 'PURCHASED' && (
+            {removed && <p className={styles.caption}>원본 상품의 판매가 종료되었어요.</p>}
+            {purchases && product.status === 'PURCHASED' && (
               <Button
                 className={styles.secondary}
                 onClick={() => {
@@ -316,7 +317,7 @@ export function ProductDetailScreen({
             {error}
           </p>
         )}
-        {uncertain && (
+        {uncertain && view === 'detail' && (
           <Button className={styles.secondary} onClick={reload}>
             현재 상태 확인
           </Button>
@@ -347,7 +348,7 @@ export function ProductDetailScreen({
             <img src={pencil} alt="" />
             상품 수정
           </button>
-          {product?.status === 'PLANNED' && (
+          {canPurchase && (
             <button
               type="button"
               className={styles.menuAction}

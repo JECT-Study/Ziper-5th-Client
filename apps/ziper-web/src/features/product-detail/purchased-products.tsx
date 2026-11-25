@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ProductDetail, ProductDetailApi } from '@ziper/api/product-detail';
+import type { ProductDetail, ProductPurchases } from '@ziper/api/product-detail';
 import { Button } from '../../components';
 import checkCircle from '../../assets/product-detail/check-circle.svg';
 import { ProductImage } from './product-image';
@@ -10,7 +10,7 @@ export function PurchasedProducts({
   api,
   affectedBoardCount,
 }: {
-  api: ProductDetailApi;
+  api: ProductPurchases;
   affectedBoardCount: number | null;
 }) {
   const [products, setProducts] = useState<readonly ProductDetail[] | null>(null);
@@ -19,7 +19,7 @@ export function PurchasedProducts({
   useEffect(() => {
     const request = new AbortController();
     void api
-      .listPurchased(request.signal)
+      .list(request.signal)
       .then((value) => {
         if (!request.signal.aborted) setProducts(value);
       })
@@ -64,7 +64,7 @@ export function PurchasedProducts({
           {products.length === 0 && <p role="status">구매 완료한 상품이 없어요.</p>}
           {products.map((product) => (
             <article className={styles.resultCard} key={product.cardId}>
-              <ProductImage key={product.imageUrl} product={product} purchased />
+              <ProductImage product={product} purchased />
               <span className={styles.chips}>
                 <span className={styles.boardChip}>구매 완료</span>
                 <span className={styles.boardChip}>PURCHASED</span>

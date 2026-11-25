@@ -3,6 +3,7 @@ import {
   ProductDetailError,
   type ProductDetail,
   type ProductDetailApi,
+  type ProductPurchases,
 } from '@ziper/api/product-detail';
 import { ProductDetailScreen } from './product-detail-screen';
 
@@ -15,20 +16,21 @@ export const sampleProduct: ProductDetail = {
   memo: '소개팅 때 입을 니트',
   imageUrl: null,
   imageFileId: null,
+  imageFileUrl: null,
   fallbackIcon: 'TOP',
   status: 'PLANNED',
-  isLinkValid: true,
+  linkStatus: 'AVAILABLE',
   tags: ['가을코디', '위시리스트'],
   boards: [
     { id: '1', name: '기본 보드' },
     { id: '2', name: '가을 코디' },
   ],
 };
-export function createPreviewApi(mode: string): ProductDetailApi {
+export function createPreviewApi(mode: string): ProductDetailApi & { purchases: ProductPurchases } {
   let product: ProductDetail = {
     ...sampleProduct,
     status: mode === 'purchased' ? 'PURCHASED' : 'PLANNED',
-    isLinkValid: mode !== 'unavailable',
+    linkStatus: mode === 'unavailable' ? 'REMOVED' : 'AVAILABLE',
   };
   if (mode === 'empty')
     product = {
@@ -62,19 +64,21 @@ export function createPreviewApi(mode: string): ProductDetailApi {
       };
       return product;
     },
-    async purchase() {
-      if (mode === 'failed') throw new ProductDetailError('failed');
-      if (mode === 'unknown') throw new Error('response lost');
-      product = { ...product, status: 'PURCHASED' };
-      return {
-        cardId: product.cardId,
-        status: 'PURCHASED',
-        affectedBoardCount: product.boards.length,
-      };
-    },
-    async listPurchased(signal) {
-      signal.throwIfAborted();
-      return product.status === 'PURCHASED' ? [product] : [];
+    purchases: {
+      async complete() {
+        if (mode === 'failed') throw new ProductDetailError('failed');
+        if (mode === 'unknown') throw new Error('response lost');
+        product = { ...product, status: 'PURCHASED' };
+        return {
+          cardId: product.cardId,
+          status: 'PURCHASED',
+          affectedBoardCount: product.boards.length,
+        };
+      },
+      async list(signal) {
+        signal.throwIfAborted();
+        return product.status === 'PURCHASED' ? [product] : [];
+      },
     },
     async openOriginal() {},
   };

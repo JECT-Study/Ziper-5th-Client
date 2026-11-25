@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { Suspense } from 'react';
 import { usePlatform } from '../bridge/provider';
+import { productDetailApi } from '../features/product-detail/product-detail-api';
 import { ProductDetailScreen } from '../features/product-detail/product-detail-screen';
 import {
   parseDetailPreview,
@@ -40,16 +41,16 @@ function ProductDetailRoute() {
     manage:
       status !== 'native'
         ? undefined
-        : async (purchased: boolean): Promise<'edit' | 'purchase' | null> => {
+        : async (canPurchase: boolean): Promise<'edit' | 'purchase' | null> => {
             const result = await platform.sheets.actions({
               title: '상품 관리',
               actions: [
                 { id: 'edit', label: '상품 수정' },
-                ...(purchased ? [] : [{ id: 'purchase', label: '구매 완료' }]),
+                ...(canPurchase ? [{ id: 'purchase', label: '구매 완료' }] : []),
               ],
             });
             return result.status === 'selected' &&
-              (result.actionId === 'edit' || result.actionId === 'purchase')
+              (result.actionId === 'edit' || (canPurchase && result.actionId === 'purchase'))
               ? result.actionId
               : null;
           },
@@ -59,6 +60,6 @@ function ProductDetailRoute() {
       <ProductDetailPreview key={cardId + preview} {...props} mode={preview} />
     </Suspense>
   ) : (
-    <ProductDetailScreen key={cardId} {...props} />
+    <ProductDetailScreen key={cardId} {...props} api={productDetailApi} />
   );
 }

@@ -1,12 +1,10 @@
-# JEC-23 상품 상세·상태 관리 레퍼런스
+# JEC-23 상품 상세·상태 관리
 
 ## 범위와 실행
 
-- 상세 조회, 전체 상품명·가격·이미지·메모·태그·소속 보드 표시.
-- 상품 수정, 계절/직접 입력 태그, 기존 이미지 유지·제거·대체 도안, 활성 보드 선택.
-- 구매 완료 확인 → 서버 성공 후 상태 및 구매 완료 목록 갱신.
-- 원본 쇼핑몰 열기와 방문 기록은 구매 완료와 별개.
-- **제외:** JEC-22 홈/보드 관리·상품 삭제, JEC-27 휴지통·복구. 다른 화면의 목록·카운트 갱신도 해당 기능 통합 시 연결한다. 신규 이미지 업로드, 구매 취소, 재발견 스와이프/Undo는 추가하지 않는다.
+- 로그인 후 `/products/<내 상품 ID>`를 열면 상세 조회·수정·활성 보드 선택·원본 이동 기록을 사용할 수 있다. 개발 서버는 `/api` 프록시, 배포 웹은 `https://api.ziper.cc`를 사용한다.
+- **구매 완료와 구매 목록은 아래 프리뷰 전용**이다. [JEC-79](https://linear.app/ject5-team6/issue/JEC-79)가 배포되기 전에는 일반 화면에서 해당 동작을 노출하지 않는다.
+- 홈·보드에서 상세로의 진입과 목록 갱신(JEC-22), 삭제·복구(JEC-22/27), 신규 이미지 업로드, 재발견 스와이프는 이 연동의 범위 밖이다.
 
 `pnpm dev:web` 후 아래 주소로 확인한다.
 
@@ -19,30 +17,18 @@
 | `?preview=offline`, `auth`, `not-found` | 조회 오류                                              |
 | `?preview=failed`, `unknown`            | 확정 실패 / 응답 유실에 따른 재확인                    |
 
-프리뷰는 DEV 전용 lazy 모듈이며 인스턴스별 메모리 데이터다. 새로고침하면 초기화된다. 운영 빌드에서는 프리뷰 파라미터와 fixture를 제거하고 **서비스 미연결**을 표시한다. 가짜 HTTP 요청이나 운영 성공 응답은 만들지 않는다.
+프리뷰는 DEV 전용 lazy 모듈의 메모리 데이터다. 새로고침하면 초기화되며 운영 빌드에서는 무시한다.
 
-## 서버 조사와 타입 근거
+## 배포 계약
 
-조사 기준: [Server develop @ 6e3b7dc](https://github.com/JECT-Study/Ziper-5th-Server/tree/6e3b7dcd8a5c565f4b3cd8de2430cadd7b91f270). GitHub API로 전체 파일 트리, 열린 PR 7개 및 최근 병합 PR을 확인했다. 열린 PR #32, #33, #52–56은 모두 의존성 업데이트이며, 상품 상세/수정/구매 HTTP Controller·DTO는 없다. DeepWiki에는 이 저장소가 인덱싱되어 있지 않아 원본 코드·문서로 조사했다.
+[배포 `0277435`](https://github.com/JECT-Study/Ziper-5th-Server/actions/runs/44993618174) 기준으로 [상품 상세 API](https://github.com/JECT-Study/Ziper-5th-Server/pull/83)와 [보드 조회 API](https://github.com/JECT-Study/Ziper-5th-Server/pull/84)를 사용한다.
 
-| 원본                                                                                                                                                                               | 참고한 내용                                                                       |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| [V6 migration](https://github.com/JECT-Study/Ziper-5th-Server/blob/6e3b7dcd8a5c565f4b3cd8de2430cadd7b91f270/src/main/resources/db/migration/V6__create_product_and_tag_tables.sql) | `PLANNED / PURCHASED`, nullable 가격·이미지, 대체 도안 5종, 상품당 다중 태그/보드 |
-| [ADR 0015](https://github.com/JECT-Study/Ziper-5th-Server/blob/6e3b7dcd8a5c565f4b3cd8de2430cadd7b91f270/docs/adr/0015-product-card-and-rediscovery-schema.md)                      | 동일 URL 단일 카드, 구매 완료 시 보드 연결 보존, 도메인 API는 후속                |
-| [PRD](https://github.com/JECT-Study/Ziper-5th-Server/blob/6e3b7dcd8a5c565f4b3cd8de2430cadd7b91f270/docs/prd.md)                                                                    | 상세/원본 이동 시 14일 리셋, 구매 완료는 모든 일반 보드·재발견에서 제외           |
-| [ProblemFactory](https://github.com/JECT-Study/Ziper-5th-Server/blob/6e3b7dcd8a5c565f4b3cd8de2430cadd7b91f270/src/main/java/com/ject/ziper/global/error/ProblemFactory.java)       | `application/problem+json`, `code`, `requestId`, 401 Bearer                       |
-| [JEC-77](https://linear.app/ject5-team6/issue/JEC-77), [JEC-79](https://linear.app/ject5-team6/issue/JEC-79)                                                                       | 예정 상세/수정/원본 이벤트 및 구매 완료 API — 구현된 HTTP 계약이 아님             |
-
-`@ziper/api/product-detail`은 **클라이언트용 인터페이스**다. DB 스키마를 서버 DTO로 간주하거나 예정 경로에 임의로 요청하지 않는다.
-
-- BIGINT ID는 클라이언트에서 문자열로 취급한다. 최종 JSON ID 표현은 서버와 협의한다.
-- 가격은 nullable 원 단위 정수. 기존 등록 폼과 같은 10자리 입력 제한/파서를 재사용한다.
-- 상품명은 예정 API의 보수적인 200자 제한(V6 컬럼은 255자), 메모는 100자, 태그는 개별 64자.
-- 삭제 상태를 status enum에 넣지 않는다. 서버의 소프트 삭제와 구매 상태는 별개다.
-- 최종 HTTP 어댑터에서 응답 검증·null 정규화·인증·오류 코드 매핑·가격 범위·업로드·구매 목록 정렬/페이지네이션을 확정해야 한다.
-- 쓰기 실패가 확정된 경우만 재시도를 허용한다. 응답 유실은 자동 재전송하지 않고 상세 재조회로 확인하도록 안내한다.
-
-상세 조회 자체가 이벤트/주기 리셋을 동반하므로 **라우트 preload에서 호출하지 않는다.** 화면의 실제 진입에서 조회하고, 이탈한 조회는 abort 및 늦은 응답 검사로 버린다. 백엔드 연동 시 조회 이벤트 중복/멱등성 정책도 검증한다.
+- `GET /api/v1/products/{cardId}`, `GET /api/v1/boards`, `PATCH /api/v1/products/{cardId}`, `POST /api/v1/products/{cardId}/open-original`은 기존 Bearer 인증을 사용한다.
+- 상세 조회 자체가 이벤트·주기 리셋을 동반하므로 프리로드에서 요청하지 않는다. 화면에서 시작한 읽기는 이탈 시 중단하고, 정상 수정 취소는 기존 상세로 돌아와 다시 읽지 않는다.
+- 화면의 ID는 문자열이다. 서버 JSON의 숫자 ID는 안전한 정수인지 검사하고 PATCH의 보드·파일 ID는 숫자로 보낸다. JavaScript 안전 정수 범위 밖의 응답은 거부한다.
+- 수정에는 0~10억원 정수 가격, 태그 1개 이상(각 6자 이하), 이미지나 대체 도안, 활성 보드 1개 이상이 필요하다.
+- 서명 이미지 URL → 원본 이미지 URL → 대체 도안 순서로 표시한다. PATCH에는 임시 서명 URL을 보내지 않는다. 판매 종료 링크는 원본 열기를 막고 품절 링크는 열 수 있다.
+- 응답 유실·5xx·잘못된 성공 응답은 완료 여부를 알 수 없다. [JEC-95](https://linear.app/ject5-team6/issue/JEC-95)처럼 저장이 먼저 반영됐을 수 있으므로 재전송하지 않고 상세를 다시 확인한다.
 
 ## Figma와 구현 경계
 
@@ -59,9 +45,8 @@ MCP 요청을 병렬화하지 않고 순차 조회했다. 다음 노드의 디�
 의도적인 차이:
 
 - 삭제 메뉴·휴지통 안내와 하단 보드 탐색은 JEC-22/27 범위라 노출하지 않는다.
-- 수정 화면은 공통 입력 컴포넌트를 사용하며 스크롤과 검증을 유지한다. 이전 C6의 “메모/태그 필수” 문구는 최신 서버 PRD와 충돌하므로 강제하지 않는다. 상품 URL 변경 API가 없어 읽기 전용이다.
+- 수정 화면은 공통 입력 컴포넌트를 사용한다. 메모는 선택이고 상품 URL은 읽기 전용이다.
 - 브라우저 메뉴는 Figma 행/아이콘, 앱 메뉴는 기존 네이티브 액션 시트로 OS 취소/Back 동작을 유지한다.
-- 구매 결과의 보드명 고정 문구는 서버의 `affectedBoardCount`를 사용한다. 구매 완료 상태만 바꾸며 보드 연결을 프런트에서 삭제하지 않는다.
 
 ## 외부 이동
 
@@ -80,12 +65,6 @@ MCP 요청을 병렬화하지 않고 순차 조회했다. 다음 노드의 디�
 
 ## 검증
 
-- `pnpm test`: 웹 UI, 실제 브릿지 transport, 모바일 handler 및 Expo Router iOS/Android 테스트.
-- `pnpm typecheck:bridge`, `typecheck:web`, `typecheck:mobile`, `typecheck:landing`.
-- `pnpm lint`, `pnpm fmt`, `pnpm check`, `pnpm build:web`, `git diff --check`.
-- 브라우저 375×812에서 정상/접근불가/메뉴/확인/구매 완료/수정을 Figma와 반복 비교. 320px에서 수평 넘침 없음.
-- 브라우저에서 수정 저장, 구매 완료, 결과 불명 시 중복 액션 차단 확인.
-- axe-core로 상세·접근불가·구매 완료·수정 검사. 수정 도움말의 대비 문제를 이 화면에 한정해 수정.
-- 운영 SSR 서버에서 `?preview=normal`이 제거되고 서비스 미연결 상태만 나오는지, fixture가 클라이언트 번들에 없는지 확인.
-
-실제 서버 통합, 실제 기기/시뮬레이터에서의 OS 브라우저 전환·키보드·Back 동작 검증은 수행하지 않았다. 모바일 자동 테스트의 WebView/OS 서비스는 mock이며 단말 검증을 대신하지 않는다.
+- `pnpm test`의 어댑터 테스트는 배포 응답 형태, 인증, 취소, 숫자 ID, 5xx·잘못된 성공 응답을 검증한다. 화면 테스트는 수정·재조회·구매 액션 숨김·이미지 대체를 검증한다.
+- `pnpm e2e:ios`, `pnpm e2e:android`는 화면 진입·시트·구매 프리뷰·Back 회귀다. 서버에 데이터를 쓰지 않는다.
+- 연동 확인: 전용 테스트 계정으로 로그인한 뒤 프리뷰 없이 자기 카드를 열고, 메모를 수정한 뒤 다시 열어 반영을 확인한다. 원본 이동 성공 후에만 이벤트를 전송하는지 확인하고, 테스트 카드에서만 실행한다.

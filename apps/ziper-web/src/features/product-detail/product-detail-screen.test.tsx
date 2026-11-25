@@ -31,7 +31,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 async function mount(
-  api: ProductDetailApi | undefined = createPreviewApi('normal'),
+  api: ProductDetailApi = createPreviewApi('normal'),
   options: Partial<Parameters<typeof ProductDetailScreen>[0]> = {},
 ) {
   const container = document.createElement('div');
@@ -93,10 +93,22 @@ it('renders the full title and preserves a zero price rather than treating it as
   expect(container.textContent).toContain('0원');
   expect(container.textContent).toContain('담긴 보드 · 2개');
 });
-it('keeps unconfigured production routes honest', async () => {
-  const { container } = await mount(undefined, { api: undefined });
-  expect(container.textContent).toContain('서비스는 아직 연결되지 않았어요');
-  expect(container.querySelector('button')).toBeNull();
+it('offers no purchase actions when the adapter does not support them', async () => {
+  const api = { ...createPreviewApi('normal'), purchases: undefined };
+  const browser = await mount(api, { manage: undefined });
+  await click(browser.container, '상품 관리');
+  expect(browser.container.querySelector('dialog')?.textContent).not.toContain('구매 완료');
+
+  const manage = vi.fn(async () => 'purchase' as const);
+  const native = await mount(api, { manage });
+  await click(native.container, '상품 관리');
+  expect(manage).toHaveBeenCalledExactlyOnceWith(false);
+  expect(native.container.querySelector('dialog')).toBeNull();
+
+  api.get = async () => ({ ...sampleProduct, status: 'PURCHASED' });
+  const { container } = await mount(api);
+  expect(container.textContent).toContain('구매 완료한 상품이에요');
+  expect(container.textContent).not.toContain('구매 완료 목록 보기');
 });
 it.each(['auth-required', 'forbidden', 'not-found', 'failed'] as const)(
   'shows a feature-specific %s load error',
@@ -136,7 +148,7 @@ it('composes the browser menu from shared controls and hides out-of-scope action
 });
 it('does not call a mutation when the menu or confirmation is cancelled', async () => {
   const api = createPreviewApi('normal');
-  const purchase = vi.spyOn(api, 'purchase');
+  const purchase = vi.spyOn(api.purchases, 'complete');
   const result = await mount(api);
   await click(result.container, '상품 관리');
   expect(result.container.querySelector('dialog')).toBeNull();
@@ -146,9 +158,9 @@ it('does not call a mutation when the menu or confirmation is cancelled', async 
 });
 it('deduplicates purchase submits and displays the server-confirmed purchased list', async () => {
   const api = createPreviewApi('normal');
-  const original = api.purchase;
+  const original = api.purchases.complete;
   const pending = deferred<void>();
-  const purchase = vi.spyOn(api, 'purchase').mockImplementation(async (id) => {
+  const purchase = vi.spyOn(api.purchases, 'complete').mockImplementation(async (id) => {
     await pending.promise;
     return original(id);
   });
@@ -165,7 +177,9 @@ it('deduplicates purchase submits and displays the server-confirmed purchased li
 });
 it('requires reconciliation after a lost purchase reply and never blindly resubmits', async () => {
   const api = createPreviewApi('normal');
-  const purchase = vi.spyOn(api, 'purchase').mockRejectedValue(new Error('response lost'));
+  const purchase = vi
+    .spyOn(api.purchases, 'complete')
+    .mockRejectedValue(new Error('response lost'));
   const { container } = await confirmPurchase(api);
   await click(container, '이동하기');
   expect(container.textContent).toContain('구매 처리 결과를 확인할 수 없어요');
@@ -183,8 +197,8 @@ it('allows retry after a confirmed no-effects purchase failure', async () => {
 });
 it('does not repeat a completed purchase when the purchased list fails', async () => {
   const api = createPreviewApi('normal');
-  const purchase = vi.spyOn(api, 'purchase');
-  api.listPurchased = vi
+  const purchase = vi.spyOn(api.purchases, 'complete');
+  api.purchases.list = vi
     .fn()
     .mockRejectedValueOnce(new Error('offline'))
     .mockResolvedValue([{ ...sampleProduct, status: 'PURCHASED' }]);
@@ -201,13 +215,33 @@ it('keeps saved information visible but disables an unavailable original link', 
   expect(button(container, '원본 상품 접근불가').disabled).toBe(true);
   expect(props.openExternal).not.toHaveBeenCalled();
 });
+it('marks sold-out products without blocking the original and falls back from the signed image', async () => {
+  const api = createPreviewApi('normal');
+  const signed = 'https://storage.example.com/signed';
+  const original = 'https://images.example.com/original';
+  api.get = async () => ({
+    ...sampleProduct,
+    imageFileUrl: signed,
+    imageUrl: original,
+    linkStatus: 'SOLD_OUT',
+  });
+  const { container } = await mount(api);
+  const photo = () => container.querySelector<HTMLImageElement>('figure img')!;
+  expect(container.textContent).toContain('품절된 상품이에요');
+  expect(button(container, '↗ 원본 쇼핑몰 가기').disabled).toBe(false);
+  expect(photo().src).toBe(signed);
+  await act(() => photo().dispatchEvent(new Event('error')));
+  expect(photo().src).toBe(original);
+  await act(() => photo().dispatchEvent(new Event('error')));
+  expect(container.querySelector('figcaption')?.textContent).toContain('도안');
+});
 it('opens the shop before recording the event and never marks a purchase', async () => {
   const api = createPreviewApi('normal');
   const order: string[] = [];
   api.openOriginal = vi.fn(async () => {
     order.push('record');
   });
-  const purchase = vi.spyOn(api, 'purchase');
+  const purchase = vi.spyOn(api.purchases, 'complete');
   const { container } = await mount(api, {
     openExternal: async () => {
       order.push('open');
@@ -263,14 +297,14 @@ it('edits existing values and refreshes detail without creating another card', a
   const update = vi.spyOn(api, 'update');
   const { container } = await edit(api);
   await input(container, '상품명', '수정한 전체 상품명');
-  await input(container, '가격 (원)', '');
+  await input(container, '가격 (원)', '0');
   await input(container, '해시태그', '#봄, 봄, 여름');
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
     '1',
     expect.objectContaining({
       productTitle: '수정한 전체 상품명',
-      price: null,
+      price: 0,
       tags: ['봄', '여름'],
       boardIds: ['1', '2'],
     }),
@@ -278,11 +312,22 @@ it('edits existing values and refreshes detail without creating another card', a
   expect(container.querySelector('h1')?.textContent).toBe('상품 상세');
   expect(container.textContent).toContain('수정한 전체 상품명');
 });
-it('rejects malformed prices and requires at least one active board', async () => {
+it('enforces the deployed price and tag rules before submitting', async () => {
   const { container } = await edit();
-  await input(container, '가격 (원)', '1e3');
-  expect(button(container, '수정 완료').disabled).toBe(true);
-  await input(container, '가격 (원)', '0');
+  for (const price of ['', '1e3', '1,000,000,001']) {
+    await input(container, '가격 (원)', price);
+    expect(button(container, '수정 완료').disabled).toBe(true);
+  }
+  await input(container, '가격 (원)', '1,000,000,000');
+  for (const tags of ['', '일이삼사오육칠']) {
+    await input(container, '해시태그', tags);
+    expect(button(container, '수정 완료').disabled).toBe(true);
+  }
+  await input(container, '해시태그', '일이삼사오육');
+  expect(button(container, '수정 완료').disabled).toBe(false);
+});
+it('requires at least one active board', async () => {
+  const { container } = await edit();
   await click(container, '기본 보드');
   await click(container, '가을 코디');
   expect(button(container, '수정 완료').disabled).toBe(true);
@@ -302,13 +347,27 @@ it('blocks duplicate updates and the header back button until a write settles', 
   await act(async () => pending.resolve(sampleProduct));
   expect(container.querySelector('h1')?.textContent).toBe('상품 상세');
 });
+it('returns from a normal edit cancel without recording another detail view', async () => {
+  const api = createPreviewApi('normal');
+  const get = vi.spyOn(api, 'get');
+  const { container } = await edit(api);
+  await click(container, '취소');
+  expect(container.querySelector('h1')?.textContent).toBe('상품 상세');
+  expect(get).toHaveBeenCalledOnce();
+});
 it('blocks an uncertain update until the user re-reads detail', async () => {
-  const { container } = await edit(createPreviewApi('unknown'));
+  const api = createPreviewApi('unknown');
+  const get = vi.spyOn(api, 'get');
+  const update = vi.spyOn(api, 'update');
+  const { container } = await edit(api);
   await click(container, '수정 완료');
   expect(container.textContent).toContain('수정 결과를 확인할 수 없어요');
   expect(button(container, '수정 완료').disabled).toBe(true);
+  expect(get).toHaveBeenCalledOnce();
   await click(container, '상세에서 확인');
   expect(container.querySelector('h1')?.textContent).toBe('상품 상세');
+  expect(get).toHaveBeenCalledTimes(2);
+  expect(update).toHaveBeenCalledOnce();
 });
 it('does not offer deletion, board creation or trash controls', async () => {
   const { container } = await edit();
