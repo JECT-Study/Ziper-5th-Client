@@ -3,10 +3,10 @@ import { Platform, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { Input, Output } from '@ziper/bridge/contract';
 import { isProductExtractionURL } from '@ziper/product-extraction/link';
-import { startExtraction, type ExtractionView, type Job } from './extraction-job';
+import { ExtractionJob, type ExtractionView } from './extraction-job';
 
 export function useProductExtraction() {
-  const pending = useRef<Job | null>(null);
+  const pending = useRef<ExtractionJob | null>(null);
   const sourceVersion = useRef(0);
   const webView = useRef<WebView<unknown>>(null);
   const [view, setView] = useState<ExtractionView | null>(null);
@@ -16,26 +16,28 @@ export function useProductExtraction() {
         if (!isProductExtractionURL(request.url, true)) return null;
         // In-page Back cancels the web await, not the native load. The next submit owns the view.
         pending.current?.finish(null);
-        return startExtraction(request, {
-          pending,
+        const job = new ExtractionJob(request, {
           nextVersion: () => ++sourceVersion.current,
           show: setView,
         });
+        pending.current = job;
+        return job.start();
       },
       cancel: () => pending.current?.finish(null),
     }),
     [],
   );
 
-  const job = view?.job;
-  const isCurrent = () =>
-    view && pending.current === view.job && view.version === view.job.sourceVersion;
+  if (!view) return { extraction, extractionView: null };
+  const { job, version } = view;
+  const isCurrent = () => job.isCurrent(version);
+  const inject = () => webView.current?.injectJavaScript(job.script);
   const onRendererGone = () => {
-    if (isCurrent()) job?.rendererGone();
+    if (isCurrent()) job.rendererGone();
   };
   return {
     extraction,
-    extractionView: job && view && (
+    extractionView: (
       <View
         pointerEvents="none"
         accessibilityElementsHidden
@@ -43,7 +45,7 @@ export function useProductExtraction() {
         style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
       >
         <WebView
-          key={view.version}
+          key={version}
           ref={webView}
           source={{ uri: view.url }}
           originWhitelist={['*']}
@@ -66,27 +68,17 @@ export function useProductExtraction() {
           injectedJavaScriptForMainFrameOnly
           injectedJavaScriptBeforeContentLoaded={job.script}
           injectedJavaScript={job.script}
-          onShouldStartLoadWithRequest={({ url, isTopFrame }) => {
-            return Boolean(isCurrent() && job.allowNavigation(url, isTopFrame !== false));
-          }}
+          onShouldStartLoadWithRequest={({ url, isTopFrame }) =>
+            isCurrent() && job.allowNavigation(url, isTopFrame !== false)
+          }
           onLoadStart={({ nativeEvent: { url } }) => {
-            if (!isCurrent()) return;
-            const earlyInjection = job.pageURL !== url && job.injectedAtURL === url;
-            job.updatePage(url);
-            // Android emits this from doUpdateVisitedHistory, before a slow page finishes loading.
-            if (Platform.OS === 'android' && isCurrent()) job.allowLateProductTime(url);
-            // Progress can inject into the previous document; the scan is idempotent here.
-            if (earlyInjection && isCurrent()) webView.current?.injectJavaScript(job.script);
+            if (isCurrent() && job.loadStarted(version, url)) inject();
           }}
           onLoadProgress={({ nativeEvent: { url, progress } }) => {
-            if (isCurrent() && job.shouldInjectEarly(url, progress))
-              webView.current?.injectJavaScript(job.script);
+            if (isCurrent() && job.shouldInjectEarly(url, progress)) inject();
           }}
-          // Some Android redirects only report the final URL at load finish.
-          onLoad={({ nativeEvent }) => {
-            if (!isCurrent()) return;
-            job.updatePage(nativeEvent.url);
-            if (isCurrent()) job.allowLateProductTime(nativeEvent.url);
+          onLoad={({ nativeEvent: { url } }) => {
+            if (isCurrent()) job.loaded(version, url);
           }}
           onMessage={({ nativeEvent }) => {
             if (isCurrent()) job.readMessage(nativeEvent.data, nativeEvent.url);

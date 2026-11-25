@@ -4,7 +4,7 @@ import {
   canonicalProductExtractionURL,
   findSharedURL,
   isProductExtractionURL,
-  productShortLinkShop,
+  shortLinkShop,
   musinsaAppProductURL,
 } from './link';
 import { productMetadata } from './schema';
@@ -147,7 +147,7 @@ it('does not widen navigation to unknown or insecure redirect hosts', () => {
 });
 
 it('accepts only the exact Ably shortener host for navigation, not as an extracted product', () => {
-  expect(productShortLinkShop(ably)).toBe('m.a-bly.com');
+  expect(shortLinkShop(ably)?.id).toBe('ably');
   expect(isProductExtractionURL(ably, true)).toBe(true);
   expect(isProductExtractionURL(ably)).toBe(false);
   expect(isProductExtractionURL('https://applink.a-bly.com.example.org/69ptirx', true)).toBe(false);

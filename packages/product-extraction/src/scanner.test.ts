@@ -45,14 +45,22 @@ it('extracts metadata from the final shop and accepts only bounded, related mess
     page,
   );
   const data = postMessage.mock.calls[0]![0];
-  expect(readProductMessage(data, 'https://www.musinsa.com', finalUrl, shops)).toEqual({
+  expect(
+    readProductMessage(data, { origin: 'https://www.musinsa.com', pageURL: finalUrl, shops }),
+  ).toEqual({
     documentURL: finalUrl,
     metadata: extracted,
     complete: true,
   });
-  expect(readProductMessage(data, 'https://cdn.example', finalUrl, shops)).toBeNull();
   expect(
-    readProductMessage(data, finalUrl, 'https://www.musinsa.com/products/8', shops),
+    readProductMessage(data, { origin: 'https://cdn.example', pageURL: finalUrl, shops }),
+  ).toBeNull();
+  expect(
+    readProductMessage(data, {
+      origin: finalUrl,
+      pageURL: 'https://www.musinsa.com/products/8',
+      shops,
+    }),
   ).toBeNull();
   expect(isProductExtractionURL(shortUrl, true)).toBe(true);
   expect(isProductExtractionURL('https://www.musinsa.com.example.org/item', true)).toBe(false);
@@ -84,7 +92,13 @@ it.each([
     new URL(finalUrl),
     page,
   );
-  expect(readProductMessage(postMessage.mock.calls[0]![0], finalUrl, finalUrl, shops)).toEqual({
+  expect(
+    readProductMessage(postMessage.mock.calls[0]![0], {
+      origin: finalUrl,
+      pageURL: finalUrl,
+      shops,
+    }),
+  ).toEqual({
     documentURL: finalUrl,
     metadata: { ...extracted, name: fitsBridge ? name : '' },
     complete: fitsBridge,
@@ -95,14 +109,24 @@ it('accepts metadata after a same-document fragment change, but not after a quer
   const pageURL = `${finalUrl}?option=7#reviews`;
   const frameURL = `${finalUrl}?option=7`;
   const payload = (url: string) => JSON.stringify({ ...extracted, url });
-  expect(readProductMessage(payload(`${frameURL}#details`), frameURL, pageURL, shops)).toEqual({
+  expect(
+    readProductMessage(payload(`${frameURL}#details`), {
+      origin: frameURL,
+      pageURL: pageURL,
+      shops,
+    }),
+  ).toEqual({
     documentURL: frameURL,
     metadata: extracted,
     complete: true,
   });
   const otherOption = `${finalUrl}?option=8#reviews`;
-  expect(readProductMessage(payload(otherOption), frameURL, pageURL, shops)).toBeNull();
-  expect(readProductMessage(payload(frameURL), otherOption, pageURL, shops)).toBeNull();
+  expect(
+    readProductMessage(payload(otherOption), { origin: frameURL, pageURL: pageURL, shops }),
+  ).toBeNull();
+  expect(
+    readProductMessage(payload(frameURL), { origin: otherOption, pageURL: pageURL, shops }),
+  ).toBeNull();
 });
 
 it('scans one document and resends late metadata while native commits a redirect', () => {
@@ -167,16 +191,33 @@ it('keeps the same Ably product across the observed redirect but rejects a diffe
   );
   const data = postMessage.mock.calls[0]![0];
   expect(
-    readProductMessage(data, 'https://mobile.a-bly.com', redirected, ablyRules, canonical),
+    readProductMessage(data, {
+      origin: 'https://mobile.a-bly.com',
+      pageURL: redirected,
+      shops: ablyRules,
+      requestedURL: canonical,
+    }),
   ).toEqual({
     documentURL: redirected,
     metadata: { ...extracted, url: canonical, imageURL: ablyImage },
     complete: true,
   });
   expect(
-    readProductMessage(data, redirected, redirected, ablyRules, canonical.replace('13519743', '9')),
+    readProductMessage(data, {
+      origin: redirected,
+      pageURL: redirected,
+      shops: ablyRules,
+      requestedURL: canonical.replace('13519743', '9'),
+    }),
   ).toBeNull();
-  expect(readProductMessage(data, redirected, redirected, shops, canonical)).toBeNull();
+  expect(
+    readProductMessage(data, {
+      origin: redirected,
+      pageURL: redirected,
+      shops,
+      requestedURL: canonical,
+    }),
+  ).toBeNull();
   expect(isProductExtractionURL('https://mobile.a-bly.com/account', true)).toBe(false);
   expect(isProductExtractionURL('https://www.musinsa.com', true)).toBe(false);
   expect(isProductExtractionURL('https://s.zigzag.kr/example', true)).toBe(true);
@@ -270,7 +311,14 @@ it('only reads Ably Open Graph blocks and retailer prices for the requested prod
   const expected = { url, name: '니트 원피스 모음', price: 26_800, imageURL };
   const padded = url.replace('/13519743', '/0013519743') + '?coupon_sno=7';
   const data = scan(['13519743'], imageURL, '', 0, '', padded).mock.calls[0]?.[0];
-  expect(readProductMessage(data ?? '', padded, padded, rules, padded)).toEqual({
+  expect(
+    readProductMessage(data ?? '', {
+      origin: padded,
+      pageURL: padded,
+      shops: rules,
+      requestedURL: padded,
+    }),
+  ).toEqual({
     documentURL: padded,
     metadata: { ...expected, url: 'https://m.a-bly.com/goods/13519743' },
     complete: true,
