@@ -168,9 +168,7 @@ it('uploads a multipart file then registers with numeric IDs', async () => {
   );
   const file = new File(['image'], 'card.png', { type: 'image/png' });
   await expect(productSaveApi.save({ ...input, image: { kind: 'upload', file } })).resolves.toEqual(
-    {
-      cardId: '7',
-    },
+    { status: 'done', value: { cardId: '7' } },
   );
   const [upload, registration] = fetch.mock.calls;
   expect(upload?.[0]).toBe('/api/v1/files/images');
@@ -195,7 +193,10 @@ it('distinguishes duplicate from a possible commit with a server error', async (
     Response.json({ code: 'DUPLICATE_PRODUCT_URL' }, { status: 409 }),
     Response.json({}, { status: 500 }),
   );
-  await expect(productSaveApi.save(input)).resolves.toBe('duplicate');
-  await expect(productSaveApi.save(input)).rejects.toMatchObject({ status: 500 });
+  await expect(productSaveApi.save(input)).resolves.toEqual({
+    status: 'rejected',
+    reason: 'duplicate',
+  });
+  await expect(productSaveApi.save(input)).resolves.toEqual({ status: 'unknown' });
   expect(fetch).toHaveBeenCalledTimes(2);
 });

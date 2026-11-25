@@ -1,3 +1,4 @@
+import { done, rejected, unknownOutcome } from '@ziper/api/outcome';
 import type { BoardSummary, ProductSaveApi } from '@ziper/api/product-save';
 import { useState } from 'react';
 import previewCard from '../../assets/product-save/preview-card.png';
@@ -71,10 +72,10 @@ function createPreviewApi(mode: PreviewMode): ProductSaveApi {
       return board;
     },
     async save() {
-      if (mode === 'duplicate') return 'duplicate';
-      if (mode === 'failed') return 'failed';
-      if (mode === 'unknown') throw new Error('Preview save result unavailable');
-      return { cardId: '1' };
+      if (mode === 'duplicate') return rejected('duplicate');
+      if (mode === 'failed') return rejected('failed');
+      if (mode === 'unknown') return unknownOutcome;
+      return done({ cardId: '1' });
     },
   };
 }

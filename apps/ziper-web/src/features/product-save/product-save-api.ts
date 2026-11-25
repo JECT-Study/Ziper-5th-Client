@@ -1,4 +1,5 @@
 import type { BoardSummary, ProductSaveApi } from '@ziper/api/product-save';
+import { done, rejected, unknownOutcome } from '@ziper/api/outcome';
 import { isGatewayFailure, withDeadline } from '../../shared/api/deadline';
 import { ApiError, parseResponse, request, requestResponse } from '../../shared/api/http';
 import {
@@ -112,7 +113,9 @@ export const productSaveApi: ProductSaveApi = {
         imageFileId = wireId(result.fileId);
       } catch (error) {
         // No product POST has been sent, even if a file upload may have committed.
-        return error instanceof ApiError && error.status === 401 ? 'auth-required' : 'failed';
+        return rejected(
+          error instanceof ApiError && error.status === 401 ? 'auth-required' : 'failed',
+        );
       }
     }
     try {
@@ -136,15 +139,17 @@ export const productSaveApi: ProductSaveApi = {
           },
         }),
       );
-      return { cardId: id(saved.cardId) };
+      return done({ cardId: id(saved.cardId) });
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.status === 401) return 'auth-required';
-        if (error.status === 409 && error.code === 'DUPLICATE_PRODUCT_URL') return 'duplicate';
-        if (error.status === 400 || error.status === 403 || error.status === 404) return 'failed';
+        if (error.status === 401) return rejected('auth-required');
+        if (error.status === 409 && error.code === 'DUPLICATE_PRODUCT_URL')
+          return rejected('duplicate');
+        if (error.status === 400 || error.status === 403 || error.status === 404)
+          return rejected('failed');
       }
-      // 5xx may follow a successful database commit (JEC-95).
-      throw error;
+      // 5xx, a lost reply or an unreadable body may follow a database commit (JEC-95).
+      return unknownOutcome;
     }
   },
 };

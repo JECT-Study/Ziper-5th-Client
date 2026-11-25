@@ -1,3 +1,4 @@
+import type { Outcome } from './outcome';
 import type { FallbackIcon } from './product-fields';
 
 export type BoardSummary = { id: string; name: string; productCount: number };
@@ -30,12 +31,14 @@ export type ProductSaveInput = {
   metadataSource: 'CLIENT' | 'MANUAL';
 };
 
-export type ProductSaveResult = { cardId: string } | 'duplicate' | 'auth-required' | 'failed';
+export type ProductSaveResult = Outcome<
+  { cardId: string },
+  'duplicate' | 'auth-required' | 'failed'
+>;
 
 export interface ProductSaveApi {
   lookup(url: string, signal: AbortSignal): Promise<ProductLookup>;
   listBoards(signal: AbortSignal): Promise<readonly BoardSummary[]>;
   createBoard(name: string): Promise<BoardSummary>;
-  // 'failed' means no product was registered. Reject if registration may have committed.
   save(input: ProductSaveInput): Promise<ProductSaveResult>;
 }

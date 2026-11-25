@@ -1,3 +1,4 @@
+import { done, unknownOutcome } from '@ziper/api/outcome';
 // @vitest-environment happy-dom
 import type { ProductLookup, ProductSaveApi } from '@ziper/api/product-save';
 import { act } from 'react';
@@ -111,7 +112,7 @@ const extractedProduct = { name: '니트', price: 35_690, imageURL: 'https://cdn
 const linkedPreview = () => container.querySelector(`img[src="${extractedProduct.imageURL}"]`)!;
 
 it('keeps extracted fields and draft edits when only the boards request needs a retry', async () => {
-  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue({ cardId: '1' });
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(done({ cardId: '1' }));
   const listBoards = vi
     .fn<ProductSaveApi['listBoards']>()
     .mockRejectedValueOnce(new Error('boards unavailable'))
@@ -169,7 +170,7 @@ it('allows retry after a board timeout and ignores the stale response', async ()
 
 it('keeps an overlong extracted title editable and saves all 200 code points after correction', async () => {
   const title = '가'.repeat(199) + '🍑';
-  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue({ cardId: '1' });
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(done({ cardId: '1' }));
   await mount(save, { ...extractedProduct, name: title + '끝' });
   const name = [...container.querySelectorAll('input')].find((e) => e.value === title + '끝')!;
   await act(() => {
@@ -191,7 +192,7 @@ it('keeps an overlong extracted title editable and saves all 200 code points aft
 });
 
 it('only marks the thumbnail ready when the retry actually loads', async () => {
-  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue({ cardId: '1' });
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(done({ cardId: '1' }));
   await mount(save, extractedProduct);
   const submit = button('보드에 저장하기');
   await act(() => {
@@ -217,7 +218,7 @@ it('only marks the thumbnail ready when the retry actually loads', async () => {
 
 it('retains the name and price and allows a template when the thumbnail times out', async () => {
   vi.useFakeTimers();
-  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue({ cardId: '1' });
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(done({ cardId: '1' }));
   await mount(save, extractedProduct);
   const first = linkedPreview();
   await act(() => vi.advanceTimersByTime(4_000));
@@ -243,7 +244,7 @@ it('retains the name and price and allows a template when the thumbnail times ou
 });
 
 it('requires the deployed fields and does not resend an uncertain write', async () => {
-  const save = vi.fn<ProductSaveApi['save']>().mockRejectedValue(new Error('response lost'));
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(unknownOutcome);
   await mount(save);
   const submit = button('보드에 저장하기');
   expect(submit.disabled).toBe(true);

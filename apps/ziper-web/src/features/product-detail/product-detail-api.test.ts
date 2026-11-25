@@ -67,7 +67,8 @@ it('maps deployed reads and sends a PATCH with numeric IDs, not the signed URL',
   });
   await expect(productDetailApi.listBoards(requestSignal)).resolves.toEqual(boards);
   await expect(productDetailApi.update('7', patch)).resolves.toMatchObject({
-    productTitle: patch.productTitle,
+    status: 'done',
+    value: { productTitle: patch.productTitle },
   });
   await productDetailApi.openOriginal('7');
   expect(fetchApi.mock.calls.map(([target, init]) => [target, init?.method])).toEqual([
@@ -91,17 +92,20 @@ it.each([
   [400, 'failed'],
   [403, 'forbidden'],
   [404, 'not-found'],
-] as const)('maps HTTP %i to a confirmed failure', async (status, code) => {
+] as const)('maps HTTP %i to a confirmed failure', async (status, reason) => {
   reply({}, status);
-  await expect(productDetailApi.update('7', patch)).rejects.toMatchObject({ code });
+  await expect(productDetailApi.update('7', patch)).resolves.toMatchObject({
+    status: 'rejected',
+    reason,
+  });
   expect(fetchApi).toHaveBeenCalledOnce();
 });
 
 it('does not repeat or report success after a 5xx or malformed success', async () => {
   reply({}, 502);
   reply({ cardId: 7 });
-  await expect(productDetailApi.update('7', patch)).rejects.toMatchObject({ status: 502 });
-  await expect(productDetailApi.update('7', patch)).rejects.toThrow('Invalid API response');
+  await expect(productDetailApi.update('7', patch)).resolves.toEqual({ status: 'unknown' });
+  await expect(productDetailApi.update('7', patch)).resolves.toEqual({ status: 'unknown' });
   expect(fetchApi).toHaveBeenCalledTimes(2);
 });
 
@@ -111,7 +115,7 @@ it('rejects invalid paths and IDs before sending them', async () => {
   });
   await expect(
     productDetailApi.update('7', { ...patch, boardIds: ['9007199254740993'] }),
-  ).rejects.toThrow();
+  ).resolves.toEqual({ status: 'unknown' });
   expect(fetchApi).not.toHaveBeenCalled();
   reply({ boards: [{ boardId: Number.MAX_SAFE_INTEGER + 1, name: '보드' }] });
   await expect(productDetailApi.listBoards(signal())).rejects.toThrow('Invalid API response');

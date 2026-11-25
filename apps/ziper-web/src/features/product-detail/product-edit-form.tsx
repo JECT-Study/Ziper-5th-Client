@@ -1,5 +1,5 @@
+import { unknownOutcome } from '@ziper/api/outcome';
 import {
-  ProductDetailError,
   type ProductBoard,
   type ProductDetail,
   type ProductDetailApi,
@@ -108,30 +108,29 @@ export function ProductEditForm({
       imageFileId: image === 'keep' ? product.imageFileId : null,
       fallbackIcon: image === 'keep' ? product.fallbackIcon : image,
     };
-    try {
-      const updated = await api.update(product.cardId, input);
-      if (alive.current) onSaved(updated);
-    } catch (reason) {
-      if (!alive.current) return;
-      onBusyChange(false);
-      if (reason instanceof ProductDetailError) {
-        setError(
-          reason.code === 'auth-required'
-            ? '로그인한 뒤 다시 수정해 주세요.'
-            : reason.code === 'not-found' || reason.code === 'forbidden'
-              ? '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.'
-              : (reason.detail ?? '수정하지 못했어요. 다시 시도해 주세요.'),
-        );
-        const retryable = reason.code === 'failed' || reason.code === 'auth-required';
-        setStatus(retryable ? 'idle' : 'unknown');
-        busy.current = !retryable;
-        if (!retryable) onReconcile();
-      } else {
-        setStatus('unknown');
-        onReconcile();
-        setError('수정 결과를 확인할 수 없어요. 다시 제출하지 말고 상세 화면에서 확인해 주세요.');
-      }
+    const result = await api.update(product.cardId, input).catch(() => unknownOutcome);
+    if (!alive.current) return;
+    if (result.status === 'done') return onSaved(result.value);
+    onBusyChange(false);
+    if (result.status === 'unknown') {
+      setStatus('unknown');
+      onReconcile();
+      setError('수정 결과를 확인할 수 없어요. 다시 제출하지 말고 상세 화면에서 확인해 주세요.');
+      return;
     }
+    const { reason, detail } = result;
+    setError(
+      reason === 'auth-required'
+        ? '로그인한 뒤 다시 수정해 주세요.'
+        : reason === 'not-found' || reason === 'forbidden'
+          ? '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.'
+          : (detail ?? '수정하지 못했어요. 다시 시도해 주세요.'),
+    );
+    // A missing or forbidden product needs the detail screen to reload, not another submit.
+    const retryable = reason === 'failed' || reason === 'auth-required';
+    setStatus(retryable ? 'idle' : 'unknown');
+    busy.current = !retryable;
+    if (!retryable) onReconcile();
   }
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)} noValidate>

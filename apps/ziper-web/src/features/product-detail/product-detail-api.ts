@@ -1,8 +1,10 @@
+import { done, rejected, unknownOutcome } from '@ziper/api/outcome';
 import {
   ProductDetailError,
   type ProductBoard,
   type ProductDetail,
   type ProductDetailApi,
+  type ProductMutation,
 } from '@ziper/api/product-detail';
 import { ApiError, request } from '../../shared/api/http';
 import {
@@ -75,6 +77,18 @@ async function authenticated(
   }
 }
 
+// A rejection from the server changed nothing. Anything else, including an unreadable reply
+// or a 5xx (such as an image-signing failure), may follow a commit.
+async function mutate<T>(run: () => Promise<T>): Promise<ProductMutation<T>> {
+  try {
+    return done(await run());
+  } catch (error) {
+    return error instanceof ProductDetailError
+      ? rejected(error.code, error.detail)
+      : unknownOutcome;
+  }
+}
+
 export const productDetailApi: ProductDetailApi = {
   async get(cardId, signal) {
     return decodeProduct(await authenticated(productPath(cardId), { signal }), cardId);
@@ -83,16 +97,18 @@ export const productDetailApi: ProductDetailApi = {
     const value = await authenticated('/api/v1/boards', { signal });
     return list(object(value).boards).map(decodeBoard);
   },
-  async update(cardId, { boardIds, imageFileId, ...input }) {
-    const value = await authenticated(productPath(cardId), {
-      method: 'PATCH',
-      body: {
-        ...input,
-        boardIds: boardIds.map(idNumber),
-        imageFileId: nullable(idNumber, imageFileId),
-      },
+  update(cardId, { boardIds, imageFileId, ...input }) {
+    return mutate(async () => {
+      const value = await authenticated(productPath(cardId), {
+        method: 'PATCH',
+        body: {
+          ...input,
+          boardIds: boardIds.map(idNumber),
+          imageFileId: nullable(idNumber, imageFileId),
+        },
+      });
+      return decodeProduct(value, cardId);
     });
-    return decodeProduct(value, cardId);
   },
   async openOriginal(cardId) {
     await authenticated(`${productPath(cardId)}/open-original`, { method: 'POST' });

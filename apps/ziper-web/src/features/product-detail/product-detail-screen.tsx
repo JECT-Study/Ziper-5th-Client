@@ -3,6 +3,7 @@ import {
   type ProductDetail,
   type ProductDetailApi,
 } from '@ziper/api/product-detail';
+import { unknownOutcome } from '@ziper/api/outcome';
 import { useEffect, useRef, useState } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { BottomSheet, Button, HeaderSub, Toast } from '../../components';
@@ -119,23 +120,25 @@ export function ProductDetailScreen({
     if (!product || !purchases || !canPurchase || busy.current || uncertain) return;
     begin('purchase');
     try {
-      const result = await purchases.complete(product.cardId);
-      if (!alive.current) return;
-      updateProduct((current) => ({ ...current, status: result.status }));
-      setAffectedBoardCount(result.affectedBoardCount);
-      setConfirm(false);
-      setView('purchased');
-    } catch (reason) {
+      const result = await purchases.complete(product.cardId).catch(() => unknownOutcome);
       if (!alive.current) return;
       setConfirm(false);
-      const known = reason instanceof ProductDetailError;
-      setUncertain(!known || reason.code === 'not-found' || reason.code === 'forbidden');
+      if (result.status === 'done') {
+        const { status, affectedBoardCount } = result.value;
+        updateProduct((current) => ({ ...current, status }));
+        setAffectedBoardCount(affectedBoardCount);
+        setView('purchased');
+        return;
+      }
+      const reason = result.status === 'rejected' ? result.reason : null;
+      // Without a confirmed failure, or for a product that changed underneath, reload first.
+      setUncertain(!reason || reason === 'not-found' || reason === 'forbidden');
       setError(
-        known
-          ? reason.code === 'failed'
+        !reason
+          ? '구매 처리 결과를 확인할 수 없어요. 다시 처리하지 말고 현재 상태를 확인해 주세요.'
+          : reason === 'failed'
             ? '구매 완료로 변경하지 못했어요. 다시 시도해 주세요.'
-            : loadErrors[reason.code]
-          : '구매 처리 결과를 확인할 수 없어요. 다시 처리하지 말고 현재 상태를 확인해 주세요.',
+            : loadErrors[reason],
       );
     } finally {
       finish();

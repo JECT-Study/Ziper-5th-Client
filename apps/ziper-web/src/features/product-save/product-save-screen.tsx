@@ -4,6 +4,7 @@ import type {
   ProductSaveApi,
   ProductSaveResult,
 } from '@ziper/api/product-save';
+import { unknownOutcome } from '@ziper/api/outcome';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import accessory from '../../assets/product-save/accessory.png';
 import beauty from '../../assets/product-save/beauty.png';
@@ -113,14 +114,16 @@ type ScreenData =
   | Ready
   | { status: 'loading' | 'error' | 'duplicate' | 'unsupported' | 'auth-required' };
 
-type SaveStatus = ProductSaveResult | 'idle' | 'unknown';
 const authMessage = '로그인한 뒤 상품을 저장할 수 있어요.';
-const saveErrors: Partial<Record<Extract<SaveStatus, string>, string>> = {
+const saveErrors = {
   duplicate: '이미 저장한 상품 링크예요.',
   failed: '저장하지 못했어요. 다시 시도해 주세요.',
   unknown: '저장 결과를 확인할 수 없어요. 다시 저장하기 전 보드를 확인해 주세요.',
   'auth-required': authMessage,
-};
+} satisfies Record<
+  Extract<ProductSaveResult, { status: 'rejected' }>['reason'] | 'unknown',
+  string
+>;
 type InitialDraft = {
   name?: string;
   memo: string;
@@ -256,7 +259,7 @@ function ProductForm({
   const [boardName, setBoardName] = useState<string | null>(null);
   const [boardError, setBoardError] = useState(false);
   const [pending, setPending] = useState<'board' | 'save' | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [saveResult, setSaveResult] = useState<ProductSaveResult | null>(null);
   const [opening, setOpening] = useState<'idle' | 'busy' | 'error'>('idle');
   const boardList = useRef<HTMLUListElement>(null);
   const focusTrigger = useRef<'tag' | 'board' | null>(null);
@@ -280,9 +283,13 @@ function ProductForm({
     selectedTags.length &&
     typeof boards !== 'string' &&
     selectedBoards.length &&
-    (saveStatus === 'idle' || saveStatus === 'failed'),
+    // Only a confirmed no-effect failure may be submitted again.
+    (!saveResult || (saveResult.status === 'rejected' && saveResult.reason === 'failed')),
   );
-  const saveError = typeof saveStatus === 'string' && saveErrors[saveStatus];
+  const saveError =
+    saveResult?.status === 'rejected'
+      ? saveErrors[saveResult.reason]
+      : saveResult?.status === 'unknown' && saveErrors.unknown;
 
   function toggle(selection: string[], value: string) {
     return selection.includes(value)
@@ -333,9 +340,9 @@ function ProductForm({
     if (!canSave || !image || numericPrice === null || busy.current) return;
     busy.current = true;
     setPending('save');
-    setSaveStatus('idle');
+    setSaveResult(null);
     try {
-      setSaveStatus(
+      setSaveResult(
         await api.save({
           url,
           sharedUrl: sourceURL === url ? null : sourceURL,
@@ -350,14 +357,14 @@ function ProductForm({
         }),
       );
     } catch {
-      setSaveStatus('unknown');
+      setSaveResult(unknownOutcome);
     } finally {
       setPending(null);
       busy.current = false;
     }
   }
 
-  if (typeof saveStatus === 'object') {
+  if (saveResult?.status === 'done') {
     return (
       <ScreenShell onClose={onClose} busy={opening === 'busy'}>
         <Toast>{savedMessage}</Toast>
@@ -369,7 +376,7 @@ function ProductForm({
               onClick={async () => {
                 setOpening('busy');
                 try {
-                  await onViewProduct(saveStatus.cardId);
+                  await onViewProduct(saveResult.value.cardId);
                 } catch {
                   setOpening('error');
                 }

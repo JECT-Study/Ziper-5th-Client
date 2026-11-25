@@ -337,7 +337,7 @@ it('requires at least one active board', async () => {
 });
 it('blocks duplicate updates and the header back button until a write settles', async () => {
   const api = createPreviewApi('normal');
-  const pending = deferred<typeof sampleProduct>();
+  const pending = deferred<{ status: 'done'; value: typeof sampleProduct }>();
   const update = vi.spyOn(api, 'update').mockReturnValue(pending.promise);
   const { container } = await edit(api);
   await act(() => {
@@ -347,7 +347,7 @@ it('blocks duplicate updates and the header back button until a write settles', 
   await click(container, '뒤로 가기');
   expect(container.querySelector('h1')?.textContent).toBe('상품 수정');
   expect(update).toHaveBeenCalledOnce();
-  await act(async () => pending.resolve(sampleProduct));
+  await act(async () => pending.resolve({ status: 'done', value: sampleProduct }));
   expect(container.querySelector('h1')?.textContent).toBe('상품 상세');
 });
 it('returns from a normal edit cancel without recording another detail view', async () => {
