@@ -2,11 +2,12 @@ import { expect, it } from 'vitest';
 import {
   alternateProductExtractionURL,
   canonicalProductExtractionURL,
-  productMetadata,
   findSharedURL,
   isProductExtractionURL,
   productShortLinkShop,
-} from './contract';
+  musinsaAppProductURL,
+} from './link';
+import { productMetadata } from './schema';
 
 const ably = 'https://applink.a-bly.com/69ptirx';
 const product = 'https://m.a-bly.com/goods/51978009';
@@ -150,4 +151,20 @@ it('accepts only the exact Ably shortener host for navigation, not as an extract
   expect(isProductExtractionURL(ably, true)).toBe(true);
   expect(isProductExtractionURL(ably)).toBe(false);
   expect(isProductExtractionURL('https://applink.a-bly.com.example.org/69ptirx', true)).toBe(false);
+});
+
+it('resolves only the OneLink app target for an HTTPS Musinsa product', () => {
+  const product = 'https://www.musinsa.com/products/4804589';
+  const target = (link: string) => `musinsaad://web?link=${encodeURIComponent(link)}`;
+  expect(musinsaAppProductURL(target(`${product}?utm_source=share`))).toBe(product);
+  expect(musinsaAppProductURL(target(product.replace('https:', 'http:')))).toBeNull();
+  expect(musinsaAppProductURL(target('https://www.musinsa.com/brand/astorflex'))).toBeNull();
+  expect(musinsaAppProductURL(target('https://m.a-bly.com/goods/51978009'))).toBeNull();
+  expect(
+    musinsaAppProductURL(target(product.replace('www.musinsa.com', 'www.musinsa.com.example.org'))),
+  ).toBeNull();
+  expect(musinsaAppProductURL(target(product) + '&link=' + encodeURIComponent(product))).toBeNull();
+  expect(
+    musinsaAppProductURL(target(product).replace('musinsaad://web', 'musinsaad://other')),
+  ).toBeNull();
 });

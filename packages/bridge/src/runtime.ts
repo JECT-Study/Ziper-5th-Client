@@ -4,7 +4,6 @@ import {
   BridgeError,
   capability,
   methods,
-  productExtractionMaxDuration,
   providers,
   resultSchema,
   sessionSchema,
@@ -21,6 +20,7 @@ import {
   type WebAuthService,
   type WebServices,
 } from './contract';
+import { productExtractionMaxDuration } from '@ziper/product-extraction/link';
 
 export interface RuntimeOptions {
   handshakeTimeoutMs?: number;

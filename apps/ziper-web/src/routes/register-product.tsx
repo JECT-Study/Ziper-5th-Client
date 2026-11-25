@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
-import { findSharedURL } from '@ziper/bridge/contract';
+import { findSharedURL } from '@ziper/product-extraction/link';
 import { Suspense, useState, type SubmitEvent } from 'react';
 import { usePlatform } from '../bridge/provider';
 import { Button, TextField } from '../components';

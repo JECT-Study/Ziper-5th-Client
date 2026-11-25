@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { isProductExtractionURL } from '@ziper/bridge/contract';
+import { isProductExtractionURL } from '@ziper/product-extraction/link';
 import { usePlatform } from '../../bridge/provider';
 import { productSaveApi } from './product-save-api';
 import { productSaveWithExtraction } from './product-extraction';

@@ -1,14 +1,5 @@
-import {
-  ablyAppProductURL,
-  ablyProductRedirectHost,
-  canonicalProductExtractionURL,
-  productMetadata,
-  type Input,
-  type Output,
-} from '@ziper/bridge/contract';
-
-type Shops = Input<'extractProductV1'>['shops'];
-type Metadata = NonNullable<Output<'extractProductV1'>>;
+import { ablyAppProductURL, ablyProductRedirectHost, canonicalProductExtractionURL } from './link';
+import { productMetadata, type ProductMetadata, type Shops } from './schema';
 
 export function productDocumentURL(value: string) {
   const url = new URL(value);
@@ -22,7 +13,7 @@ export function readProductMessage(
   pageURL: string | null,
   shops: Shops,
   requestedURL = pageURL,
-): { documentURL: string; metadata: Metadata; complete: boolean } | null {
+): { documentURL: string; metadata: ProductMetadata; complete: boolean } | null {
   if (data.length > 8_000) return null;
   try {
     const parsed = productMetadata.safeParse(JSON.parse(data));

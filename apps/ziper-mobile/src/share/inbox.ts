@@ -1,4 +1,5 @@
-import { findSharedURL, isShareURL, type IncomingShare } from '@ziper/bridge/contract';
+import type { IncomingShare } from '@ziper/bridge/contract';
+import { findSharedURL, isShareURL } from '@ziper/product-extraction/link';
 import type { SharePayload } from 'expo-sharing';
 
 export const expoShareWakeURL = 'ziper://expo-sharing';

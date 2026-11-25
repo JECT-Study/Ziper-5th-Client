@@ -1,12 +1,9 @@
-import {
-  ablyProductRedirectHost,
-  maxExtractedTitleUnits,
-  productExtractionTimeout,
-  type Input,
-} from '@ziper/bridge/contract';
+import { ablyProductRedirectHost, productExtractionTimeout, shopHosts } from './link';
+import { maxExtractedTitleUnits, type Shops } from './schema';
 
-// Standalone JS for the extraction WebView. Metro/Hermes needn't preserve function source.
-const scanProduct = String.raw`(function (shops, ablyRedirectHost, timeout) {
+// Standalone JS injected into the extraction WebView. It posts {url, name, price, imageURL}
+// snapshots until one is complete. Keep it as source text: Hermes doesn't preserve function source.
+const scanProduct = String.raw`(function (shops, ablyRedirectHost, hosts, timeout) {
   if (window !== window.top) return;
   const host = location.hostname === ablyRedirectHost ? 'm.a-bly.com' : location.hostname;
   const rule = shops.find((shop) => shop.hosts.includes(host));
@@ -25,12 +22,12 @@ const scanProduct = String.raw`(function (shops, ablyRedirectHost, timeout) {
     const price = Number(value.replace(/[,\s원]/g, ''));
     return price <= 1000000000 ? price : null;
   };
-  const musinsaHosts = ['musinsa.com', 'www.musinsa.com', 'm.musinsa.com', 'store.musinsa.com'];
+  const musinsaHosts = hosts.musinsa;
   // Musinsa keeps the submitted path spelling but uses the decimal goods number in Detail and CDN paths.
   const musinsaPath = /^\/(?:products|app\/goods)\/0*([1-9]\d*|0)\/?$/;
   const musinsaId = musinsaHosts.includes(host) && musinsaPath.exec(location.pathname)?.[1];
   const musinsaPageTitle = (value) => value.replace(/\s+-\s+(?:사이즈\s*&\s*)?후기\s*\|\s*무신사\s*$/, '');
-  const zigzagHosts = ['zigzag.kr', 'www.zigzag.kr', 'store.zigzag.kr', 's.zigzag.kr'];
+  const zigzagHosts = hosts.zigzag;
   const zigzagPath = /^\/(?:app\/)?catalog\/products\/(\d+)(?:\/|$)/;
   const zigzagId = zigzagHosts.includes(host) && zigzagPath.exec(location.pathname)?.[1];
   const imageUrl = (value) => {
@@ -53,7 +50,7 @@ const scanProduct = String.raw`(function (shops, ablyRedirectHost, timeout) {
     } catch { return null; }
   };
 
-  const ablyHosts = ['a-bly.com', 'www.a-bly.com', 'm.a-bly.com', ablyRedirectHost];
+  const ablyHosts = hosts.ably;
   const ablyPath = /^\/(?:app\/)?goods\/0*([1-9]\d*|0)\/?$/;
   const ablyId = ablyHosts.includes(host) && /^\/goods\/0*([1-9]\d*|0)(?:\/|$)/.exec(location.pathname)?.[1];
   let ablyUnavailable = false;
@@ -490,9 +487,9 @@ const scanProduct = String.raw`(function (shops, ablyRedirectHost, timeout) {
   setTimeout(() => clearInterval(interval), timeout);
 })`;
 
-export function metadataScript(
-  shops: Input<'extractProductV1'>['shops'],
-  timeout = productExtractionTimeout,
-) {
-  return `${scanProduct}(${JSON.stringify(shops)}, ${JSON.stringify(ablyProductRedirectHost)}, ${timeout}); true;`;
+export function productScanScript(shops: Shops, timeout = productExtractionTimeout) {
+  const args = [shops, ablyProductRedirectHost, shopHosts, timeout].map((arg) =>
+    JSON.stringify(arg),
+  );
+  return `${scanProduct}(${args.join(', ')}); true;`;
 }

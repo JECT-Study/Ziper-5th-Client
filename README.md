@@ -5,6 +5,7 @@
 - `apps/ziper-mobile/`: Expo Router, React Native, Unistyles, Expo UI.
 - `apps/ziper-web/`: TanStack Start/Router, React, Vanilla Extract.
 - `packages/bridge/`: 버전별 계약, 기능 협상, 웹과 네이티브 구현 선택.
+- `packages/product-extraction/`: 쇼핑몰 링크 정규화(`link`), 추출 규칙·결과 스키마(`schema`), 앱 추출 WebView에 주입하는 페이지 스캐너(`scanner`)와 그 메시지 검증(`message`).
 
 ## 개발
 
