@@ -22,6 +22,7 @@ export function errorMessage(error: unknown, fallback: string) {
 type RequestOptions = {
   method?: string;
   body?: unknown;
+  signal?: AbortSignal;
   /** Access Token 을 붙인다. 만료(401)되면 한 번 재발급하고 다시 보낸다. */
   auth?: boolean;
   /**
@@ -33,7 +34,7 @@ type RequestOptions = {
 
 function send(
   path: string,
-  { method = 'GET', body, session }: RequestOptions,
+  { method = 'GET', body, session, signal }: RequestOptions,
   accessToken?: string | null,
 ) {
   const headers: Record<string, string> = {};
@@ -43,6 +44,7 @@ function send(
   return fetch(`${BASE_URL}${path}`, {
     method,
     headers,
+    signal,
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: session ? 'include' : 'same-origin',
   });
@@ -113,6 +115,8 @@ export async function request<T = void>(path: string, options: RequestOptions = 
   const response = await send(path, options, getAccessToken());
   if (response.status !== 401) return parse<T>(response);
 
-  if (!(await refreshAccessToken())) return parse<T>(response);
-  return parse<T>(await send(path, options, getAccessToken()));
+  options.signal?.throwIfAborted();
+  const renewed = await refreshAccessToken();
+  options.signal?.throwIfAborted();
+  return parse<T>(renewed ? await send(path, options, getAccessToken()) : response);
 }

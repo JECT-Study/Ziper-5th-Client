@@ -10,4 +10,4 @@
 
 ## 상품 상세·상태 관리 (JEC-23)
 
-`@ziper/api/product-detail`은 현재 서버 PRD·V6 스키마와 예정 API를 참고한 클라이언트 인터페이스입니다. 조사 시점의 develop과 열린 PR에는 상품 상세 HTTP Controller/DTO가 없어 HTTP 어댑터는 연결하지 않습니다. 타입 근거, 개발 프리뷰, 검증 및 연동 전 확인할 내용은 [JEC-23 문서](../../docs/jec-23-product-detail.md)를 참고하세요.
+`@ziper/api/product-detail`은 클라이언트 인터페이스입니다. 웹 어댑터가 배포된 상세·수정·보드 조회·원본 이동 API의 응답을 이 인터페이스로 변환합니다. 구매 동작은 서버 배포 전까지 개발 프리뷰에만 제공됩니다. 계약과 검증 방법은 [JEC-23 문서](../../docs/jec-23-product-detail.md)를 참고하세요.

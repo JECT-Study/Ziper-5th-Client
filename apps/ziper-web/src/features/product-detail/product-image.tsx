@@ -17,8 +17,11 @@ export function ProductImage({
   product: ProductDetail;
   purchased?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  const unavailable = !product.isLinkValid;
+  const [failedUrls, setFailedUrls] = useState<string[]>([]);
+  const image = [product.imageFileUrl, product.imageUrl].find(
+    (url) => url !== null && !failedUrls.includes(url),
+  );
+  const unavailable = product.linkStatus === 'REMOVED';
   const template = product.fallbackIcon ? templates[product.fallbackIcon] : null;
   return (
     <figure className={styles.imageGroup}>
@@ -34,12 +37,13 @@ export function ProductImage({
             <img className={styles.unavailableIcon} src={unavailableTop} alt="" />
             <span className={styles.unavailableLabel}>원본 상품에 접근할 수 없어요</span>
           </>
-        ) : product.imageUrl && !failed ? (
+        ) : image ? (
           <img
+            key={image}
             className={styles.photo}
-            src={product.imageUrl}
+            src={image}
             alt={product.productTitle}
-            onError={() => setFailed(true)}
+            onError={() => setFailedUrls((urls) => [...urls, image])}
           />
         ) : template ? (
           <img
@@ -55,9 +59,11 @@ export function ProductImage({
         <figcaption className={styles.caption}>
           {unavailable
             ? '접근불가 · 저장한 정보는 보관돼요'
-            : product.imageUrl && !failed
+            : image
               ? '저장한 상품 이미지'
-              : '도안 · 카드 이미지'}
+              : template
+                ? '도안 · 카드 이미지'
+                : '카드 이미지'}
         </figcaption>
       )}
     </figure>

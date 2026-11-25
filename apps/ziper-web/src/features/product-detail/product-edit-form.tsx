@@ -1,5 +1,6 @@
 import {
   ProductDetailError,
+  type FallbackIcon,
   type ProductBoard,
   type ProductDetail,
   type ProductDetailApi,
@@ -16,12 +17,14 @@ export function ProductEditForm({
   onSaved,
   onCancel,
   onBusyChange,
+  onReconcile,
 }: {
   product: ProductDetail;
   api: ProductDetailApi;
   onSaved: (product: ProductDetail) => void;
   onCancel: () => void;
   onBusyChange: (busy: boolean) => void;
+  onReconcile: () => void;
 }) {
   const [title, setTitle] = useState(product.productTitle);
   const [price, setPrice] = useState(product.price?.toString() ?? '');
@@ -29,7 +32,7 @@ export function ProductEditForm({
   const [tags, setTags] = useState(product.tags.join(', '));
   const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.id));
   const [boards, setBoards] = useState<readonly ProductBoard[] | null>(null);
-  const [image, setImage] = useState('keep');
+  const [image, setImage] = useState<'keep' | FallbackIcon>('keep');
   const [status, setStatus] = useState<'idle' | 'saving' | 'unknown'>('idle');
   const [error, setError] = useState('');
   const [attempt, retry] = useState(0);
@@ -63,9 +66,11 @@ export function ProductEditForm({
         .filter(Boolean),
     ),
   ];
-  const amount = price.trim() ? parseWholeWon(price) : null;
-  const invalidPrice = Boolean(price.trim()) && amount === null;
-  const invalidTags = parsedTags.some((tag) => tag.length > 64);
+  const amount = parseWholeWon(price);
+  const invalidPrice = amount === null || amount > 1_000_000_000;
+  const invalidTags = parsedTags.some((tag) => [...tag].length > 6);
+  const missingImage =
+    image === 'keep' && !product.imageUrl && !product.imageFileId && !product.fallbackIcon;
   const invalidBoards =
     !boards || !boardIds.length || boardIds.some((id) => !boards.some((board) => board.id === id));
   const valid =
@@ -73,13 +78,15 @@ export function ProductEditForm({
     title.trim().length <= 200 &&
     memo.length <= 100 &&
     !invalidPrice &&
+    parsedTags.length > 0 &&
     !invalidTags &&
+    !missingImage &&
     !invalidBoards;
   const locked = status !== 'idle';
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!valid || busy.current) return;
+    if (!valid || amount === null || busy.current) return;
     busy.current = true;
     setStatus('saving');
     onBusyChange(true);
@@ -93,12 +100,7 @@ export function ProductEditForm({
       boardIds,
       imageUrl: image === 'keep' ? product.imageUrl : null,
       imageFileId: image === 'keep' ? product.imageFileId : null,
-      fallbackIcon:
-        image === 'keep'
-          ? product.fallbackIcon
-          : image === 'none'
-            ? null
-            : (image as ProductUpdate['fallbackIcon']),
+      fallbackIcon: image === 'keep' ? product.fallbackIcon : image,
     };
     try {
       const updated = await api.update(product.cardId, input);
@@ -112,13 +114,15 @@ export function ProductEditForm({
             ? '로그인한 뒤 다시 수정해 주세요.'
             : reason.code === 'not-found' || reason.code === 'forbidden'
               ? '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.'
-              : '수정하지 못했어요. 다시 시도해 주세요.',
+              : (reason.detail ?? '수정하지 못했어요. 다시 시도해 주세요.'),
         );
         const retryable = reason.code === 'failed' || reason.code === 'auth-required';
         setStatus(retryable ? 'idle' : 'unknown');
         busy.current = !retryable;
+        if (!retryable) onReconcile();
       } else {
         setStatus('unknown');
+        onReconcile();
         setError('수정 결과를 확인할 수 없어요. 다시 제출하지 말고 상세 화면에서 확인해 주세요.');
       }
     }
@@ -142,8 +146,11 @@ export function ProductEditForm({
           inputMode="numeric"
           value={price}
           onChange={(event) => setPrice(event.target.value)}
-          error={invalidPrice && '0 이상의 원 단위 정수를 입력해 주세요. (최대 10자리)'}
-          helperText="입력하지 않으면 가격 없이 저장해요."
+          required
+          error={
+            price.trim() !== '' && invalidPrice && '0원부터 10억원까지의 정수를 입력해 주세요.'
+          }
+          helperText="0원부터 10억원까지 입력할 수 있어요."
         />
         <TextField
           variant="box"
@@ -177,18 +184,18 @@ export function ProductEditForm({
           label="해시태그"
           value={tags}
           onChange={(event) => setTags(event.target.value)}
-          helperText="쉼표로 구분해 입력해 주세요."
-          error={invalidTags && '태그 하나는 최대 64자까지 입력할 수 있어요.'}
+          required
+          helperText="해시태그를 1개 이상 입력해 주세요. 여러 개는 쉼표로 구분해요."
+          error={invalidTags && '태그 하나는 최대 6자까지 입력할 수 있어요.'}
         />
         <label className={styles.legend}>
           카드 이미지
           <select
             className={styles.select}
             value={image}
-            onChange={(event) => setImage(event.target.value)}
+            onChange={(event) => setImage(event.target.value as typeof image)}
           >
             <option value="keep">기존 이미지 유지</option>
-            <option value="none">이미지 없음</option>
             <option value="TOP">상의</option>
             <option value="PANTS">바지</option>
             <option value="SKIRT">스커트</option>
@@ -196,6 +203,7 @@ export function ProductEditForm({
             <option value="BEAUTY">뷰티</option>
           </select>
         </label>
+        {missingImage && <p className={styles.error}>카드 이미지 도안을 선택해 주세요.</p>}
       </fieldset>
       <fieldset className={styles.fieldset} disabled={locked}>
         <legend className={styles.legend}>담을 보드 (1개 이상)</legend>
