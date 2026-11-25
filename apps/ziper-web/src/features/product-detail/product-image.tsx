@@ -1,4 +1,5 @@
 import type { ProductDetail } from '@ziper/api/product-detail';
+import type { FallbackIcon } from '@ziper/api/product-fields';
 import { useState } from 'react';
 import top from '../../assets/product-detail/top.svg';
 import purchasedTop from '../../assets/product-detail/purchased-top.svg';
@@ -9,7 +10,13 @@ import accessory from '../../assets/product-save/accessory.png';
 import beauty from '../../assets/product-save/beauty.png';
 import * as styles from './product-detail.css';
 
-const templates = { TOP: top, PANTS: pants, SKIRT: skirt, ACCESSORY: accessory, BEAUTY: beauty };
+const templates: Record<FallbackIcon, string> = {
+  TOP: top,
+  PANTS: pants,
+  SKIRT: skirt,
+  ACCESSORY: accessory,
+  BEAUTY: beauty,
+};
 export function ProductImage({
   product,
   purchased = false,

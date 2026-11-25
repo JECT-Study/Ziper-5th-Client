@@ -1,7 +1,8 @@
+import type { FallbackIcon } from './product-fields';
+
 /** Client-facing types; the web adapter maps the deployed HTTP contract to this shape. */
 export type ProductStatus = 'PLANNED' | 'PURCHASED';
 export type ProductLinkStatus = 'AVAILABLE' | 'SOLD_OUT' | 'REMOVED' | 'UNKNOWN';
-export type FallbackIcon = 'TOP' | 'PANTS' | 'SKIRT' | 'ACCESSORY' | 'BEAUTY';
 export type ProductBoard = { id: string; name: string };
 
 export type ProductDetail = {

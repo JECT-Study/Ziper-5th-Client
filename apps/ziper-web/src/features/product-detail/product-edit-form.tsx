@@ -1,6 +1,5 @@
 import {
   ProductDetailError,
-  type FallbackIcon,
   type ProductBoard,
   type ProductDetail,
   type ProductDetailApi,
@@ -8,8 +7,26 @@ import {
 } from '@ziper/api/product-detail';
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { Button, ChipFilter, TextField } from '../../components';
-import { parseWholeWon } from '../product-save/price';
+import {
+  codePointLength,
+  normalizeTag,
+  parseWholeWon,
+  priceRangeMessage,
+  productLimits,
+  fallbackIcons,
+  seasonTags,
+  titleLengthMessage,
+  type FallbackIcon,
+} from '@ziper/api/product-fields';
 import * as styles from './product-detail.css';
+
+const iconLabels: Record<FallbackIcon, string> = {
+  TOP: '상의',
+  PANTS: '바지',
+  SKIRT: '스커트',
+  ACCESSORY: '패션잡화',
+  BEAUTY: '뷰티',
+};
 
 export function ProductEditForm({
   product,
@@ -58,26 +75,19 @@ export function ProductEditForm({
     };
   }, [api, attempt]);
 
-  const parsedTags = [
-    ...new Set(
-      tags
-        .split(',')
-        .map((tag) => tag.trim().replace(/^#+/, '').trim())
-        .filter(Boolean),
-    ),
-  ];
+  const parsedTags = [...new Set(tags.split(',').map(normalizeTag).filter(Boolean))];
   const amount = parseWholeWon(price);
-  const invalidPrice = amount === null || amount > 1_000_000_000;
-  const invalidTags = parsedTags.some((tag) => [...tag].length > 6);
+  const invalidPrice = amount === null;
+  const invalidTags = parsedTags.some((tag) => codePointLength(tag) > productLimits.tagLength);
   const missingImage =
     image === 'keep' && !product.imageUrl && !product.imageFileId && !product.fallbackIcon;
   const invalidBoards =
     !boards || !boardIds.length || boardIds.some((id) => !boards.some((board) => board.id === id));
-  const titleLength = [...title.trim()].length;
+  const titleLength = codePointLength(title.trim());
   const valid =
     titleLength > 0 &&
-    titleLength <= 200 &&
-    memo.length <= 100 &&
+    titleLength <= productLimits.titleLength &&
+    memo.length <= productLimits.memoLength &&
     !invalidPrice &&
     parsedTags.length > 0 &&
     !invalidTags &&
@@ -137,8 +147,8 @@ export function ProductEditForm({
           label="상품명"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          helperText={`${titleLength}/200`}
-          error={titleLength > 200 && '상품명은 200자까지 저장할 수 있어요. 줄여 주세요.'}
+          helperText={`${titleLength}/${productLimits.titleLength}`}
+          error={titleLength > productLimits.titleLength && titleLengthMessage}
           required
         />
         <TextField
@@ -148,9 +158,7 @@ export function ProductEditForm({
           value={price}
           onChange={(event) => setPrice(event.target.value)}
           required
-          error={
-            price.trim() !== '' && invalidPrice && '0원부터 10억원까지의 정수를 입력해 주세요.'
-          }
+          error={price.trim() !== '' && invalidPrice && priceRangeMessage}
           helperText="0원부터 10억원까지 입력할 수 있어요."
         />
         <TextField
@@ -158,11 +166,11 @@ export function ProductEditForm({
           label="한 줄 메모"
           value={memo}
           onChange={(event) => setMemo(event.target.value)}
-          maxLength={100}
+          maxLength={productLimits.memoLength}
           showCounter
         />
         <div className={styles.chips} role="group" aria-label="계절 태그">
-          {['봄', '여름', '가을', '겨울'].map((season) => (
+          {seasonTags.map((season) => (
             <ChipFilter
               key={season}
               className={styles.choice}
@@ -197,11 +205,11 @@ export function ProductEditForm({
             onChange={(event) => setImage(event.target.value as typeof image)}
           >
             <option value="keep">기존 이미지 유지</option>
-            <option value="TOP">상의</option>
-            <option value="PANTS">바지</option>
-            <option value="SKIRT">스커트</option>
-            <option value="ACCESSORY">패션잡화</option>
-            <option value="BEAUTY">뷰티</option>
+            {fallbackIcons.map((icon) => (
+              <option key={icon} value={icon}>
+                {iconLabels[icon]}
+              </option>
+            ))}
           </select>
         </label>
         {missingImage && <p className={styles.error}>카드 이미지 도안을 선택해 주세요.</p>}

@@ -1,4 +1,4 @@
-import type { FallbackIcon } from './product-detail';
+import type { FallbackIcon } from './product-fields';
 
 export type BoardSummary = { id: string; name: string; productCount: number };
 

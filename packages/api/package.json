@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./product-save": "./src/product-save.ts",
-    "./product-detail": "./src/product-detail.ts"
+    "./product-detail": "./src/product-detail.ts",
+    "./product-fields": "./src/product-fields.ts"
   }
 }

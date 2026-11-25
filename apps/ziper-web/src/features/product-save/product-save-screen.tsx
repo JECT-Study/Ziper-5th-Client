@@ -20,18 +20,27 @@ import {
   TextField,
   Toast,
 } from '../../components';
+import {
+  codePointLength,
+  normalizeTag,
+  parseWholeWon,
+  priceRangeMessage,
+  productLimits,
+  seasonTags,
+  titleLengthMessage,
+  type FallbackIcon,
+} from '@ziper/api/product-fields';
 import { InlineEntry } from './inline-entry';
-import { parseWholeWon } from './price';
 import * as styles from './product-save.css';
 
-const initialTags = ['봄', '여름', '가을', '겨울'];
-const templates = [
+const initialTags: readonly string[] = seasonTags;
+const templates: readonly { id: FallbackIcon; label: string; src: string }[] = [
   { id: 'TOP', label: '상의', src: tops },
   { id: 'PANTS', label: '하의', src: pants },
   { id: 'SKIRT', label: '스커트', src: skirt },
   { id: 'ACCESSORY', label: '패션잡화', src: accessory },
   { id: 'BEAUTY', label: '뷰티', src: beauty },
-] as const;
+];
 const imageModes = [
   { value: 'upload', label: '이미지 불러오기' },
   { value: 'template', label: '도안 고르기' },
@@ -283,7 +292,7 @@ function ProductForm({
   const boardList = useRef<HTMLUListElement>(null);
   const focusTrigger = useRef<'tag' | 'board' | null>(null);
   const busy = useRef(false);
-  const tagName = tag?.trim().replace(/^#+/, '').trim();
+  const tagName = tag === null ? undefined : normalizeTag(tag);
   const newBoardName = boardName?.trim();
   const canAddTag = Boolean(tagName && !tags.includes(tagName));
   const canCreateBoard = Boolean(
@@ -292,8 +301,8 @@ function ProductForm({
     !boards.some((board) => board.name === newBoardName),
   );
   const numericPrice = parseWholeWon(price);
-  const invalidPrice = numericPrice === null || numericPrice > 1_000_000_000;
-  const invalidName = [...name.trim()].length > 200;
+  const invalidPrice = numericPrice === null;
+  const invalidName = codePointLength(name.trim()) > productLimits.titleLength;
   const canSave = Boolean(
     name.trim() &&
     !invalidName &&
@@ -471,7 +480,7 @@ function ProductForm({
             value={name}
             onChange={(event) => setName(event.target.value)}
             onClear={() => setName('')}
-            error={invalidName && '상품명은 200자까지 저장할 수 있어요. 줄여 주세요.'}
+            error={invalidName && titleLengthMessage}
             required
           />
           <TextField
@@ -480,9 +489,7 @@ function ProductForm({
             value={price}
             inputMode="numeric"
             placeholder="ex)10,000원"
-            error={
-              Boolean(price.trim()) && invalidPrice && '0원부터 10억원까지의 정수를 입력해 주세요.'
-            }
+            error={Boolean(price.trim()) && invalidPrice && priceRangeMessage}
             onChange={(event) => setPrice(event.target.value)}
             onBlur={() => {
               if (!invalidPrice && numericPrice !== null) setPrice(won.format(numericPrice));
@@ -532,7 +539,7 @@ function ProductForm({
               <InlineEntry
                 label="새 해시태그"
                 value={tag}
-                maxLength={6}
+                maxLength={productLimits.tagLength}
                 action="추가"
                 disabled={!canAddTag}
                 onChange={setTag}
@@ -547,7 +554,7 @@ function ProductForm({
             value={memo}
             onChange={(event) => setMemo(event.target.value)}
             onClear={() => setMemo('')}
-            maxLength={100}
+            maxLength={productLimits.memoLength}
           />
           <section className={styles.group} aria-label="보드 선택">
             <p className={styles.label}>보드 선택 (1개 이상)</p>
@@ -608,7 +615,7 @@ function ProductForm({
                       <InlineEntry
                         label="새 보드 이름"
                         value={boardName}
-                        maxLength={10}
+                        maxLength={productLimits.boardNameLength}
                         action="완료"
                         variant="secondary"
                         placeholder="보드 이름"

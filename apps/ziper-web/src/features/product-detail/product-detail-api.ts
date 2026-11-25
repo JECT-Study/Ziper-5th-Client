@@ -15,6 +15,7 @@ import {
   text,
   url,
 } from '../../shared/api/response';
+import { fallbackIcons, isValidPrice } from '@ziper/api/product-fields';
 
 const products = '/api/v1/products';
 
@@ -30,15 +31,7 @@ function decodeBoard(value: unknown): ProductBoard {
 function decodeProduct(value: unknown, cardId: string): ProductDetail {
   const card = object(value);
   const price = card.price;
-  if (
-    id(card.cardId) !== cardId ||
-    typeof price !== 'number' ||
-    !Number.isInteger(price) ||
-    price < 0 ||
-    price > 1_000_000_000
-  ) {
-    invalidResponse();
-  }
+  if (id(card.cardId) !== cardId || !isValidPrice(price)) invalidResponse();
   return {
     cardId,
     productUrl: url(card.productUrl),
@@ -49,10 +42,7 @@ function decodeProduct(value: unknown, cardId: string): ProductDetail {
     imageUrl: nullable(url, card.imageUrl),
     imageFileId: nullable(id, card.imageFileId),
     imageFileUrl: nullable(url, card.imageFileUrl),
-    fallbackIcon:
-      card.fallbackIcon === null
-        ? null
-        : choice(card.fallbackIcon, ['TOP', 'PANTS', 'SKIRT', 'ACCESSORY', 'BEAUTY']),
+    fallbackIcon: card.fallbackIcon === null ? null : choice(card.fallbackIcon, fallbackIcons),
     status: choice(card.status, ['PLANNED', 'PURCHASED']),
     linkStatus: choice(object(card.link).status, ['AVAILABLE', 'SOLD_OUT', 'REMOVED', 'UNKNOWN']),
     tags: list(card.tags).map((tag) => text(object(tag).title)),

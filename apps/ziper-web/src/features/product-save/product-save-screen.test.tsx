@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ProductSaveScreen } from './product-save-screen';
-import { parseWholeWon } from './price';
+import { parseWholeWon } from '@ziper/api/product-fields';
 import { ConnectedProductSave } from './connected-product-save';
 import { productSaveApi } from './product-save-api';
 import type { RuntimeStatus } from '@ziper/bridge/contract';
@@ -97,13 +97,9 @@ it.each(['ready', 'pending'])('does not start a manual lookup on pagehide: %s', 
 });
 
 it('accepts whole won amounts without turning malformed input into a different price', () => {
-  expect(['0', ' 45,900 ', '1e3', '1,2', '-50'].map(parseWholeWon)).toEqual([
-    0,
-    45900,
-    null,
-    null,
-    null,
-  ]);
+  expect(
+    ['0', ' 45,900 ', '1e3', '1,2', '-50', '1,000,000,000', '1000000001'].map(parseWholeWon),
+  ).toEqual([0, 45900, null, null, null, 1_000_000_000, null]);
 });
 
 const sendForm = () =>
