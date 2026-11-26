@@ -10,7 +10,11 @@ import type { BridgeDelegate } from '@webview-bridge/react-native';
 import type { NativeBridge } from '@ziper/bridge/native';
 import RootLayout from '../src/app/_layout';
 import HomeRoute from '../src/app/index';
-import WebRoute from '../src/app/web';
+import CatchAllRoute from '../src/app/[...path]';
+import BoardRoute from '../src/app/boards/[boardId]';
+import ProductRoute from '../src/app/products/[cardId]';
+import NewProductRoute from '../src/app/products/new';
+import SharedProductRoute from '../src/app/products/shared';
 import { redirectSystemPath } from '../src/app/+native-intent';
 
 const sharing = vi.hoisted(() => ({
@@ -77,21 +81,26 @@ vi.mock('@expo/ui', () => ({
 const routes = {
   _layout: RootLayout,
   index: HomeRoute,
-  web: WebRoute,
+  '[...path]': CatchAllRoute,
+  'boards/[boardId]': BoardRoute,
+  'products/[cardId]': ProductRoute,
+  'products/new': NewProductRoute,
+  'products/shared': SharedProductRoute,
   '+native-intent': { redirectSystemPath },
 };
 
 it.each([
-  ['/products/1?preview=normal', 24],
-  ['/register-product?step=details', 0],
-  ['/share-product', 0],
+  ['/products/1', 24],
+  ['/products/new?step=details', 0],
+  ['/products/shared', 0],
+  ['/boards/1', 24],
   ['/', 24],
 ] as const)('preserves the top safe area for %s', async (path, paddingTop) => {
   const insets = vi
     .spyOn(SafeArea, 'useSafeAreaInsets')
     .mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
   try {
-    await renderRouter(routes, { initialUrl: '/web?path=' + encodeURIComponent(path) });
+    await renderRouter(routes, { initialUrl: path });
     // Android WebView 는 env(safe-area-inset-top) 을 스스로 주므로 네이티브 여백을 두지 않는다.
     expect(screen.getByText(/^WebView:/).parent?.props.style).toMatchObject({
       paddingTop: Platform.OS === 'android' ? 0 : paddingTop,
@@ -135,7 +144,7 @@ it('keeps a cold-start share across native screens and only lets the focused scr
   const share = { id: 'share-1', url: 'https://example.com/product?x=1' };
   expect(await home.shareReadV1()).toEqual(success(share));
   expect(sharing.payloads).toEqual([]);
-  await act(() => router.push({ pathname: '/web', params: { path: '/product' } }));
+  await act(() => router.push('/product'));
   expect(await home.shareDismissV1({ id: share.id })).toMatchObject({ ok: false });
   const product = mockWebView.delegate!;
   expect(await product.shareReadV1()).toEqual(success(share));
@@ -144,7 +153,7 @@ it('keeps a cold-start share across native screens and only lets the focused scr
 });
 
 it('advertises product extraction and runs it through the screen bridge', async () => {
-  await renderRouter(routes, { initialUrl: '/web?path=%2Fregister-product' });
+  await renderRouter(routes, { initialUrl: '/products/new' });
   const page = mockWebView.delegate!;
   expect(await page.getBridgeInfoV1()).toMatchObject({
     value: { capabilities: expect.arrayContaining([capability.productExtraction]) },
@@ -191,20 +200,20 @@ afterEach(() => {
 
 it('resolves a deep link and passes its decoded path to the web screen', async () => {
   expect(Platform.OS).toBe(process.env.TEST_NATIVE_PLATFORM);
-  const rendered = await renderRouter(routes, { initialUrl: '/web?path=%2Fitems%3Ftab%3Dall' });
-  expect(rendered.getPathname()).toBe('/web');
-  expect(rendered.getSearchParams()).toEqual({ path: '/items?tab=all' });
+  const rendered = await renderRouter(routes, { initialUrl: '/items?tab=all' });
+  expect(rendered.getPathname()).toBe('/items');
+  expect(rendered.getSearchParams()).toMatchObject({ tab: 'all' });
   expect(screen.getByText(/WebView: .*\/items\?tab=all$/)).toBeTruthy();
 });
 
 it('pushes, replaces and goes back without retaining the replaced screen', async () => {
   const rendered = await renderRouter(routes);
   expect(screen.getByText(/WebView: .*\/$/)).toBeTruthy();
-  await act(() => router.push({ pathname: '/web', params: { path: '/first' } }));
+  await act(() => router.push('/first'));
   expect(screen.getByText(/WebView: .*\/first$/)).toBeTruthy();
   expect(router.canGoBack()).toBe(true);
-  await act(() => router.replace({ pathname: '/web', params: { path: '/second' } }));
-  expect(rendered.getSearchParams()).toEqual({ path: '/second' });
+  await act(() => router.replace('/second'));
+  expect(rendered.getPathname()).toBe('/second');
   expect(screen.getByText(/WebView: .*\/second$/)).toBeTruthy();
   await act(() => router.back());
   expect(rendered.getPathname()).toBe('/');
@@ -221,7 +230,7 @@ it('navigates the real WebScreen Stack through its bridge delegate', async () =>
     expect(await home.navigationPushV1(push)).toEqual(success({ handled: true }));
     expect(await home.navigationPushV1(push)).toEqual(success({ handled: true }));
   });
-  expect(rendered.getSearchParams()).toEqual({ path: '/first' });
+  expect(rendered.getPathname()).toBe('/first');
   expect(screen.getByText(/WebView: .*\/first$/)).toBeTruthy();
   expect(await home.navigationPushV1({ path: '/stale', operationId: 'stale-1' })).toEqual({
     ok: false,
@@ -233,7 +242,7 @@ it('navigates the real WebScreen Stack through its bridge delegate', async () =>
       success({ handled: true }),
     );
   });
-  expect(rendered.getSearchParams()).toEqual({ path: '/second' });
+  expect(rendered.getPathname()).toBe('/second');
   expect(screen.getByText(/WebView: .*\/second$/)).toBeTruthy();
   expect(
     await mockWebView.delegate!.navigationPushV1({ path: '//evil.test', operationId: 'bad-1' }),
@@ -241,7 +250,7 @@ it('navigates the real WebScreen Stack through its bridge delegate', async () =>
     ok: false,
     error: { code: 'INVALID_REQUEST' },
   });
-  expect(rendered.getSearchParams()).toEqual({ path: '/second' });
+  expect(rendered.getPathname()).toBe('/second');
   await act(async () => {
     expect(await mockWebView.delegate!.navigationBackV1()).toEqual(success({ handled: true }));
   });
@@ -257,10 +266,10 @@ it.each(['web close', 'native Back'])(
     const home = mockWebView.delegate!;
     await act(async () => {
       expect(
-        await home.navigationPushV1({ path: '/share-product', operationId: 'share-open' }),
+        await home.navigationPushV1({ path: '/products/shared', operationId: 'share-open' }),
       ).toEqual(success({ handled: true }));
     });
-    expect(rendered.getSearchParams()).toEqual({ path: '/share-product' });
+    expect(rendered.getPathname()).toBe('/products/shared');
     const save = mockWebView.delegate!;
     sharing.payloads = [{ shareType: 'url', value: 'https://example.com/second' }];
     await act(() => {
@@ -288,17 +297,17 @@ it('returns through the in-app registration history without consuming a queued s
   const rendered = await renderRouter(routes);
   const home = mockWebView.delegate!;
   await act(async () => {
-    expect(
-      await home.navigationPushV1({ path: '/register-product', operationId: 'register' }),
-    ).toEqual(success({ handled: true }));
+    expect(await home.navigationPushV1({ path: '/products/new', operationId: 'register' })).toEqual(
+      success({ handled: true }),
+    );
   });
   const registration = mockWebView.delegate!;
-  expect(rendered.getSearchParams()).toEqual({ path: '/register-product' });
+  expect(rendered.getPathname()).toBe('/products/new');
   await act(async () => {
     await registration.navigationSetWebHistoryV1({ depth: 1 });
     expect(await registration.navigationBackV1()).toEqual(success({ handled: true }));
   });
-  expect(rendered.getSearchParams()).toEqual({ path: '/register-product' });
+  expect(rendered.getPathname()).toBe('/products/new');
   await act(async () => {
     await registration.navigationSetWebHistoryV1({ depth: 0 });
     expect(await registration.navigationBackV1()).toEqual(success({ handled: true }));
@@ -311,9 +320,10 @@ it('returns through the in-app registration history without consuming a queued s
 
 it('returns home when registration is the first native screen', async () => {
   const rendered = await renderRouter(routes, {
-    initialUrl: '/web?path=%2Fregister-product%3Fstep%3Ddetails',
+    initialUrl: '/products/new?step=details',
   });
-  expect(rendered.getSearchParams()).toEqual({ path: '/register-product?step=details' });
+  expect(rendered.getPathname()).toBe('/products/new');
+  expect(rendered.getSearchParams()).toEqual({ step: 'details' });
   await act(async () => {
     expect(await mockWebView.delegate!.navigationBackV1()).toEqual(success({ handled: true }));
   });
@@ -353,7 +363,7 @@ it.each(['sheet dismiss', 'bridge back', 'route blur'] as const)(
   'cancels the native sheet on %s',
   async (mode) => {
     const rendered = await renderRouter(routes);
-    await act(() => router.push({ pathname: '/web', params: { path: '/design-system' } }));
+    await act(() => router.push('/design-system'));
     const page = mockWebView.delegate!;
     let result!: ReturnType<typeof page.sheetActionsV1>;
     await act(async () => {
@@ -365,18 +375,18 @@ it.each(['sheet dismiss', 'bridge back', 'route blur'] as const)(
       await act(async () => {
         expect(await page.navigationBackV1()).toEqual(success({ handled: true }));
       });
-      expect(rendered.getSearchParams()).toEqual({ path: '/design-system' });
+      expect(rendered.getPathname()).toBe('/design-system');
     } else {
-      await act(() => router.push({ pathname: '/web', params: { path: '/other' } }));
-      expect(rendered.getSearchParams()).toEqual({ path: '/other' });
+      await act(() => router.push('/other'));
+      expect(rendered.getPathname()).toBe('/other');
     }
     await expect(result).resolves.toEqual(success({ status: 'cancelled' }));
     expect(screen.queryByText('작업 선택')).toBeNull();
   },
 );
 
-it('refuses an external path supplied through a deep link', async () => {
-  await renderRouter(routes, { initialUrl: '/web?path=%2F%2Fevil.test' });
-  expect(screen.getByText('잘못된 화면 주소예요.')).toBeTruthy();
-  expect(mockWebView.delegate).toBeNull();
+it('keeps an encoded external-looking deep link on the service origin', async () => {
+  await renderRouter(routes, { initialUrl: '/%2F%2Fevil.test' });
+  expect(screen.getByText(/^WebView: /).props.children.join('')).not.toMatch(/evil\.test\//);
+  expect(screen.queryByText(/WebView: https?:\/\/evil\.test/)).toBeNull();
 });

@@ -93,7 +93,7 @@ export function BoardsScreen() {
                 // TODO: 구매 완료 목록 API(JEC-79)가 배포되면 purchasesEnabled 를 켠다.
                 onOpen={() =>
                   purchasesEnabled
-                    ? void navigate({ to: '/products/purchased', search: { sort: undefined } })
+                    ? void navigate({ to: '/boards/purchased', search: { sort: undefined } })
                     : showToast('구매 완료 목록은 준비 중이에요')
                 }
                 onMore={() => showToast('구매 완료 목록은 수정하거나 삭제할 수 없어요')}
@@ -120,7 +120,7 @@ export function BoardsScreen() {
         onAdd={
           status === 'initializing'
             ? undefined
-            : () => void platform.navigation.push('/register-product').catch(() => {})
+            : () => void platform.navigation.push('/products/new').catch(() => {})
         }
       />
       {create.sheet}

@@ -6,7 +6,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fproducts%2F7
+      LINK: ziper://products/7
 - extendedWaitUntil:
     visible: 오버핏 울 블렌드 니트 가디건
     timeout: 15000

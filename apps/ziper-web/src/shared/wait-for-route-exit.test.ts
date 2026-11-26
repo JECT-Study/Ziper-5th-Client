@@ -6,7 +6,7 @@ afterEach(() => vi.useRealTimers());
 
 it('waits for the route to change, ignoring a temporary entry on the same route', async () => {
   const history = createMemoryHistory({
-    initialEntries: ['/boards/1?sort=PRICE_ASC', '/products/purchased', '/products/purchased'],
+    initialEntries: ['/boards/1?sort=PRICE_ASC', '/boards/purchased', '/boards/purchased'],
   });
   const exited = vi.fn();
   const pending = waitForRouteExit(history, () => history.back()).then(exited);
@@ -20,7 +20,7 @@ it('waits for the route to change, ignoring a temporary entry on the same route'
 
 it('reports an ignored traversal without attempting a second Back', async () => {
   vi.useFakeTimers();
-  const history = createMemoryHistory({ initialEntries: ['/boards', '/products/purchased'] });
+  const history = createMemoryHistory({ initialEntries: ['/boards', '/boards/purchased'] });
   const traverse = vi.fn();
   const pending = waitForRouteExit(history, traverse);
   await vi.advanceTimersByTimeAsync(1_200);

@@ -34,7 +34,7 @@ export function useIncomingShare({ keepFirst = false } = {}) {
 
 export function ShareEntry() {
   const isSaveScreen = useRouterState({
-    select: (state) => state.location.pathname === '/share-product',
+    select: (state) => state.location.pathname === '/products/shared',
   });
   return isSaveScreen ? null : <OpenIncomingShare />;
 }
@@ -46,7 +46,7 @@ function OpenIncomingShare() {
   useEffect(() => {
     if (!share || attempted.current === share.id) return;
     attempted.current = share.id;
-    void platform.navigation.push('/share-product').catch(() => {
+    void platform.navigation.push('/products/shared').catch(() => {
       if (attempted.current === share.id) attempted.current = null;
     });
   }, [platform, share]);

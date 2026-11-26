@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { BridgeError } from '@ziper/bridge/contract';
-import { usePlatform } from '../bridge/provider';
-import { useIncomingShare } from '../features/product-save/incoming-share';
-import { ConnectedProductSave } from '../features/product-save/connected-product-save';
-import { ScreenShell } from '../features/product-save/product-save-screen';
+import { usePlatform } from '../../../bridge/provider';
+import { useIncomingShare } from '../../../features/product-save/incoming-share';
+import { ConnectedProductSave } from '../../../features/product-save/connected-product-save';
+import { ScreenShell } from '../../../features/product-save/product-save-screen';
 
-export const Route = createFileRoute('/share-product')({
+export const Route = createFileRoute('/_app/products/shared')({
   component: Incoming,
 });
 

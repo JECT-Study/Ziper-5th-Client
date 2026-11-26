@@ -1,10 +1,10 @@
 import { createFileRoute, useLocation, useRouter } from '@tanstack/react-router';
-import { usePlatform } from '../bridge/provider';
-import type { ProductSort } from '../features/product-detail/product-sort';
-import { ProductDetailScreen } from '../features/product-detail/product-detail-screen';
-import { purchasesEnabled } from '../features/product-detail/purchases';
-import { discardStaleBackLayer } from '../shared/use-back-layer';
-import { waitForRouteExit } from '../shared/wait-for-route-exit';
+import { usePlatform } from '../../../bridge/provider';
+import type { ProductSort } from '../../../features/product-detail/product-sort';
+import { ProductDetailScreen } from '../../../features/product-detail/product-detail-screen';
+import { purchasesEnabled } from '../../../features/product-detail/purchases';
+import { discardStaleBackLayer } from '../../../shared/use-back-layer';
+import { waitForRouteExit } from '../../../shared/wait-for-route-exit';
 
 declare module '@tanstack/react-router' {
   interface HistoryState {
@@ -13,7 +13,7 @@ declare module '@tanstack/react-router' {
   }
 }
 
-export const Route = createFileRoute('/products/$cardId')({
+export const Route = createFileRoute('/_app/products/$cardId')({
   head: () => ({ meta: [{ title: '상품 상세 | Ziper' }] }),
   component: ProductDetailRoute,
 });
@@ -42,7 +42,7 @@ function ProductDetailRoute() {
       return;
     }
     await navigate({
-      to: '/products/purchased',
+      to: '/boards/purchased',
       search: { sort: source?.sort },
       replace: replace || Boolean(source),
     });

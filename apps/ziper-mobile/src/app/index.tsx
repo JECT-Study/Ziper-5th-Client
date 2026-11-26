@@ -1,4 +1,5 @@
-import { WebScreen } from '../screens/web-screen';
-export default function HomeRoute() {
-  return <WebScreen path="/" />;
+import { WebRoute } from '../screens/web-route';
+
+export default function Route() {
+  return <WebRoute pattern="/" />;
 }

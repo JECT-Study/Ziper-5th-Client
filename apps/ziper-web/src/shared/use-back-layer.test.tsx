@@ -75,7 +75,7 @@ it('discards the confirmation entry so replacing the screen leaves the preceding
   await act(async () => {
     expect(await discardLayer()).toBe(true);
     expect(backs).toBe(0);
-    router.history.replace('/products/purchased');
+    router.history.replace('/boards/purchased');
     setOpen(false);
   });
   expect(index()).toBe(1);
@@ -118,7 +118,7 @@ it('retries a timed-out purchase confirmation without leaving detail behind the 
     expect(back).toHaveBeenCalledOnce();
     expect(history.location.state.ziperLayer).toBe(true);
     expect(await discardStaleBackLayer(history)).toBe(true);
-    history.replace('/products/purchased');
+    history.replace('/boards/purchased');
     history.back();
     expect(history.location.href).toBe('/boards/1?sort=PRICE_ASC');
   } finally {
@@ -180,11 +180,11 @@ it('does not pop a new route that replaces the confirmation entry', async () => 
   const base = index();
   await act(async () => setOpen(true));
   await act(async () => {
-    router.history.replace('/products/purchased');
+    router.history.replace('/boards/purchased');
     setOpen(false);
   });
   expect(index()).toBe(base + 1);
-  expect(router.history.location.pathname).toBe('/products/purchased');
+  expect(router.history.location.pathname).toBe('/boards/purchased');
 });
 
 it('keeps an entry when Back arrives but the layer cannot close yet', async () => {

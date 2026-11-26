@@ -8,7 +8,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fboards%2F1
+      LINK: ziper://boards/1
 - extendedWaitUntil:
     visible: 린넨 블라우스
     timeout: 15000
@@ -21,7 +21,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fproducts%2Fpurchased
+      LINK: ziper://boards/purchased
 - extendedWaitUntil:
     visible: ^품절$
     timeout: 10000

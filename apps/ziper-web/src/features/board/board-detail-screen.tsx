@@ -75,7 +75,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
     status === 'initializing'
       ? undefined
       : () =>
-          void platform.navigation.push('/register-product').catch(() => {
+          void platform.navigation.push('/products/new').catch(() => {
             showToast('상품 추가 화면을 열지 못했어요.');
           });
 
