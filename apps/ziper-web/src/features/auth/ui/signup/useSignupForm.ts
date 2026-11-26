@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { resendEmailCode, sendEmailCode, signUp, verifyEmailCode } from '../../api/authApi';
+import {
+  useEmailSignupMutation,
+  useResendEmailCodeMutation,
+  useSendEmailCodeMutation,
+  useVerifyEmailCodeMutation,
+} from '../../api/queries';
 import { useAgreements } from '../../hooks/useAgreements';
 import { EMAIL_CODE_LENGTH, isValidEmail, isValidPassword } from '../../model/rules';
 
@@ -9,7 +14,7 @@ const STEPS: SignupStep[] = ['nickname', 'email', 'code', 'password'];
 
 /**
  * 이메일 회원가입 폼 전체 상태(RQ-AUTH-13·14). 단계가 이어지고 값끼리 엮여 있어서 폼 단위로 한곳에서 관리한다.
- * API 를 부르는 함수는 실패하면 그대로 던진다. 토스트와 화면 이동은 쓰는 쪽이 정한다.
+ * API 는 TanStack Query mutation 으로 부르고, 실패하면 그대로 던진다(mutateAsync). 토스트와 화면 이동은 쓰는 쪽이 정한다.
  */
 export function useSignupForm() {
   const [step, setStep] = useState<SignupStep>('nickname');
@@ -22,16 +27,10 @@ export function useSignupForm() {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const { agreed, setAgreed, requiredAgreed } = useAgreements();
-  const [pending, setPending] = useState<'send' | 'verify' | 'submit' | null>(null);
-
-  async function whilePending<T>(kind: 'send' | 'verify' | 'submit', run: () => Promise<T>) {
-    setPending(kind);
-    try {
-      return await run();
-    } finally {
-      setPending(null);
-    }
-  }
+  const sendCode = useSendEmailCodeMutation();
+  const resendCode = useResendEmailCodeMutation();
+  const verifyCode = useVerifyEmailCodeMutation();
+  const signup = useEmailSignupMutation();
 
   const passwordValid = isValidPassword(password);
   const passwordsMatch = passwordConfirm.length > 0 && passwordConfirm === password;
@@ -48,13 +47,12 @@ export function useSignupForm() {
     email,
     setEmail: (value: string) => setEmail(value.trim()),
     emailValid: isValidEmail(email),
-    sendingCode: pending === 'send',
-    sendCode: () =>
-      whilePending('send', async () => {
-        setFlowId(await sendEmailCode(email));
-        setCode('');
-        setCodeError(null);
-      }),
+    sendingCode: sendCode.isPending,
+    sendCode: async () => {
+      setFlowId(await sendCode.mutateAsync(email));
+      setCode('');
+      setCodeError(null);
+    },
 
     code,
     // 숫자만, 6자리까지만 받는다.
@@ -64,16 +62,15 @@ export function useSignupForm() {
     },
     codeComplete: code.length === EMAIL_CODE_LENGTH,
     codeError,
-    verifyingCode: pending === 'verify',
+    verifyingCode: verifyCode.isPending,
     /** 맞으면 true. 틀리거나 잠기면 codeError 에 남기고 false. */
-    verifyCode: () =>
-      whilePending('verify', async () => {
-        const result = await verifyEmailCode(flowId, code);
-        if (result !== 'verified') setCodeError(result);
-        return result === 'verified';
-      }),
+    verifyCode: async () => {
+      const result = await verifyCode.mutateAsync({ flowId, code });
+      if (result !== 'verified') setCodeError(result);
+      return result === 'verified';
+    },
     resendCode: async () => {
-      await resendEmailCode(flowId);
+      await resendCode.mutateAsync(flowId);
       setCode('');
       setCodeError(null);
     },
@@ -87,10 +84,8 @@ export function useSignupForm() {
     agreed,
     setAgreed,
     canSubmit: passwordValid && passwordsMatch && requiredAgreed,
-    submitting: pending === 'submit',
+    submitting: signup.isPending,
     submit: () =>
-      whilePending('submit', () =>
-        signUp({ flowId, nickname, password, marketingAgreed: agreed.marketing }),
-      ),
+      signup.mutateAsync({ flowId, nickname, password, marketingAgreed: agreed.marketing }),
   };
 }
