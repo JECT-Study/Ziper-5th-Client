@@ -19,19 +19,16 @@ appId: com.ject.ziper
     timeout: 10000
 - tapOn: 봄
 - tapOn: 수정 완료
+# The toast is transient; Chromium verifies its text. Here verify the stable blocked state.
 - extendedWaitUntil:
-    visible: 로그인 화면으로 이동
+    notVisible: 수정 완료
     timeout: 10000
-- assertVisible: '로그인이 만료됐어요.*'
-- assertNotVisible: '선택한 보드가 바뀌었어요.*'
-- assertNotVisible: 수정 완료
+- assertVisible: 취소
 - assertNotVisible: 현재 상태 확인
-- tapOn: 상세에서 확인
+- assertNotVisible: 로그인 화면으로 이동
+- tapOn: 취소
 - extendedWaitUntil:
-    visible: 로그인한 뒤 상품을 확인해 주세요.
+    notVisible: 상품 수정
     timeout: 10000
+- assertVisible: 상품 상세
 - assertNotVisible: 원본 쇼핑몰로 이동
-- tapOn: 로그인 화면으로 이동
-- extendedWaitUntil:
-    visible: 이메일로 가입하기
-    timeout: 10000

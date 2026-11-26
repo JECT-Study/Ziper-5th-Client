@@ -15,7 +15,6 @@ declare module '@tanstack/react-router' {
   interface HistoryState {
     /** Set when opening a product from the purchased list, to return to the same sort. */
     purchasedSource?: { sort?: ProductSort; index: number };
-    productAction?: 'edit';
   }
 }
 
@@ -33,9 +32,7 @@ function ProductDetailRoute() {
   const navigate = Route.useNavigate();
   const router = useRouter();
   const { platform, status } = usePlatform();
-  const { purchasedSource, productAction } = useLocation({
-    select: (location) => location.state,
-  });
+  const purchasedSource = useLocation({ select: (location) => location.state.purchasedSource });
   // The purchased list exists only with the JEC-79 fixture until that API ships.
   const source = purchasesEnabled ? purchasedSource : undefined;
 
@@ -82,13 +79,6 @@ function ProductDetailRoute() {
       key={cardId}
       {...props}
       api={productDetailApi}
-      onSignIn={() => navigate({ to: '/login', replace: true })}
-      initialAction={source ? productAction : undefined}
-      onInitialActionHandled={() => {
-        const { href, state } = router.history.location;
-        router.history.replace(href, { ...state, productAction: undefined });
-        router.history.flush();
-      }}
       fromPurchasedList={Boolean(source)}
       openPurchased={purchasesEnabled ? openPurchased : undefined}
     />

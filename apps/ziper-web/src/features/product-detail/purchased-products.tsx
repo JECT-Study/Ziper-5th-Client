@@ -1,18 +1,16 @@
-import { useLayoutEffect, useRef, useState, type MouseEventHandler, type Ref } from 'react';
+import { useLayoutEffect, useState, type MouseEventHandler, type Ref } from 'react';
 import {
   ProductDetailError,
   type PurchasedProduct,
   type ProductPurchases,
 } from '@ziper/api/product-detail';
-import { Button, showToast } from '../../components';
-import { useBackLayer } from '../../shared/use-back-layer';
+import { Button } from '../../components';
 import { ProductCard, ProductCardSkeleton } from '../board/product-card';
 import type { ProductSort } from './product-sort';
 import { ProductSortChips } from './product-sort-chips';
 import { useProductPages } from './use-product-pages';
 import { useProductPageFocus } from './use-product-page-focus';
 import * as boardStyles from '../board/board-detail.css';
-import { ProductManageSheet } from './product-manage-sheet';
 
 type AccessError = 'auth-required' | 'forbidden';
 
@@ -20,7 +18,6 @@ type Props = {
   api: ProductPurchases;
   missingCards?: ReadonlySet<string>;
   onOpen?: (product: PurchasedProduct) => void;
-  onEdit?: (product: PurchasedProduct) => Promise<unknown>;
   onOpenOriginal: (product: PurchasedProduct) => void;
   onAccessDenied?: (code: AccessError, moveFocus: boolean) => void;
 };
@@ -58,7 +55,6 @@ function PurchasedGrid({
   missingCards,
   sort,
   onOpen,
-  onEdit,
   onOpenOriginal,
   onAccessDenied,
   revision,
@@ -78,33 +74,6 @@ function PurchasedGrid({
     const anchor = pager.current;
     onAccessDenied?.(accessError, Boolean(anchor && anchor === anchor.ownerDocument.activeElement));
   }, [accessError, onAccessDenied, pager]);
-  const [managedId, setManagedId] = useState<string | null>(null);
-  const managed =
-    !accessError && managedId !== null
-      ? items?.find((item) => item.cardId === managedId)
-      : undefined;
-  if (managedId !== null && !managed) setManagedId(null);
-  const menuOpen = Boolean(managed);
-  const selecting = useRef(false);
-  const close = () => {
-    if (!selecting.current) setManagedId(null);
-  };
-  const discard = useBackLayer(menuOpen, close);
-
-  async function edit() {
-    if (!menuOpen || !onEdit || !managed || selecting.current) return;
-    selecting.current = true;
-    try {
-      if (!(await discard())) throw new Error('Could not close product menu');
-      await onEdit(managed);
-    } catch {
-      showToast('상품 수정 화면을 열지 못했어요. 다시 시도해 주세요.');
-    } finally {
-      selecting.current = false;
-      setManagedId(null);
-    }
-  }
-
   return (
     <>
       {waiting && !page && (
@@ -127,7 +96,6 @@ function PurchasedGrid({
                 product={product}
                 purchased
                 onOpen={onOpen ? () => onOpen(product) : undefined}
-                onMore={onEdit ? () => setManagedId(product.cardId) : undefined}
                 onOpenOriginal={() => onOpenOriginal(product)}
               />
             ))}
@@ -140,11 +108,11 @@ function PurchasedGrid({
           )
         ))}
       <div ref={pager} tabIndex={-1}>
-        {accessError ? (
-          <PurchasedListError code={accessError} />
+        {accessError === 'auth-required' ? null : accessError ? (
+          <PurchasedListError forbidden />
         ) : status === 'error' ? (
           <PurchasedListError
-            stage={rejectedCursor ? 'restart' : refreshing ? 'refresh' : page ? 'next' : 'initial'}
+            nextPage={Boolean(page && !refreshing && !rejectedCursor)}
             retry={(event) => pageAction(event, retry, refreshing || rejectedCursor)}
           />
         ) : canLoadMore ? (
@@ -163,51 +131,31 @@ function PurchasedGrid({
           </p>
         ) : null}
       </div>
-      <ProductManageSheet
-        open={menuOpen}
-        canPurchase={false}
-        onSelect={() => void edit()}
-        onClose={close}
-      />
     </>
   );
 }
 
-const purchaseReadErrors = {
-  initial: '구매 완료 목록을 불러오지 못했어요.',
-  next: '다음 상품을 불러오지 못했어요.',
-  refresh: '구매 완료 목록을 갱신하지 못했어요.',
-  restart: '다음 상품을 이어서 불러올 수 없어요. 목록을 다시 불러와 주세요.',
-};
-
 export function PurchasedListError({
-  code,
+  forbidden,
   ref,
-  stage = 'initial',
-  onSignIn,
+  nextPage,
   retry,
 }: {
-  code?: AccessError;
+  forbidden?: boolean;
   ref?: Ref<HTMLDivElement>;
-  stage?: keyof typeof purchaseReadErrors;
-  onSignIn?: () => void;
+  nextPage?: boolean;
   retry?: MouseEventHandler<HTMLButtonElement>;
 }) {
   return (
     <div ref={ref} className={boardStyles.status} role="alert" tabIndex={ref ? -1 : undefined}>
-      {code === 'forbidden'
+      {forbidden
         ? '구매 완료 목록을 볼 수 있는 권한이 없어요.'
-        : code === 'auth-required'
-          ? '로그인한 뒤 구매 완료 목록을 확인해 주세요.'
-          : purchaseReadErrors[stage]}
-      {onSignIn && (
-        <Button variant="secondary" size="small" onClick={onSignIn}>
-          로그인 화면으로 이동
-        </Button>
-      )}
+        : nextPage
+          ? '다음 상품을 불러오지 못했어요.'
+          : '구매 완료 목록을 불러오지 못했어요.'}
       {retry && (
         <Button variant="secondary" size="small" onClick={retry}>
-          {stage === 'next' ? '다음 상품 다시 불러오기' : '목록 다시 불러오기'}
+          {nextPage ? '다음 상품 다시 불러오기' : '목록 다시 불러오기'}
         </Button>
       )}
     </div>

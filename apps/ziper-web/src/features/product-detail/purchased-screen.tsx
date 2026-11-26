@@ -19,16 +19,14 @@ export function PurchasedScreen({
   onRetryEntry,
   openProduct,
   goBack,
-  signIn,
 }: {
   sort: ProductSort;
   onSortChange: (sort: ProductSort) => void;
   /** 라우트 진입(세션 확인)이 실패했다. */
   entryError?: boolean;
   onRetryEntry: () => void;
-  openProduct: (product: PurchasedProduct, action?: 'edit') => Promise<unknown>;
+  openProduct: (product: PurchasedProduct) => Promise<unknown>;
   goBack: () => Promise<unknown>;
-  signIn: () => Promise<unknown>;
 }) {
   const { platform, status } = usePlatform();
   const selectTab = useTabNavigation();
@@ -45,6 +43,7 @@ export function PurchasedScreen({
     opening.current?.abort();
     focusAccessNotice.current = moveFocus;
     setAccessError(code);
+    if (code === 'auth-required') showToast('로그인이 만료되어 구매 완료 목록을 볼 수 없어요.');
   }, []);
   useLayoutEffect(() => {
     if (!accessError || !focusAccessNotice.current) return;
@@ -72,7 +71,6 @@ export function PurchasedScreen({
         mayHaveRecorded = false;
         if (error.code === 'auth-required') {
           restrictAccess(error.code);
-          showToast('쇼핑몰은 열었지만 방문 기록은 남기지 못했어요.');
           return;
         }
         if (error.code === 'not-found') {
@@ -101,11 +99,11 @@ export function PurchasedScreen({
     }
   }
 
-  async function open(product: PurchasedProduct, action?: 'edit') {
+  async function open(product: PurchasedProduct) {
     if (accessError || navigating.current) return;
     navigating.current = true;
     try {
-      await openProduct(product, action);
+      await openProduct(product);
     } finally {
       navigating.current = false;
     }
@@ -122,11 +120,6 @@ export function PurchasedScreen({
     } finally {
       navigating.current = false;
     }
-  }
-
-  function signInOnce() {
-    if (navigating.current) return;
-    void signIn().catch(() => showToast('로그인 화면을 열지 못했어요.'));
   }
 
   function add() {
@@ -151,12 +144,8 @@ export function PurchasedScreen({
         )}
       </div>
       <div className={purchasedScroll} data-scroll-restoration-id="purchased-products">
-        {accessError ? (
-          <PurchasedListError
-            ref={accessNotice}
-            code={accessError}
-            onSignIn={accessError === 'auth-required' ? signInOnce : undefined}
-          />
+        {accessError === 'auth-required' ? null : accessError ? (
+          <PurchasedListError ref={accessNotice} forbidden />
         ) : entryError ? (
           <PurchasedListError retry={onRetryEntry} />
         ) : (
@@ -172,7 +161,6 @@ export function PurchasedScreen({
             onOpen={(product) =>
               void open(product).catch(() => showToast('상품 상세를 열지 못했어요.'))
             }
-            onEdit={(product) => open(product, 'edit')}
             onOpenOriginal={(product) => void openOriginal(product)}
           />
         )}

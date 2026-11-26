@@ -129,35 +129,6 @@ it('sends one detail read even if React probes effects in Strict Mode', async ()
   expect(get).toHaveBeenCalledOnce();
 });
 
-it('does not open the edit shortcut while leaving the loading detail', async () => {
-  const api = createPreviewApi('normal');
-  const detail = deferred<typeof sampleProduct>();
-  const navigation = deferred<void>();
-  const get = vi.spyOn(api, 'get').mockReturnValue(detail.promise);
-  const list = vi.spyOn(api, 'listBoards');
-  const onInitialActionHandled = vi.fn();
-  const onBack = vi.fn(async () => {
-    await navigation.promise;
-    throw new Error('Navigation failed');
-  });
-  const { container } = await mount(api, {
-    initialAction: 'edit',
-    onInitialActionHandled,
-    onBack,
-  });
-  await click(container, '뒤로 가기');
-  await act(async () => detail.resolve(sampleProduct));
-  expect(onBack).toHaveBeenCalledOnce();
-  expect(onInitialActionHandled).toHaveBeenCalledOnce();
-  expect(container.querySelector('dialog')).toBeNull();
-  expect(list).not.toHaveBeenCalled();
-  await act(async () => navigation.resolve());
-  expect(container.textContent).toContain('이전 화면으로 돌아가지 못했어요.');
-  await click(container, '상품 관리');
-  expect(container.querySelector('dialog h2')?.textContent).toBe('상품 관리');
-  expect(get).toHaveBeenCalledOnce();
-});
-
 it('prevents the purchased shortcut and original opener from interrupting header Back', async () => {
   const api = createPreviewApi('purchased');
   const pending = deferred<void>();
@@ -178,19 +149,15 @@ it('prevents the purchased shortcut and original opener from interrupting header
   await act(async () => pending.resolve());
 });
 
-it.each([
-  ['unknown', 'keyboard'],
-  ['unknown', 'pointer'],
-  ['auth-required', 'keyboard'],
-] as const)(
-  'focuses the purchase confirmation message after %s only for keyboard activation (%s)',
-  async (result, activation) => {
+it.each(['keyboard', 'pointer'] as const)(
+  'focuses the uncertain purchase message only for keyboard activation (%s)',
+  async (activation) => {
     const api = createPreviewApi('normal');
-    const response = result === 'unknown' ? unknownOutcome : rejected('auth-required');
+    const response = unknownOutcome;
     const pending = deferred<typeof response>();
     const complete = vi.spyOn(api.purchases, 'complete').mockReturnValue(pending.promise);
     const get = vi.spyOn(api, 'get');
-    const { container } = await mount(api, { onSignIn: vi.fn() });
+    const { container } = await mount(api);
     const manage = button(container, '상품 관리');
     manage.focus();
     await click(container, '상품 관리');
@@ -206,9 +173,7 @@ it.each([
     await act(() => pending.resolve(response));
     expect(container.querySelector('dialog')).toBeNull();
     const alert = container.querySelector('[role="alert"]');
-    expect(alert?.textContent).toContain(
-      result === 'auth-required' ? '로그인한 뒤' : '결과를 확인할 수 없어요',
-    );
+    expect(alert?.textContent).toContain('결과를 확인할 수 없어요');
     expect(document.activeElement === alert).toBe(activation === 'keyboard');
     expect(get).toHaveBeenCalledOnce();
     expect(complete).toHaveBeenCalledOnce();
@@ -235,8 +200,7 @@ it.each(['auth-required', 'forbidden'] as const)(
     const get = vi.spyOn(api, 'get');
     const rejectedAction = vi.fn(async () => rejected(reason));
     api.purchases.complete = rejectedAction;
-    const onSignIn = vi.fn(async () => {});
-    const { container } = await mount(api, { onSignIn });
+    const { container } = await mount(api);
     await click(container, '상품 관리');
     await click(container, '구매 완료');
     await click(container, '이동하기');
@@ -245,9 +209,10 @@ it.each(['auth-required', 'forbidden'] as const)(
     expect(container.textContent).not.toMatch(/원본 쇼핑몰로 이동|현재 상태 확인|휴지통으로 이동/);
     expect(get).toHaveBeenCalledOnce();
     if (reason === 'auth-required') {
-      await click(container, '로그인 화면으로 이동');
-      expect(onSignIn).toHaveBeenCalledOnce();
-      expect(get).toHaveBeenCalledOnce();
+      expect(showToast).toHaveBeenCalledExactlyOnceWith(
+        '로그인이 만료되어 구매 상태를 바꿀 수 없어요.',
+      );
+      expect(container.textContent).not.toContain('로그인 화면으로 이동');
     } else {
       expect(container.textContent).toContain('이 상품의 상태를 변경할 권한이 없어요.');
       expect(container.textContent).not.toContain('로그인 화면으로 이동');
@@ -270,7 +235,7 @@ it('offers no purchase actions when the adapter does not support them', async ()
   expect(container.textContent).toContain('구매 완료한 상품이에요');
   expect(container.textContent).not.toContain('구매 완료 목록 보기');
 });
-it.each(['auth-required', 'forbidden', 'not-found', 'failed'] as const)(
+it.each(['forbidden', 'not-found', 'failed'] as const)(
   'shows a feature-specific %s load error',
   async (code) => {
     const api = createPreviewApi('normal');
@@ -284,45 +249,13 @@ it.each(['auth-required', 'forbidden', 'not-found', 'failed'] as const)(
     expect(button(container, '다시 확인')).toBeDefined();
   },
 );
-it.each(['auth-required', 'forbidden'] as const)(
-  'offers sign-in only for %s when the session is required',
-  async (code) => {
-    const api = createPreviewApi('normal');
-    api.get = vi.fn().mockRejectedValue(new ProductDetailError(code));
-    const onSignIn = vi.fn(async () => {});
-    const { container } = await mount(api, { onSignIn });
-    if (code === 'auth-required') await click(container, '로그인 화면으로 이동');
-    else expect(container.textContent).not.toContain('로그인 화면으로 이동');
-    expect(onSignIn).toHaveBeenCalledTimes(code === 'auth-required' ? 1 : 0);
-    expect(api.get).toHaveBeenCalledOnce();
-  },
-);
-it('serializes sign-in navigation from expired detail and permits retry after failure', async () => {
+it('notifies an unauthenticated detail read without opening login', async () => {
   const api = createPreviewApi('auth');
   const get = vi.spyOn(api, 'get');
-  const first = deferred<void>();
-  const onSignIn = vi
-    .fn(async () => {})
-    .mockImplementationOnce(async () => {
-      await first.promise;
-      throw new Error('navigation failed');
-    });
-  const onBack = vi.fn();
-  const { container } = await mount(api, { onSignIn, onBack });
-  const signIn = button(container, '로그인 화면으로 이동');
-  await act(() => {
-    signIn.click();
-    signIn.click();
-    button(container, '뒤로 가기').click();
-  });
-  expect(onSignIn).toHaveBeenCalledOnce();
-  expect(onBack).not.toHaveBeenCalled();
-  expect(signIn.disabled).toBe(true);
-  await act(async () => first.resolve());
-  expect(container.textContent).toContain('로그인 화면을 열지 못했어요.');
-  expect(signIn.disabled).toBe(false);
-  await click(container, '로그인 화면으로 이동');
-  expect(onSignIn).toHaveBeenCalledTimes(2);
+  const { container } = await mount(api);
+  expect(showToast).toHaveBeenCalledExactlyOnceWith('로그인한 뒤 상품을 확인해 주세요.');
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.textContent).not.toContain('로그인 화면으로 이동');
   expect(get).toHaveBeenCalledOnce();
 });
 
@@ -725,18 +658,17 @@ it.each(['auth-required', 'not-found', 'forbidden'] as const)(
     const record = vi
       .spyOn(api, 'openOriginal')
       .mockRejectedValueOnce(new ProductDetailError(code));
-    const onSignIn = vi.fn(async () => {});
-    const { container, props } = await mount(api, { onSignIn });
+    const { container, props } = await mount(api);
     await click(container, '원본 쇼핑몰로 이동');
     expect(props.openExternal).toHaveBeenCalledExactlyOnceWith(sampleProduct.productUrl);
     expect(container.textContent).not.toContain('원본 쇼핑몰을 열지 못했어요');
-    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1);
     if (code === 'auth-required') {
-      expect(container.textContent).toContain('로그인한 뒤 상품을 확인해 주세요.');
+      expect(showToast).toHaveBeenCalledExactlyOnceWith(
+        '로그인이 만료되어 방문 기록을 남기지 못했어요.',
+      );
       expect(container.textContent).not.toContain(sampleProduct.productTitle);
       expect(container.textContent).not.toContain('원본 쇼핑몰로 이동');
-      await click(container, '로그인 화면으로 이동');
-      expect(onSignIn).toHaveBeenCalledOnce();
+      expect(container.textContent).not.toContain('로그인 화면으로 이동');
     } else if (code === 'not-found') {
       expect(container.textContent).toContain('상품을 찾을 수 없어요.');
       expect(container.textContent).not.toContain('휴지통');
@@ -769,7 +701,7 @@ it('edits existing values and refreshes detail without creating another card', a
   await click(container, '태그 추가');
   expect(document.activeElement).toBe(button(container, '+직접 추가'));
   expect(update).not.toHaveBeenCalled();
-  expect(container.querySelector('details')?.open).toBe(false);
+  expect(container.querySelector('[aria-label="카드 이미지"]')).toBeNull();
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
     '1',
@@ -953,20 +885,13 @@ it('keeps the edited title and asks for a new board if the server rejects a stal
   expect(get).toHaveBeenCalledOnce();
 });
 
-it('keeps the stored image when a draft switches back from an optional replacement', async () => {
+it('keeps the stored image without offering a replacement during an ordinary edit', async () => {
   const api = createPreviewApi('normal');
   const imageUrl = 'https://shop.example/original.png';
   vi.spyOn(api, 'get').mockResolvedValueOnce({ ...sampleProduct, imageUrl, imageFileId: '81' });
   const update = vi.spyOn(api, 'update');
   const { container } = await edit(api);
-  const options = container.querySelector('details')!;
-  expect(options.open).toBe(false);
-  await act(() => {
-    options.open = true;
-  });
-  await click(options, '바지');
-  await click(options, '기존 이미지 유지');
-  expect(button(options, '기존 이미지 유지').getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('[role="group"][aria-label="카드 이미지"]')).toBeNull();
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
     '1',
@@ -987,7 +912,6 @@ it('requires an explicit replacement image without losing edits when the existin
   expect(container.querySelector('dialog [role="alert"]')?.textContent).toContain(
     '새 도안을 선택해 주세요',
   );
-  expect(container.querySelector('details')?.open).toBe(true);
   expect(button(container, '수정 완료').disabled).toBe(true);
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledOnce();
@@ -1256,12 +1180,7 @@ it.each([
     if (refreshBoards) {
       listBoards.mockResolvedValueOnce(sampleProduct.boards).mockRejectedValueOnce(auth);
     }
-    const login = deferred<void>();
-    const onSignIn = vi.fn(async () => {
-      await login.promise;
-      throw new Error('navigation failed');
-    });
-    const { container } = await edit(api, { onSignIn });
+    const { container } = await edit(api);
     if (step !== 'boards') await input(container, '상품명', '저장할 초안');
     const dialog = container.querySelector('dialog')!;
     if (step !== 'boards') await click(dialog, '수정 완료');
@@ -1272,25 +1191,17 @@ it.each([
     const field = dialog.querySelector('input')!;
     expect(field.value).toBe(step === 'boards' ? sampleProduct.productTitle : '저장할 초안');
     expect(field.closest('fieldset')?.disabled).toBe(true);
-    expect(dialog.textContent).toContain('로그인이 만료됐어요');
-    expect(dialog.textContent).not.toMatch(/선택한 보드가 바뀌었어요|조회한 정보에 수정 내용이/);
-    expect(dialog.textContent).not.toMatch(/수정 완료|현재 상태 확인|보드 목록 다시 불러오기/);
-    const signIn = button(dialog, '로그인 화면으로 이동');
-    await act(() => {
-      signIn.click();
-      signIn.click();
-    });
-    expect(signIn.disabled).toBe(true);
-    expect(onSignIn).toHaveBeenCalledOnce();
-    await act(async () => login.resolve());
-    expect(dialog.textContent).toContain('로그인 화면을 열지 못했어요');
-    expect(signIn.disabled).toBe(false);
-    await click(dialog, '상세에서 확인');
+    expect(showToast).toHaveBeenCalledExactlyOnceWith(
+      '로그인이 만료되어 수정 내용을 저장할 수 없어요.',
+      { toasterId: expect.any(String) },
+    );
+    expect(dialog.textContent).not.toMatch(
+      /수정 완료|현재 상태 확인|로그인 화면으로 이동|보드 목록 다시 불러오기/,
+    );
+    await click(dialog, '취소');
     expect(container.querySelector('dialog')).toBeNull();
-    expect(container.textContent).toContain('로그인한 뒤 상품을 확인해 주세요.');
     expect(container.textContent).not.toContain(sampleProduct.productTitle);
     expect(container.textContent).not.toContain('원본 쇼핑몰로 이동');
-    expect(button(container, '로그인 화면으로 이동')).toBeDefined();
     expect(update).toHaveBeenCalledTimes(step === 'boards' ? 0 : 1);
     expect(get).toHaveBeenCalledTimes(step.endsWith('status check') ? 2 : 1);
     expect(listBoards).toHaveBeenCalledTimes(refreshBoards ? 2 : 1);
@@ -1302,14 +1213,13 @@ it.each(['initial list', 'stale selection', 'checked update'] as const)(
   async (step) => {
     const api = createPreviewApi('normal');
     const get = vi.spyOn(api, 'get');
-    const onSignIn = vi.fn();
     const choices = vi.spyOn(api, 'listBoards');
     if (step !== 'initial list') choices.mockResolvedValueOnce(sampleProduct.boards);
     choices.mockRejectedValueOnce(new ProductDetailError('forbidden'));
     const update = vi
       .spyOn(api, 'update')
       .mockResolvedValue(step === 'checked update' ? unknownOutcome : rejected('board-not-found'));
-    const { container } = await edit(api, { onSignIn });
+    const { container } = await edit(api);
     const dialog = container.querySelector('dialog')!;
     if (step !== 'initial list') {
       await input(dialog, '상품명', '보존할 초안');
@@ -1333,7 +1243,6 @@ it.each(['initial list', 'stale selection', 'checked update'] as const)(
     expect(get).toHaveBeenCalledTimes(step === 'checked update' ? 2 : 1);
     expect(choices).toHaveBeenCalledTimes(step === 'initial list' ? 1 : 2);
     expect(update).toHaveBeenCalledTimes(step === 'initial list' ? 0 : 1);
-    expect(onSignIn).not.toHaveBeenCalled();
   },
 );
 

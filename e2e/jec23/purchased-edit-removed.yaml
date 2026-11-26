@@ -10,9 +10,13 @@ appId: com.ject.ziper
     env:
       LINK: ziper://web?path=%2Fproducts%2Fpurchased%3Fsort%3DOLDEST
 - extendedWaitUntil:
-    visible: 구매한 셔츠 상품 관리
+    visible: 구매한 셔츠
     timeout: 15000
-- tapOn: 구매한 셔츠 상품 관리
+- tapOn: 구매한 셔츠
+- extendedWaitUntil:
+    visible: 상품 관리
+    timeout: 10000
+- tapOn: 상품 관리
 - tapOn: 상품 수정
 - extendedWaitUntil:
     visible: 수정 완료
@@ -28,7 +32,7 @@ appId: com.ject.ziper
 - assertNotVisible: 다시 확인
 - tapOn: 구매 완료 목록 보기
 - extendedWaitUntil:
-    visible: 구매한 바지 상품 관리
+    visible: 구매한 바지
     timeout: 10000
 - assertVisible: 오래된 순
-- assertNotVisible: 구매한 셔츠 상품 관리
+- assertNotVisible: 구매한 셔츠

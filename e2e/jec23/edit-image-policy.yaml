@@ -17,6 +17,7 @@ appId: com.ject.ziper
 - extendedWaitUntil:
     visible: 수정 완료
     timeout: 10000
+- assertNotVisible: 카드 이미지 도안을 선택해 주세요.
 - tapOn: 봄
 - tapOn: 수정 완료
 - extendedWaitUntil:

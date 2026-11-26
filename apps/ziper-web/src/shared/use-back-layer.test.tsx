@@ -83,43 +83,6 @@ it('discards the confirmation entry so replacing the screen leaves the preceding
   expect(router.history.location.href).toBe('/products/1?preview=normal');
 });
 
-it('restores the open sheet after login navigation fails, so Back still closes it', async () => {
-  const { router, index, element } = await setup();
-  const base = index();
-  await act(async () => setOpen(true));
-  const failure = new Error('Navigation failed');
-  await act(async () => {
-    await expect(
-      discardLayer(async () => {
-        expect(index()).toBe(base);
-        throw failure;
-      }),
-    ).rejects.toBe(failure);
-  });
-  expect(index()).toBe(base + 1);
-  expect(backs).toBe(0);
-  expect(element.textContent).toBe('open');
-  await act(async () => router.history.back());
-  expect(backs).toBe(1);
-  expect(index()).toBe(base);
-  expect(element.textContent).toBe('closed');
-});
-
-it('does not start login navigation after a different route takes over', async () => {
-  const { router } = await setup();
-  const back = vi.spyOn(router.history, 'back').mockImplementation(() => {});
-  try {
-    await act(async () => setOpen(true));
-    const navigate = vi.fn(async () => {});
-    const result = discardLayer(navigate);
-    await act(async () => router.history.push('/boards/1'));
-    await expect(result).resolves.toBe(false);
-    expect(navigate).not.toHaveBeenCalled();
-  } finally {
-    back.mockRestore();
-  }
-});
-
 it('releases callers if WebView ignores Back, without trying a second traversal on cleanup', async () => {
   const { router } = await setup();
   const back = vi.spyOn(router.history, 'back').mockImplementation(() => {});
@@ -182,16 +145,13 @@ it('can retry navigation after an earlier Back arrives after the discard deadlin
   vi.useFakeTimers();
   try {
     await act(async () => setOpen(true));
-    const navigate = vi.fn(async () => {});
-    const timedOut = discardLayer(navigate);
+    const timedOut = discardLayer();
     await vi.advanceTimersByTimeAsync(1_200);
     await expect(timedOut).resolves.toBe(false);
-    expect(navigate).not.toHaveBeenCalled();
     expect(back).toHaveBeenCalledOnce();
     back.mockRestore();
     await act(async () => router.history.back());
-    await expect(discardLayer(navigate)).resolves.toBe(true);
-    expect(navigate).toHaveBeenCalledOnce();
+    await expect(discardLayer()).resolves.toBe(true);
     expect(backs).toBe(0);
   } finally {
     back.mockRestore();

@@ -46,24 +46,23 @@ pnpm e2e:android e2e/jec23/edit-board-membership.yaml
 
 fixture의 `/_reset`에 아래 쿼리를 붙여 `POST`하면 장애를 재현할 수 있다. 정상 흐름으로 돌아가려면 파라미터 없이 초기화한다.
 
-| 쿼리                                             | 검증                                                                                                                                                                            |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `purchasedPageReissue=401`                       | 구매 목록의 다음 페이지와 세션 재발급에 401 응답. `e2e/jec23/purchased-session-expiry.yaml` 실행.                                                                               |
-| `purchasedPageReissue=403` 또는 `503`            | 다음 페이지가 401이고 세션 재발급만 한 번 실패한다. `e2e/jec23/purchased-reissue-retry.yaml`에서 기존 카드와 커서가 유지되는지 확인.                                            |
-| `failReissueOnce=1` 또는 `403`                   | 첫 세션 확인이 한 번만 503 또는 403. 새 브라우저에서 구매 목록을 직접 열고 ‘목록 다시 불러오기’를 누른다.                                                                       |
-| `expiredSession=1`                               | 상세·세션 재발급에 401 응답. 상품 주소를 직접 열고 로그인 이동을 확인한다.                                                                                                      |
-| `expireSessionOnEdit=1`                          | 첫 PATCH 직전 세션 만료. `e2e/jec23/edit-session-expiry.yaml`에서 저장 차단과 로그인 이동을 검증한다.                                                                           |
-| `expireSessionOnPurchase=1`                      | 첫 구매 확정 직전 세션 만료. `purchase-session-expiry.yaml`에서 로그인 이동을, `auth=email`을 함께 설정한 `email-purchase-expiry.yaml`에서 재로그인과 명시적 재시도를 검증한다. |
-| `removedBeforePurchase=1`                        | 구매 확정 직전 상품이 삭제되고 POST는 400을 반환한다. `e2e/jec23/purchase-stale-card.yaml` 실행.                                                                                |
-| `duplicateBoardOnCreate=1`                       | 보드 선택 조회 이후 같은 이름의 보드가 다른 기기에서 생성되고, 첫 생성 요청은 409. `e2e/jec23/edit-board-name-conflict.yaml` 실행.                                              |
-| `deleteBoardOnEdit=1`                            | 첫 PATCH 직전 가을 코디 보드를 제거. `e2e/jec23/edit-stale-board.yaml` 실행.                                                                                                    |
-| `removeCardOnEdit=1`                             | 첫 PATCH 직전 상품이 다른 곳에서 삭제된다. 보드 진입은 `edit-removed-product.yaml`, 구매 목록 진입은 `purchased-edit-removed.yaml`을 실행한다.                                  |
-| `originalVisitStatus=401` 또는 `404`             | 원본 방문 기록 시 세션이 만료되거나 상품이 사라진 상태를 재현한다. 상세·구매 목록에서 확인한다.                                                                                 |
-| `delayOriginalReply=1`                           | 원본 방문 기록 응답을 6초 지연하고 린넨 블라우스의 링크를 판매 종료로 표시한다.                                                                                                 |
-| `staleEditReply=1`                               | 저장은 반영하지만 첫 PATCH 200에 수정 전 값을 반환한다. `e2e/jec23/edit-stale-reply.yaml`(보드 변경), `e2e/jec23/edit-stale-fields.yaml`(메모·태그)에서 상세 조회로 복구한다.   |
-| `dropEditBeforeCommit=1`                         | 첫 PATCH 응답을 저장 전에 끊는다. `e2e/jec23/edit-unknown.yaml`에서 현재 상태 확인 후 같은 입력으로 수동 저장한다.                                                              |
-| `dropMutationReplies=1&failMutationStatusRead=1` | 구매 반영 직후 응답 유실에 이어 첫 상태 확인이 503. `e2e/jec23/recover-mutation.yaml` 실행.                                                                                     |
-| `emptyPurchased=1&failPurchasedOnce=first`       | 구매 목록 직접 진입 → 첫 조회 503 → 재시도 → 빈 목록. `e2e/jec23/purchased-retry.yaml` 실행.                                                                                    |
+| 쿼리                                             | 검증                                                                                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `purchasedPageReissue=401`                       | 다음 페이지 조회·세션 재발급 401. 이전 카드를 숨기고 인증 오류 토스트를 표시한다(`purchased-session-expiry.yaml`).                             |
+| `purchasedPageReissue=403` 또는 `503`            | 다음 페이지가 401이고 세션 재발급만 한 번 실패한다. `e2e/jec23/purchased-reissue-retry.yaml`에서 기존 카드와 커서가 유지되는지 확인.           |
+| `failReissueOnce=1` 또는 `403`                   | 첫 세션 확인이 한 번만 503 또는 403. 새 브라우저에서 구매 목록을 직접 열고 ‘목록 다시 불러오기’를 누른다.                                      |
+| `expiredSession=1`                               | 상세·세션 재발급에 401 응답. 상품 주소에서 인증 오류 토스트를 확인한다.                                                                        |
+| `expireSessionOnEdit=1`                          | 첫 PATCH와 세션 재발급에 401 응답. 수정 초안을 유지하고 저장을 막으며 토스트만 표시한다(`edit-session-expiry.yaml`).                           |
+| `auth=email&expireSessionOnPurchase=1`           | 이메일 로그인 후 구매 확정 중 세션 만료. 인증 오류 토스트가 표시되고 로그인 화면으로 이동하지 않는다(`email-purchase-expiry.yaml`).            |
+| `removedBeforePurchase=1`                        | 구매 확정 직전 상품이 삭제되고 POST는 400을 반환한다. `e2e/jec23/purchase-stale-card.yaml` 실행.                                               |
+| `duplicateBoardOnCreate=1`                       | 보드 선택 조회 이후 같은 이름의 보드가 다른 기기에서 생성되고, 첫 생성 요청은 409. `e2e/jec23/edit-board-name-conflict.yaml` 실행.             |
+| `deleteBoardOnEdit=1`                            | 첫 PATCH 직전 가을 코디 보드를 제거. `e2e/jec23/edit-stale-board.yaml` 실행.                                                                   |
+| `removeCardOnEdit=1`                             | 첫 PATCH 직전 상품이 다른 곳에서 삭제된다. 보드 진입은 `edit-removed-product.yaml`, 구매 목록 진입은 `purchased-edit-removed.yaml`을 실행한다. |
+| `originalVisitStatus=401` 또는 `404`             | 원본 방문 기록 시 세션이 만료되거나 상품이 사라진 상태를 재현한다. 상세·구매 목록에서 확인한다.                                                |
+| `delayOriginalReply=1`                           | 원본 방문 기록 응답을 6초 지연하고 린넨 블라우스의 링크를 판매 종료로 표시한다.                                                                |
+| `dropEditBeforeCommit=1`                         | 첫 PATCH 응답을 저장 전에 끊는다. `e2e/jec23/edit-unknown.yaml`에서 현재 상태 확인 후 같은 입력으로 수동 저장한다.                             |
+| `dropMutationReplies=1&failMutationStatusRead=1` | 구매 반영 직후 응답 유실에 이어 첫 상태 확인이 503. 같은 상품을 다시 구매하지 않고 상태를 다시 확인한다.                                       |
+| `emptyPurchased=1&failPurchasedOnce=first`       | 구매 목록 직접 진입 → 첫 조회 503 → 재시도 → 빈 목록. `e2e/jec23/purchased-retry.yaml` 실행.                                                   |
 
 `dropEditBeforeCommit=1&failEditStatusRead=1`이면 첫 수정 상태 확인만 코드 없는 404를 반환한다. fixture 데이터는 삭제하지 않는다. `mirrorWhileEditing=1`은 위의 응답 유실 옵션과 함께 사용한다. 린넨 블라우스의 원본 URL은 유지하고, 첫 PATCH 처리 시 미러 상태를 `PENDING`에서 `READY`로 바꿔 파일 ID를 붙인다.
 
@@ -74,23 +73,23 @@ fixture는 JEC-79 문서의 구매 POST와 잠정 목록 응답 `{ items, nextCu
 [배포 `0277435`](https://github.com/JECT-Study/Ziper-5th-Server/actions/runs/44993618174) 기준으로 [상품 상세 API](https://github.com/JECT-Study/Ziper-5th-Server/pull/83)와 [보드 조회 API](https://github.com/JECT-Study/Ziper-5th-Server/pull/84)를 사용한다.
 
 - `GET /api/v1/products/{cardId}`, `GET /api/v1/boards`, `PATCH /api/v1/products/{cardId}`, `POST /api/v1/products/{cardId}/open-original`은 기존 Bearer 인증을 사용한다.
-- 상세나 구매 목록에서 세션 재발급이 401이면 로그인으로 안내한다. 구매 목록은 401·403을 받으면 기존 카드와 액션을 숨긴다. 재발급 자체가 503이거나 네트워크·응답 오류면 로그아웃으로 기록하지 않는다. 페이지네이션은 기존 카드를 유지하며 실패한 커서만 다시 읽고, 구매 목록 직접 진입 실패는 목록 헤더와 재시도 버튼을 유지한다.
+- 상세·수정·구매의 요청에서 세션 재발급까지 401이면 토스트만 표시하고 로그인으로 이동하지 않는다. 수정 시트는 열린 동안 초안을 유지하고 추가 저장은 막는다. 보호 라우트의 진입 가드는 기존대로 동작한다. 구매 목록은 401·403을 받으면 기존 카드와 액션을 숨긴다. 재발급 자체가 503이거나 네트워크·응답 오류면 로그아웃으로 기록하지 않는다. 일시적인 페이지네이션 실패는 기존 카드를 유지하며 실패한 커서만 다시 읽고, 서버가 커서를 거절하면 첫 페이지부터 다시 조회한다.
 - 상세 조회 자체가 이벤트·주기 리셋을 동반하므로 프리로드에서 요청하지 않는다. 화면에서 시작한 읽기는 이탈 시 중단하고, 정상 수정 취소는 기존 상세로 돌아와 다시 읽지 않는다.
 - 화면의 ID는 문자열이다. 서버 JSON의 숫자 ID는 안전한 정수인지 검사하고 PATCH의 보드·파일 ID는 숫자로 보낸다. JavaScript 안전 정수 범위 밖의 응답은 거부한다.
 - 상품명은 신규 저장·수정에서 연속 ASCII 공백을 한 칸으로 줄인 뒤 200 코드 포인트 한도를 검사하고, 같은 값을 요청에 보낸다. 상품명과 메모의 앞뒤 공백은 서버의 Java `String.strip()` 규칙에 맞춰 처리하고, 줄바꿈 방지 공백(`U+00A0`, `U+2007`, `U+202F`)은 보존한다. HTML 제거는 서버에서 처리한다. 응답 유실 후 새 제목이 제출 값과 다르면 서버 정리인지 별도 수정인지 단정하지 않고 최신 상세 확인을 안내한다.
 - 수정에는 0~10억원 정수 가격, 태그 1개 이상(각 6 코드 포인트 이하), 이미지나 대체 도안, 활성 보드 1개 이상이 필요하다. 메모는 앞뒤 공백을 제거한 후 100 코드 포인트까지 저장할 수 있다. 태그는 서버 `TagService`와 같이 NFC로 정규화하고, 앞쪽 `#`·공백을 제거하고 연속 공백을 줄인다. 제어·포맷 문자가 있으면 추가 전에 안내한다.
 - 서명 이미지 URL → 원본 이미지 URL → 대체 도안 순서로 표시한다. PATCH에는 임시 서명 URL을 보내지 않는다. 판매 종료 링크는 원본 열기를 막고 품절 링크는 열 수 있다.
-- PATCH의 `404 BOARD_NOT_FOUND`·`404 FILE_NOT_FOUND`는 상품 삭제가 아니다. 초안을 유지하고, 보드 오류는 선택 목록만 새로 읽어 사라진 보드를 해제한다. 이미지 오류는 이미지 변경 영역을 열고 새 도안을 선택할 때까지 제출을 막는다. `404 PRODUCT_CARD_NOT_FOUND`는 초안을 읽기 전용으로 유지하고 시트를 닫으면 추가 상세 GET 없이 상품 없음 안내를 표시한다. 코드 없는 404나 알 수 없는 오류 코드는 상품 삭제로 단정하지 않고 결과 확인을 안내한다. 복구 조회·보드 복귀는 브라우저 캐시를 우회한다.
+- PATCH의 `404 BOARD_NOT_FOUND`·`404 FILE_NOT_FOUND`는 상품 삭제가 아니다. 초안을 유지하고, 보드 오류는 선택 목록만 새로 읽어 사라진 보드를 해제한다. 이미지 오류는 대체 도안을 선택할 수 있게 하고 선택 전까지 제출을 막는다. `404 PRODUCT_CARD_NOT_FOUND`는 초안을 읽기 전용으로 유지하고 시트를 닫으면 추가 상세 GET 없이 상품 없음 안내를 표시한다. 코드 없는 404나 알 수 없는 오류 코드는 상품 삭제로 단정하지 않고 결과 확인을 안내한다. 복구 조회·보드 복귀는 브라우저 캐시를 우회한다.
 - 수정 응답이 유실되면 수정 시트의 ‘현재 상태 확인’으로 GET만 보낸다. 서버 상태가 제출 내용과 같으면 최신 상세를 표시한다. 조회한 정보에 변경이 없으면 초안을 보존하고 사용자가 다시 저장할 수 있다. 같은 원본 URL의 `READY` 미러에 새 파일 ID만 붙은 경우 다른 필드는 계속 비교하며, 수동 재제출 시 새 ID를 보존한다. 원본 URL이나 직접 지정한 파일 등 제출·이전 값과 다른 변경은 재제출을 막고 ‘최신 상세 보기’를 안내한다. 조회 실패 시에도 초안은 유지한다.
-- 응답 유실·5xx·잘못된 성공 응답은 완료 여부를 알 수 없다. [JEC-95](https://linear.app/ject5-team6/issue/JEC-95)처럼 저장이 먼저 반영됐을 수 있으므로 재전송하지 않고 상세를 다시 확인한다.
+- PATCH 200은 상품 ID와 응답 형식을 확인하고 서버가 반환한 값을 사용한다. 응답 유실·5xx·해석할 수 없는 응답은 완료 여부를 알 수 없다. [JEC-95](https://linear.app/ject5-team6/issue/JEC-95)처럼 저장이 먼저 반영됐을 수 있으므로 재전송하지 않고 상세를 다시 확인한다.
 
 ## Figma와 구현 경계
 
 현재 UI는 [D-1 최신 시안](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=1025-12670)의 라임색·Pretendard, 공통 헤더·하단 원본 이동 버튼, 수정 바텀시트, 구매 확인 모달을 사용한다. 상세의 도안은 Figma 원본을 축소해 로컬에 포함했다. 초기 PRD2 레퍼런스는 [Flow 5 561:5912](https://www.figma.com/design/aofNB0TCRM7yMND4bLj0ih?node-id=561-5912)이다.
 
-- 최신 D-1 상세의 연한 라임 메모와 38px 소속 보드 칩을 적용했다. 가격은 시안처럼 금액만 표시한다. 최신 수정 프레임 `1085:10015`의 네 가지 입력·보드 체크 목록·‘새 보드 만들기’를 반영했고, 기존 이미지 보존·도안 변경은 접어 두었다. ‘이미지 업로드 실패’ 흐름(`1085:10320` → `1085:10663`)은 저장 후 상세에서 기본 이미지와 안내를 표시한다. PATCH는 상품 URL을 수정하지 않는다.
+- 최신 D-1 상세의 연한 라임 메모와 38px 소속 보드 칩을 적용했다. 가격은 시안처럼 금액만 표시한다. 최신 수정 프레임 `1085:10015`의 네 가지 입력·보드 체크 목록·‘새 보드 만들기’를 반영했고, 정상 수정에는 이미지 변경 UI가 없으며 기존 이미지를 유지한다. 기존 이미지를 사용할 수 없는 경우에만 대체 도안을 선택할 수 있다. ‘이미지 업로드 실패’ 흐름(`1085:10320` → `1085:10663`)은 저장 후 상세에서 기본 이미지와 안내를 표시한다. PATCH는 상품 URL을 수정하지 않는다.
 - 상세의 상품 관리 메뉴는 브라우저와 앱 모두 공통 바텀시트(구매 완료·상품 수정)를 사용한다. D-1의 ‘이 보드에서 삭제’는 JEC-22 범위라 연결하지 않았다.
-- 독립 구매 목록은 기존 보드 상품 카드(`ProductCard`)와 하단 탐색을 재사용한다. 서명 이미지가 실패하면 원본 이미지를 시도하고, 그다음 카테고리 도안을 사용한다. 구매한 카드의 더보기는 기존 상세의 ‘상품 수정’만 연결한다. 구매 취소·삭제는 별도 명세가 없어 추가하지 않았다.
+- 독립 구매 목록은 기존 보드 상품 카드(`ProductCard`)와 하단 탐색을 재사용한다. 서명 이미지가 실패하면 원본 이미지를 시도하고, 그다음 카테고리 도안을 사용한다. 구매한 상품의 수정은 카드 → 상세 → ‘상품 수정’을 사용한다. 카드의 더보기 바로가기·구매 취소·삭제는 별도 정책이 확정될 때까지 연결하지 않는다.
 
 ## 외부 이동
 
@@ -109,14 +108,15 @@ fixture는 JEC-79 문서의 구매 POST와 잠정 목록 응답 `{ items, nextCu
 
 ## 검증
 
-2026-11-26 범위 정리(보드별 제거·JEC-22 보드 화면 변경 제외) 후 다시 실행한 결과다.
+PR #43 후속 정리에서 `pnpm test` 723건과 로컬 HTTP fixture 테스트 7건, `pnpm check`, `pnpm typecheck:web`, `pnpm build:web`이 통과했다. Chrome에서 수정 인증 오류의 토스트, 저장 차단과 초안 유지, 대체 도안 선택, 구매 목록 접근 오류를 확인했다.
+
+아래는 앞선 범위 정리(보드별 제거·JEC-22 보드 화면 변경 제외)의 검증 기록이다.
 
 - `pnpm test` 747건(web 312·bridge 271·mobile 98·api 66), `node --test e2e/jec23/mock-api.test.mjs`, `pnpm lint`, `pnpm typecheck:web` 통과.
 - agent-device(iOS 시뮬레이터 `ziper-e2e`, Android 에뮬레이터)에서 `e2e/flows/product-detail-*.yaml` 3개와 `e2e/jec23/*.yaml` 28개(이후 메모·태그 흐름을 합쳐 27개)를 플랫폼마다 순차 실행했다. Android는 하드웨어 Back 흐름 `e2e/flows/android/back-order.yaml`을 추가로 실행했다. 각 흐름 직전에 첫 줄 주석의 `/_reset` 쿼리로 fixture를 초기화했다. 최종 결과는 양 플랫폼 모두 전체 통과다.
   - 첫 실행의 실패 원인은 다음과 같다. 프리뷰 흐름은 자동 로그인 fixture에서 로그아웃 시작 화면을 기다렸다. 흐름 주석에 `expiredSession=1`을 명시했다. `product-link-states`는 JEC-22 범위인 보드 카드 품절 칩을 확인했다. 상세와 구매 목록만 확인하도록 바꿨다. Android `edit-board-membership`은 adb 스냅샷 타임아웃이었고, 재실행에서 통과했다.
   - fixture 요청 로그에 DELETE 요청은 없었다. 구매 POST는 각 흐름에서 한 건씩만 기록됐다.
-- 보드 상세에서 상품을 여는 동작은 같은 WebView 안의 이동으로 바꿨다. 앱에서 수정한 뒤 뒤로 가면 보드가 다시 조회되어 변경된 소속이 반영된다(`edit-board-membership`, `edit-stale-reply`). 내 보드 요약의 개수 갱신은 JEC-22 범위로 남긴다.
-- 간소화(구매 목록 화면을 feature로 이동, 수정 시트 footer 포커스 처리 통합, 메모·태그 stale 흐름 병합) 후 수정·구매·구매 목록 관련 11개 흐름을 iOS·Android에서 다시 실행해 모두 통과했다.
+- 보드 상세에서 상품을 여는 동작은 같은 WebView 안의 이동으로 바꿨다. 앱에서 수정한 뒤 뒤로 가면 보드가 다시 조회되어 변경된 소속이 반영된다(`edit-board-membership`). 내 보드 요약의 개수 갱신은 JEC-22 범위로 남긴다.
 
 ### 배포 커밋의 백엔드를 로컬에서 실행한 검증 (범위 정리 전 기록)
 

@@ -98,24 +98,5 @@ export function useBackLayer(open: boolean, onBack: () => void) {
     };
   }, [open, history, generation]);
 
-  // A rejected navigation must restore the entry if the original sheet is still open.
-  return (navigate?: () => Promise<unknown>) => {
-    const active = discard.current;
-    const href = history?.location.href;
-    const result = active?.() ?? Promise.resolve(true);
-    if (!navigate) return result;
-    return result.then(async (atBase) => {
-      const base = history?.location;
-      if (!atBase || active !== discard.current || base?.href !== href) return false;
-      try {
-        await navigate();
-        return true;
-      } catch (error) {
-        if (active && active === discard.current && history?.location === base) {
-          setGeneration((n) => n + 1);
-        }
-        throw error;
-      }
-    });
-  };
+  return () => discard.current?.() ?? Promise.resolve(true);
 }

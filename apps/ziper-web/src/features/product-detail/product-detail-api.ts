@@ -23,13 +23,7 @@ import {
   text,
   url,
 } from '../../shared/api/response';
-import {
-  isValidPrice,
-  normalizeProductMemo,
-  normalizeProductTitle,
-  normalizeTag,
-} from '@ziper/api/product-fields';
-import { normalizeBoardName } from '../board/board-name';
+import { isValidPrice } from '@ziper/api/product-fields';
 
 const products = '/api/v1/products';
 
@@ -157,11 +151,6 @@ export const productPurchases: ProductPurchases = {
   },
 };
 
-function matchesMembers(actual: readonly string[], expected: readonly string[]) {
-  const remaining = new Set(expected);
-  return actual.length === remaining.size && actual.every((value) => remaining.delete(value));
-}
-
 export const productDetailApi: ProductDetailApi = {
   purchases: purchasesEnabled ? productPurchases : undefined,
   async get(cardId, signal) {
@@ -176,11 +165,9 @@ export const productDetailApi: ProductDetailApi = {
   },
   createBoard(name) {
     return writeWithDeadline(async (signal) => {
-      const board = decodeBoard(
+      return decodeBoard(
         await authenticated('/api/v1/boards', { method: 'POST', body: { name }, signal }),
       );
-      if (board.name !== normalizeBoardName(name)) invalidResponse();
-      return board;
     });
   },
   update(cardId, { boardIds, imageFileId, ...input }) {
@@ -194,26 +181,7 @@ export const productDetailApi: ProductDetailApi = {
           imageFileId: nullable(idNumber, imageFileId),
         },
       });
-      const updated = decodeProduct(value, cardId);
-      // Only the server knows whether a title with '<' contains markup to strip.
-      if (
-        (!input.productTitle.includes('<') &&
-          updated.productTitle !== normalizeProductTitle(input.productTitle)) ||
-        updated.price !== input.price ||
-        updated.memo !== normalizeProductMemo(input.memo) ||
-        updated.fallbackIcon !== input.fallbackIcon ||
-        // An original URL can gain a mirror file. Replacing the photo with a template cannot.
-        ((imageFileId !== null || input.imageUrl === null) &&
-          updated.imageFileId !== imageFileId) ||
-        (input.imageUrl === null && updated.imageUrl !== null) ||
-        !matchesMembers(updated.tags, input.tags.map(normalizeTag)) ||
-        !matchesMembers(
-          updated.boards.map(({ id }) => id),
-          boardIds,
-        )
-      )
-        invalidResponse();
-      return updated;
+      return decodeProduct(value, cardId);
     });
   },
   async openOriginal(cardId, signal) {

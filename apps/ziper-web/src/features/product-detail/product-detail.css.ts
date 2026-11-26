@@ -162,10 +162,8 @@ export const fieldset = style({
 });
 // D-1 groups the four edit fields; the board picker follows the memo without an extra gap.
 export const editFields = style({ display: 'grid', gap: vars.space[20], minWidth: 0 });
-export const imageOptions = style({ marginTop: vars.space[20] });
 export const fieldGroup = style({ display: 'grid', gap: 8 });
 export const legend = style({ ...typography.body2Medium, color: vars.color.text.default });
-export const moreFields = style({ display: 'grid', gap: 12, marginTop: 12 });
 export const menuActions = style({ padding: '0 16px' });
 export const menuAction = style({
   ...typography.body2Medium,

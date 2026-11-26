@@ -27,14 +27,13 @@ function PurchasedRoute({ entryError = false }: { entryError?: boolean }) {
       onSortChange={(next) => void navigate({ search: { sort: next }, replace: true })}
       entryError={entryError}
       onRetryEntry={() => void router.invalidate()}
-      openProduct={(product, productAction) =>
+      openProduct={(product) =>
         navigate({
           to: '/products/$cardId',
           params: { cardId: product.cardId },
           search: { preview: undefined },
           state: {
             purchasedSource: { sort, index: router.history.location.state.__TSR_index },
-            productAction,
           },
         })
       }
@@ -45,7 +44,6 @@ function PurchasedRoute({ entryError = false }: { entryError?: boolean }) {
           throw new Error('Could not leave purchased list');
         }
       }}
-      signIn={() => navigate({ to: '/login', replace: true })}
     />
   );
 }

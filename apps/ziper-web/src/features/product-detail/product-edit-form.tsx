@@ -23,6 +23,8 @@ import {
   Footer,
   Icon,
   TextField,
+  Toaster,
+  showToast,
 } from '../../components';
 import {
   BOARD_NAME_MAX,
@@ -150,7 +152,6 @@ export function ProductEditForm({
   onBusyChange,
   onReconcile,
   onChecked,
-  onSignIn,
 }: {
   product: ProductDetail;
   api: ProductDetailApi;
@@ -159,7 +160,6 @@ export function ProductEditForm({
   onBusyChange: (busy: boolean) => void;
   onReconcile: (reason: EditRecovery) => void;
   onChecked: (product: ProductDetail) => void;
-  onSignIn?: () => Promise<unknown>;
 }) {
   const formId = useId();
   const [title, setTitle] = useState(product.productTitle);
@@ -172,7 +172,7 @@ export function ProductEditForm({
   const [tagOptions, setTagOptions] = useState(() => [...new Set([...seasonTags, ...tags])]);
   const [tagDraft, setTagDraft] = useState<string | null>(null);
   const tagTrigger = useInlineEntryTrigger(tagDraft !== null);
-  const extraFields = useRef<HTMLDetailsElement>(null);
+  const imageOptions = useRef<HTMLDivElement>(null);
   const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.id));
   const [boardName, setBoardName] = useState<string | null>(null);
   const boardTrigger = useInlineEntryTrigger(boardName !== null);
@@ -184,19 +184,11 @@ export function ProductEditForm({
   const [image, setImage] = useState<'keep' | FallbackIcon>('keep');
   const [existingImageRejected, setExistingImageRejected] = useState(false);
   const [status, setStatus] = useState<
-    | 'idle'
-    | 'saving'
-    | 'creating-board'
-    | 'unknown'
-    | 'checking'
-    | 'review'
-    | 'auth-required'
-    | 'signing-in'
+    'idle' | 'saving' | 'creating-board' | 'unknown' | 'checking' | 'review' | 'auth-required'
   >('idle');
   const unconfirmed = useRef<{ before: ProductDetail; input: ProductUpdate } | null>(null);
   const checkRequest = useRef<AbortController | null>(null);
   const [error, setError] = useState('');
-  const [signInFailed, setSignInFailed] = useState(false);
   const busy = useRef(false);
   const alive = useRef(false);
   useEffect(() => {
@@ -224,11 +216,9 @@ export function ProductEditForm({
       ? loadedBoards.error.code
       : undefined;
   const boardsDenied = boardReadError === 'forbidden';
-  const requiresLogin =
-    status === 'auth-required' || status === 'signing-in' || boardReadError === 'auth-required';
+  const requiresLogin = status === 'auth-required' || boardReadError === 'auth-required';
   const creatingBoard = status === 'creating-board';
-  const waiting =
-    status === 'saving' || status === 'checking' || status === 'signing-in' || creatingBoard;
+  const waiting = status === 'saving' || status === 'checking' || creatingBoard;
   const normalizedBoardName = normalizeBoardName(boardName ?? '');
   const nameCheck =
     boardError === 'duplicate' || boardError === 'invalid'
@@ -236,8 +226,10 @@ export function ProductEditForm({
       : checkBoardName(boardName ?? '', boards?.map(({ name }) => name) ?? []);
   const canCreateBoard = !!boards && nameCheck === 'ok' && boardError !== 'forbidden';
   useEffect(() => {
-    if (requiresLogin) onReconcile('auth-required');
-  }, [requiresLogin, onReconcile]);
+    if (!requiresLogin) return;
+    onReconcile('auth-required');
+    showToast('로그인이 만료되어 수정 내용을 저장할 수 없어요.', { toasterId: formId });
+  }, [requiresLogin, onReconcile, formId]);
   useEffect(() => {
     // Reloading the choices can push the inline error below the fixed sheet footer.
     if (boardError && loadedBoards.status !== 'loading') {
@@ -273,10 +265,8 @@ export function ProductEditForm({
     !invalidBoards;
   const locked = (status !== 'idle' && !creatingBoard) || requiresLogin || boardsDenied;
   useEffect(() => {
-    if (!missingImage || !extraFields.current) return;
-    extraFields.current.open = true;
-    if (existingImageRejected) extraFields.current.scrollIntoView({ block: 'nearest' });
-  }, [missingImage, existingImageRejected]);
+    if (existingImageRejected) imageOptions.current?.scrollIntoView({ block: 'nearest' });
+  }, [existingImageRejected]);
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -412,25 +402,6 @@ export function ProductEditForm({
     }
   }
 
-  async function signIn() {
-    if (!onSignIn || busy.current) return;
-    busy.current = true;
-    setSignInFailed(false);
-    setStatus('signing-in');
-    onBusyChange(true);
-    try {
-      await onSignIn();
-    } catch {
-      setSignInFailed(true);
-    } finally {
-      busy.current = false;
-      if (alive.current) {
-        setStatus('auth-required');
-        onBusyChange(false);
-      }
-    }
-  }
-
   const footer = useRef<HTMLDivElement>(null);
   // A keyboard-activated footer action parks focus on the footer until its result renders.
   function holdKeyboardFocus(event: MouseEvent<HTMLDivElement>) {
@@ -440,9 +411,7 @@ export function ProductEditForm({
 
   const retryChoices = status === 'idle' && boardsFailed && !requiresLogin && !boardsDenied;
   const message = requiresLogin
-    ? signInFailed
-      ? '로그인 화면을 열지 못했어요. 다시 시도해 주세요.'
-      : '로그인이 만료됐어요. 이 화면을 나가면 작성 중인 내용은 유지되지 않아요.'
+    ? ''
     : boardsDenied
       ? '보드 목록을 볼 수 있는 권한이 없어요. 수정 내용을 저장할 수 없어요.'
       : retryChoices
@@ -478,18 +447,8 @@ export function ProductEditForm({
                 {message}
               </div>
             )}
-            {requiresLogin ? (
-              onSignIn && (
-                <Button
-                  data-edit-action
-                  disabled={waiting}
-                  loading={status === 'signing-in'}
-                  onClick={() => void signIn()}
-                >
-                  로그인 화면으로 이동
-                </Button>
-              )
-            ) : boardsDenied ? null : (status === 'unknown' || status === 'checking') &&
+            {requiresLogin || boardsDenied ? null : (status === 'unknown' ||
+                status === 'checking') &&
               unconfirmed.current ? (
               <Button
                 data-edit-action
@@ -522,7 +481,7 @@ export function ProductEditForm({
             <Button variant="secondary" disabled={waiting} onClick={onCancel}>
               {status === 'review'
                 ? '최신 상세 보기'
-                : status === 'unknown' || requiresLogin
+                : status === 'unknown'
                   ? '상세에서 확인'
                   : '취소'}
             </Button>
@@ -530,6 +489,7 @@ export function ProductEditForm({
         </div>
       }
     >
+      <Toaster id={formId} />
       <form id={formId} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
         <fieldset className={styles.fieldset} disabled={locked}>
           <div className={styles.editFields}>
@@ -718,36 +678,30 @@ export function ProductEditForm({
               <p className={styles.error}>현재 보드를 1개 이상 선택해 주세요.</p>
             )}
           </section>
-          <details ref={extraFields} className={styles.imageOptions}>
-            <summary className={styles.caption}>이미지 변경</summary>
-            <div className={styles.moreFields}>
-              <div className={styles.fieldGroup} role="group" aria-label="카드 이미지">
-                <span className={styles.legend}>카드 이미지</span>
-                <div className={styles.chips}>
-                  {canKeepImage && (
-                    <ChipFilter selected={image === 'keep'} onClick={() => setImage('keep')}>
-                      기존 이미지 유지
-                    </ChipFilter>
-                  )}
-                  {fallbackIcons.map((icon) => (
-                    <ChipFilter
-                      key={icon}
-                      selected={image === icon}
-                      onClick={() => {
-                        setImage(icon);
-                        if (missingImage && existingImageRejected) setError('');
-                      }}
-                    >
-                      {iconLabels[icon]}
-                    </ChipFilter>
-                  ))}
-                </div>
+          {!canKeepImage && (
+            <div
+              ref={imageOptions}
+              className={styles.fieldGroup}
+              role="group"
+              aria-label="카드 이미지"
+            >
+              <span className={styles.legend}>카드 이미지 도안을 선택해 주세요.</span>
+              <div className={styles.chips}>
+                {fallbackIcons.map((icon) => (
+                  <ChipFilter
+                    key={icon}
+                    selected={image === icon}
+                    onClick={() => {
+                      setImage(icon);
+                      if (missingImage && existingImageRejected) setError('');
+                    }}
+                  >
+                    {iconLabels[icon]}
+                  </ChipFilter>
+                ))}
               </div>
-              {missingImage && !existingImageRejected && (
-                <p className={styles.error}>카드 이미지 도안을 선택해 주세요.</p>
-              )}
             </div>
-          </details>
+          )}
         </fieldset>
       </form>
     </BottomSheet>

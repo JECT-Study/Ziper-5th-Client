@@ -15,30 +15,9 @@ appId: com.ject.ziper
 - tapOn: 구매 완료
 - tapOn: 이동하기
 - extendedWaitUntil:
-    visible: 로그인 화면으로 이동
-    timeout: 15000
+    notVisible: 상품 관리
+    timeout: 10000
+- assertVisible: 상품 상세
+- assertNotVisible: 상품 관리
 - assertNotVisible: 구매 완료 목록
-- tapOn: 로그인 화면으로 이동
-- runFlow: subflows/sign-in.yaml
-- tapOn: ^기본 보드$
-- extendedWaitUntil:
-    visible: 가격 낮은 순
-    timeout: 15000
-- tapOn: 가격 낮은 순
-# Asserting that the card is still in the ordinary board rules out a purchase on sign-in.
-- extendedWaitUntil:
-    visible: 오버핏 울 블렌드 니트 가디건
-    timeout: 15000
-- tapOn: 오버핏 울 블렌드 니트 가디건
-- tapOn: 상품 관리
-- tapOn: 구매 완료
-- tapOn: 이동하기
-- extendedWaitUntil:
-    visible: 구매 완료 목록
-    timeout: 15000
-- assertVisible: 오버핏 울 블렌드 니트 가디건
-- tapOn: 뒤로 가기
-- extendedWaitUntil:
-    visible: 린넨 블라우스
-    timeout: 15000
-- assertNotVisible: 오버핏 울 블렌드 니트 가디건
+- assertNotVisible: 로그인 화면으로 이동

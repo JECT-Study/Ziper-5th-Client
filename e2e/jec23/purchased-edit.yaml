@@ -12,7 +12,12 @@ appId: com.ject.ziper
 - extendedWaitUntil:
     visible: 구매한 셔츠
     timeout: 15000
-- tapOn: 구매한 셔츠 상품 관리
+- assertNotVisible: 구매한 셔츠 상품 관리
+- tapOn: 구매한 셔츠
+- extendedWaitUntil:
+    visible: 상품 관리
+    timeout: 10000
+- tapOn: 상품 관리
 - extendedWaitUntil:
     visible: 상품 수정
     timeout: 10000

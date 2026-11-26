@@ -14,12 +14,10 @@ appId: com.ject.ziper
     timeout: 15000
 - tapOn: 더 불러오기
 - extendedWaitUntil:
-    visible: 로그인 화면으로 이동
+    notVisible: 최근 등록순
     timeout: 10000
+- assertVisible: 구매 완료 목록
 - assertNotVisible: 구매한 가방
 - assertNotVisible: 더 불러오기
 - assertNotVisible: 최근 등록순
-- tapOn: 로그인 화면으로 이동
-- extendedWaitUntil:
-    visible: 이메일로 가입하기
-    timeout: 10000
+- assertNotVisible: 로그인 화면으로 이동

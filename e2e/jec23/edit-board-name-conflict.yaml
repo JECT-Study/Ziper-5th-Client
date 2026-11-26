@@ -1,4 +1,4 @@
-# Reset with duplicateBoardOnCreate=1 or boardCreateReply=wrong-board.
+# Before running: POST /_reset?duplicateBoardOnCreate=1 on the fixture.
 appId: com.ject.ziper
 ---
 - runFlow: ../subflows/start-dev-client.yaml

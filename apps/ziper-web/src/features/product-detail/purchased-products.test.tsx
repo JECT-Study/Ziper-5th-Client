@@ -8,39 +8,6 @@ import { createPreviewApi, sampleProduct } from './preview';
 import { PurchasedProducts } from './purchased-products';
 import { deferred } from '../../../../../packages/bridge/test/deferred';
 
-it('offers edit only and does not request details until the user chooses it', async () => {
-  const api = createPreviewApi('purchased');
-  const list = vi.spyOn(api.purchases, 'list');
-  const get = vi.spyOn(api, 'get');
-  const onEdit = vi.fn(async () => {});
-  const container = document.createElement('div');
-  const root = createRoot(container);
-  const click = async (element: HTMLButtonElement) => act(() => element.click());
-  const label = (text: string) =>
-    Array.from(container.querySelectorAll('button')).find((item) => item.textContent === text)!;
-  const more = () =>
-    container.querySelector<HTMLButtonElement>('article button[aria-label$="상품 관리"]')!;
-  try {
-    await act(async () =>
-      root.render(
-        <PurchasedProducts api={api.purchases} onEdit={onEdit} onOpenOriginal={() => {}} />,
-      ),
-    );
-    await click(more());
-    expect(container.querySelector('dialog')?.textContent).toBe('상품 관리상품 수정닫기');
-    await click(label('닫기'));
-    expect(container.querySelector('dialog')).toBeNull();
-    expect(onEdit).not.toHaveBeenCalled();
-    await click(more());
-    await click(label('상품 수정'));
-    expect(onEdit).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ cardId: '1' }));
-    expect(list).toHaveBeenCalledOnce();
-    expect(get).not.toHaveBeenCalled();
-  } finally {
-    await act(() => root.unmount());
-  }
-});
-
 it.each(['auth-required', 'forbidden', 'failed'] as const)(
   'only reports confirmed loss of access when a later page fails with %s',
   async (code) => {
@@ -233,11 +200,11 @@ it.each(['new cursor', 'empty', 'failed reload'] as const)(
       expect(document.activeElement).toBe(button(retry));
       expect(container.querySelector('article')).not.toBeNull();
       expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-        '다음 상품을 이어서 불러올 수 없어요.',
+        '구매 완료 목록을 불러오지 못했어요.',
       );
       await click(retry);
       if (scenario === 'failed reload') {
-        expect(container.textContent).toContain('구매 완료 목록을 갱신하지 못했어요.');
+        expect(container.textContent).toContain('구매 완료 목록을 불러오지 못했어요.');
         expect(document.activeElement).toBe(button(retry));
         expect(container.querySelector('article')).not.toBeNull();
         await click(retry);
@@ -261,60 +228,6 @@ it.each(['new cursor', 'empty', 'failed reload'] as const)(
   },
 );
 
-it('dismisses a second-page menu when a date refresh replaces that page', async () => {
-  const added = { ...sampleProduct, cardId: '2', productTitle: '다음 페이지 상품' };
-  const api = createPreviewApi('purchased');
-  const list = vi.spyOn(api.purchases, 'list');
-  const first = { items: [sampleProduct], nextCursor: 'next' };
-  const second = { items: [added], nextCursor: null };
-  list
-    .mockResolvedValueOnce(first)
-    .mockResolvedValueOnce(second)
-    .mockResolvedValueOnce(first)
-    .mockResolvedValueOnce(second);
-  const onEdit = vi.fn(async () => {});
-  const container = document.createElement('div');
-  const root = createRoot(container);
-  const button = (label: string) =>
-    [...container.querySelectorAll('button')].find(
-      (b) => b.textContent === label || b.getAttribute('aria-label') === label,
-    )!;
-  const click = (label: string) => act(async () => button(label).click());
-  const render = (visitRevision: number) =>
-    act(async () =>
-      root.render(
-        <PurchasedProducts
-          api={api.purchases}
-          sort="OLDEST"
-          visitRevision={visitRevision}
-          onEdit={onEdit}
-          onOpenOriginal={() => {}}
-        />,
-      ),
-    );
-  try {
-    await render(0);
-    await click('더 불러오기');
-    await click('다음 페이지 상품 상품 관리');
-    expect(container.querySelector('dialog')).not.toBeNull();
-    await render(1);
-    expect(container.querySelectorAll('article')).toHaveLength(1);
-    expect(container.querySelector('dialog')).toBeNull();
-    await click('더 불러오기');
-    expect(container.querySelectorAll('article')).toHaveLength(2);
-    expect(container.querySelector('dialog')).toBeNull();
-    expect(onEdit).not.toHaveBeenCalled();
-    expect(list.mock.calls.map(([, , cursor]) => cursor)).toEqual([
-      undefined,
-      'next',
-      undefined,
-      'next',
-    ]);
-  } finally {
-    await act(() => root.unmount());
-  }
-});
-
 it.each(['OLDEST', 'PRICE_ASC'] as const)(
   'keeps other %s cards when a missing card forces a refresh that fails',
   async (sort) => {
@@ -326,7 +239,6 @@ it.each(['OLDEST', 'PRICE_ASC'] as const)(
       .mockRejectedValueOnce(new Error('temporarily unavailable'))
       .mockResolvedValueOnce({ items: [remaining], nextCursor: null });
     api.list = list;
-    const onEdit = vi.fn(async () => {});
     const container = document.createElement('div');
     const root = createRoot(container);
     function render(missingCards?: ReadonlySet<string>) {
@@ -336,7 +248,6 @@ it.each(['OLDEST', 'PRICE_ASC'] as const)(
             api={api}
             sort={sort}
             missingCards={missingCards}
-            onEdit={onEdit}
             onOpenOriginal={() => {}}
           />,
         ),
@@ -344,19 +255,11 @@ it.each(['OLDEST', 'PRICE_ASC'] as const)(
     }
     try {
       await render();
-      await act(() =>
-        container
-          .querySelector<HTMLButtonElement>('article button[aria-label$="상품 관리"]')!
-          .click(),
-      );
-      expect(container.querySelector('dialog')).not.toBeNull();
       await render(new Set([sampleProduct.cardId]));
-      expect(container.querySelector('dialog')).toBeNull();
       expect(container.querySelector('article')?.textContent).toContain('구매한 바지');
       expect(container.textContent).not.toContain(sampleProduct.productTitle);
       expect(container.textContent).not.toContain('더 불러오기');
-      expect(container.textContent).toContain('구매 완료 목록을 갱신하지 못했어요.');
-      expect(onEdit).not.toHaveBeenCalled();
+      expect(container.textContent).toContain('구매 완료 목록을 불러오지 못했어요.');
       const retry = Array.from(container.querySelectorAll('button')).find(
         (b) => b.textContent === '목록 다시 불러오기',
       )!;

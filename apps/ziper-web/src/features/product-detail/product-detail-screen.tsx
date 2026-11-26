@@ -28,29 +28,22 @@ export function ProductDetailScreen({
   cardId,
   api,
   onBack,
-  onSignIn,
   openPurchased,
   fromPurchasedList = false,
-  initialAction,
-  onInitialActionHandled,
   openExternal,
   platformReady = true,
 }: {
   cardId: string;
   api: ProductDetailApi;
   onBack?: () => void | Promise<unknown>;
-  onSignIn?: () => Promise<unknown>;
   openPurchased?: (replace: boolean) => Promise<unknown>;
   fromPurchasedList?: boolean;
-  /** Opens the edit sheet once the fresh detail arrives, e.g. from a purchased card menu. */
-  initialAction?: 'edit';
-  onInitialActionHandled?: () => void;
   openExternal: (url: string) => Promise<void>;
   platformReady?: boolean;
 }) {
   const [view, setView] = useState<'detail' | 'menu' | 'edit' | 'confirm'>('detail');
   const [pending, setPending] = useState<
-    'purchase' | 'original' | 'edit' | 'purchased-list' | 'sign-in' | null
+    'purchase' | 'original' | 'edit' | 'purchased-list' | null
   >(null);
   const [error, setError] = useState('');
   // Set after an unconfirmed purchase: only a fresh read may enable the menu again.
@@ -77,7 +70,6 @@ export function ProductDetailScreen({
   const alive = useRef(false);
   const openingOriginal = useRef<AbortController | null>(null);
   const purchaseAttempted = useRef(false);
-  const entryAction = useRef(initialAction);
   const detailBody = useRef<HTMLDivElement>(null);
   const manageButton = useRef<HTMLButtonElement>(null);
   const actionMessage = useRef<HTMLDivElement>(null);
@@ -96,11 +88,6 @@ export function ProductDetailScreen({
             ? '아직 구매 예정 상품이에요. 구매 완료로 변경하려면 다시 선택해 주세요.'
             : '',
         );
-        if (!entryAction.current) return;
-        entryAction.current = undefined;
-        onInitialActionHandled?.();
-        // Don't push a sheet entry in front of a Back that is already in flight.
-        if (!leaving.current) setView('edit');
       },
     },
   );
@@ -129,6 +116,10 @@ export function ProductDetailScreen({
         ? loaded.error.code
         : 'failed'
       : null);
+  const authReadFailed = loadCode === 'auth-required' && !accessError;
+  useEffect(() => {
+    if (authReadFailed) showToast(loadErrors['auth-required']);
+  }, [authReadFailed]);
   const purchases = api.purchases;
   const canPurchase = Boolean(purchases) && product?.status === 'PLANNED';
   const removed = product?.linkStatus === 'REMOVED';
@@ -186,6 +177,7 @@ export function ProductDetailScreen({
       const reason = result.status === 'rejected' ? result.reason : null;
       if (reason === 'auth-required' || reason === 'forbidden') {
         setAccessError(reason === 'forbidden' ? 'mutation-forbidden' : reason);
+        if (reason === 'auth-required') showToast('로그인이 만료되어 구매 상태를 바꿀 수 없어요.');
         return;
       }
       // JEC-79 also allows 400 for an already deleted card. Confirm the current state first.
@@ -224,17 +216,6 @@ export function ProductDetailScreen({
     }
   }
 
-  async function signIn() {
-    if (!onSignIn || !begin('sign-in')) return;
-    try {
-      await onSignIn();
-    } catch {
-      setError('로그인 화면을 열지 못했어요. 다시 시도해 주세요.');
-    } finally {
-      finish();
-    }
-  }
-
   async function original(card: Pick<ProductDetail, 'cardId' | 'productUrl' | 'linkStatus'>) {
     if (card.linkStatus === 'REMOVED' || !platformReady || !begin('original')) return;
     const operation = new AbortController();
@@ -251,7 +232,11 @@ export function ProductDetailScreen({
         if (reason.code === 'auth-required' || reason.code === 'not-found') {
           setView('detail');
           setAccessError(reason.code);
-          setError('쇼핑몰은 열었지만 방문 기록은 남기지 못했어요.');
+          if (reason.code === 'auth-required') {
+            showToast('로그인이 만료되어 방문 기록을 남기지 못했어요.');
+          } else {
+            setError('쇼핑몰은 열었지만 방문 기록은 남기지 못했어요.');
+          }
           return;
         }
         if (reason.code === 'forbidden') {
@@ -348,7 +333,7 @@ export function ProductDetailScreen({
         }
       />
       <div ref={detailBody} tabIndex={-1} className={styles.body}>
-        {loadCode ? (
+        {loadCode === 'auth-required' ? null : loadCode ? (
           <>
             <p className={styles.error} role="alert" tabIndex={-1} data-reload-result>
               {accessError === 'mutation-forbidden'
@@ -363,11 +348,7 @@ export function ProductDetailScreen({
                 </>
               )}
             </p>
-            {loadCode === 'auth-required' && onSignIn ? (
-              <Button loading={pending === 'sign-in'} onClick={() => void signIn()}>
-                로그인 화면으로 이동
-              </Button>
-            ) : loadCode === 'not-found' && fromPurchasedList && openPurchased ? (
+            {loadCode === 'not-found' && fromPurchasedList && openPurchased ? (
               purchasedReturn
             ) : (
               <Button disabled={Boolean(pending)} onClick={reload}>
@@ -481,12 +462,6 @@ export function ProductDetailScreen({
             updateProduct(() => latest);
           }}
           onCancel={closeLayer}
-          onSignIn={
-            onSignIn &&
-            (async () => {
-              if (!(await discardLayer(onSignIn))) throw new Error('Could not close edit history');
-            })
-          }
         />
       )}
       <Modal

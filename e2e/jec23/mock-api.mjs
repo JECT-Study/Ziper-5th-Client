@@ -50,7 +50,6 @@ let failMutationStatusRead = false;
 let failedStatusCardId = null;
 let summaryFailure = null;
 let dropEditBeforeCommit = false;
-let staleEditReply = false;
 let failEditStatusRead = false;
 let failDetailId = null;
 let failEditBoards = false;
@@ -66,7 +65,7 @@ let failReissueOnce = null;
 let deleteBoardOnEdit = false;
 let boardChoicesRefreshStatus = null;
 let removeCardOnEdit = false;
-let boardCreateReply = null;
+let duplicateBoardOnCreate = false;
 let delayOriginalReply = false;
 let originalVisitStatus = null;
 const purchased = () => cards.filter((card) => card.status === 'PURCHASED');
@@ -161,9 +160,7 @@ createServer(async (req, res) => {
         searchParams.get('boardChoicesRefreshStatus') ??
         (searchParams.get('expireOnBoardChoicesRefresh') === '1' ? '401' : null);
       removeCardOnEdit = searchParams.get('removeCardOnEdit') === '1';
-      boardCreateReply =
-        searchParams.get('boardCreateReply') ??
-        (searchParams.get('duplicateBoardOnCreate') === '1' ? 'duplicate' : null);
+      duplicateBoardOnCreate = searchParams.get('duplicateBoardOnCreate') === '1';
       cards = seed().filter(
         (card) => searchParams.get('emptyPurchased') !== '1' || card.status !== 'PURCHASED',
       );
@@ -204,7 +201,6 @@ createServer(async (req, res) => {
       failedStatusCardId = null;
       summaryFailure = null;
       dropEditBeforeCommit = searchParams.get('dropEditBeforeCommit') === '1';
-      staleEditReply = searchParams.get('staleEditReply') === '1';
       failEditStatusRead = searchParams.get('failEditStatusRead') === '1';
       failDetailId = null;
       failEditBoards = searchParams.get('failEditBoards') === '1';
@@ -287,21 +283,10 @@ createServer(async (req, res) => {
       const boardId = Math.max(...boards.map((board) => board.boardId)) + 1;
       const board = { boardId, name };
       boards = [board, ...boards];
-      const reply = boardCreateReply;
-      boardCreateReply = null;
-      if (reply === 'duplicate') {
+      if (duplicateBoardOnCreate) {
         // A board with the submitted name was created elsewhere after loading choices.
+        duplicateBoardOnCreate = false;
         return json(409, { code: 'DUPLICATE_BOARD_NAME' });
-      }
-      if (reply === 'wrong-board') {
-        // The requested board was created, but the response refers to a different board.
-        return json(201, {
-          boardId: 2,
-          name: '가을 코디',
-          productCount: 2,
-          createdAt,
-          modifiable: true,
-        });
       }
       return json(201, { ...board, productCount: 0, createdAt, modifiable: true });
     }
@@ -440,7 +425,6 @@ createServer(async (req, res) => {
         res.destroy();
         return;
       }
-      const previous = staleEditReply ? dto(card) : null;
       const updatedOrder = nextUpdatedOrder++;
       Object.assign(card, {
         updatedOrder,
@@ -458,8 +442,7 @@ createServer(async (req, res) => {
         tags: tags.map((title, index) => ({ title, tagId: index + 1, isDefault: false })),
       });
       finishMirror();
-      staleEditReply = false;
-      return committed(previous ?? dto(card));
+      return committed(dto(card));
     }
     if (method === 'POST' && productPath[2] === 'purchase') {
       if (expireSessionOnPurchase) {

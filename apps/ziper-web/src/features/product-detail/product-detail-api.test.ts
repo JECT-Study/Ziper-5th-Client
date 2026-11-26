@@ -108,12 +108,6 @@ it('creates a board using the deployed board command and reads its count', async
   );
 });
 
-it('rejects a create acknowledgement for a different board without replaying POST', async () => {
-  reply({ boardId: 2, name: '가을 코디', productCount: 0 }, 201);
-  await expect(productDetailApi.createBoard('새 테스트')).rejects.toThrow('Invalid API response');
-  expect(fetchApi).toHaveBeenCalledOnce();
-});
-
 it.each([
   [400, 'failed'],
   [403, 'forbidden'],
@@ -172,34 +166,9 @@ it('does not repeat or report success after a 5xx or malformed success', async (
   expect(fetchApi).toHaveBeenCalledTimes(2);
 });
 
-it.each([
-  { productTitle: '이전 이름' },
-  { price: 123 },
-  { memo: '이전 메모' },
-  { fallbackIcon: 'PANTS' },
-  { imageFileId: 32 },
-  { imageFileId: null },
-  { tags: [{ title: '봄' }] },
-  { tags: [...card.tags, ...card.tags] },
-  { boards: [] },
-  { boards: [{ boardId: 13, name: '다른 보드' }] },
-  { boards: [...card.boards, ...card.boards] },
-])('requires a status check after an inconsistent PATCH acknowledgement: %j', async (fields) => {
-  reply({ ...card, productTitle: patch.productTitle, ...fields });
+it('does not report success for a different card ID', async () => {
+  reply({ ...card, cardId: 8 });
   await expect(productDetailApi.update('7', patch)).resolves.toEqual({ status: 'unknown' });
-  expect(fetchApi.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
-    [path, 'PATCH'],
-  ]);
-});
-
-it.each([
-  { imageFileId: 31, imageUrl: null },
-  { imageFileId: null, imageUrl: 'https://shop.example/old.jpg' },
-])('checks if a photo was cleared when the fallback icon is unchanged: %j', async (image) => {
-  reply({ ...card, ...image, productTitle: patch.productTitle });
-  await expect(productDetailApi.update('7', { ...patch, imageFileId: null })).resolves.toEqual({
-    status: 'unknown',
-  });
   expect(fetchApi).toHaveBeenCalledOnce();
 });
 
