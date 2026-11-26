@@ -31,9 +31,13 @@ async function socialSignIn(path: string, body: unknown): Promise<SocialLoginRes
   return { status: 'signedIn', accessToken: result.accessToken };
 }
 
-export async function isNicknameAvailable(nickname: string): Promise<boolean> {
+export async function isNicknameAvailable(
+  nickname: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
   const { available } = await request<{ available: boolean }>(
     `/api/v1/users/nickname/availability?nickname=${encodeURIComponent(nickname)}`,
+    { signal },
   );
   return available;
 }

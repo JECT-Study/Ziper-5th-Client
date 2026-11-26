@@ -7,8 +7,8 @@ import { purchasesEnabled } from '../product-detail/product-detail-api';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
 import type { Board } from './api';
 import { BoardCard, BoardCardSkeleton } from './board-card';
-import { useBoards } from './use-boards';
 import { useBoardManage } from './use-board-manage';
+import { useBoardsQuery } from './queries';
 import { useCreateBoardSheet } from './use-create-board';
 import * as styles from './board.css';
 import * as page from './board-detail.css';
@@ -30,11 +30,11 @@ export function BoardsScreen() {
   const { platform, status } = usePlatform();
   const selectTab = useTabNavigation();
   const navigate = useNavigate();
-  const boards = useBoards();
+  const boards = useBoardsQuery();
   const [filter, setFilter] = useState<Filter>('all');
   const list = boards.data?.boards ?? [];
   const create = useCreateBoardSheet(list.map((board) => board.name));
-  const manage = useBoardManage(list, boards.reload);
+  const manage = useBoardManage(list);
 
   const now = Date.now();
   const shown =
@@ -60,15 +60,15 @@ export function BoardsScreen() {
           ))}
         </div>
 
-        {boards.status === 'error' && !boards.data ? (
+        {boards.isError && !boards.data ? (
           <div className={styles.status}>
             <p role="alert">보드를 불러오지 못했어요.</p>
-            <Button variant="secondary" size="small" onClick={boards.reload}>
+            <Button variant="secondary" size="small" onClick={() => void boards.refetch()}>
               다시 시도
             </Button>
           </div>
         ) : (
-          <div className={styles.tabGrid} aria-busy={!boards.data}>
+          <div className={styles.tabGrid} aria-busy={boards.isPending}>
             {!boards.data && (
               <>
                 <BoardCardSkeleton />

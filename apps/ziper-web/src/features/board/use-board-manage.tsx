@@ -3,19 +3,22 @@ import { BottomSheet, Button, Modal, showToast } from '../../components';
 import { cx } from '../../components/cx';
 import { ApiError, errorMessage } from '../../shared/api/http';
 import { useBackLayer } from '../../shared/use-back-layer';
-import { deleteBoard, renameBoard, type Board } from './api';
+import type { Board } from './api';
 import { BoardNameSheet } from './board-name-sheet';
+import { useDeleteBoard, useRenameBoard } from './queries';
 import * as styles from './board.css';
 
 type Step = 'menu' | 'rename' | 'delete';
 
 /**
  * 보드 카드의 ... 를 누르면 여는 보드 관리 흐름: 관리 메뉴 → 보드명 수정 시트 / 삭제 확인.
- * 수정·삭제가 끝나면 onChanged 로 목록을 다시 불러오게 한다.
+ * 수정·삭제가 끝나면 mutation 이 보드 쿼리를 다시 받게 해서 홈·내 보드 탭이 같이 바뀐다.
  */
-export function useBoardManage(boards: readonly Board[], onChanged: () => void) {
+export function useBoardManage(boards: readonly Board[]) {
   const [target, setTarget] = useState<{ board: Board; step: Step } | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const renameBoard = useRenameBoard();
+  const deleteBoard = useDeleteBoard();
+  const deleting = deleteBoard.isPending;
   const close = () => setTarget(null);
 
   // 메뉴 → 이름 수정·삭제 확인을 history 한 칸으로 묶는다. 단계마다 칸을 따로 쌓으면
@@ -35,7 +38,7 @@ export function useBoardManage(boards: readonly Board[], onChanged: () => void) 
   async function rename(name: string) {
     if (!target) return 'failed' as const;
     try {
-      await renameBoard(target.board.boardId, name);
+      await renameBoard.mutateAsync({ boardId: target.board.boardId, name });
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) return 'duplicate' as const;
       showToast(errorMessage(error, '보드 이름을 바꾸지 못했어요. 다시 시도해 주세요.'));
@@ -43,24 +46,20 @@ export function useBoardManage(boards: readonly Board[], onChanged: () => void) 
     }
     close();
     showToast('보드 이름을 바꿨어요');
-    onChanged();
     return 'done' as const;
   }
 
-  async function remove() {
+  function remove() {
     if (!target || deleting) return;
     const { board } = target;
-    setDeleting(true);
-    try {
-      await deleteBoard(board.boardId);
-      close();
-      showToast(`${board.name} 보드를 삭제했어요`);
-      onChanged();
-    } catch (error) {
-      showToast(errorMessage(error, '보드를 삭제하지 못했어요. 다시 시도해 주세요.'));
-    } finally {
-      setDeleting(false);
-    }
+    deleteBoard.mutate(board.boardId, {
+      onSuccess: () => {
+        close();
+        showToast(`${board.name} 보드를 삭제했어요`);
+      },
+      onError: (error) =>
+        showToast(errorMessage(error, '보드를 삭제하지 못했어요. 다시 시도해 주세요.')),
+    });
   }
 
   const board = target?.board;
@@ -120,7 +119,7 @@ export function useBoardManage(boards: readonly Board[], onChanged: () => void) 
             <Button variant="secondary" onClick={close} disabled={deleting}>
               취소
             </Button>
-            <Button onClick={() => void remove()} loading={deleting}>
+            <Button onClick={remove} loading={deleting}>
               삭제하기
             </Button>
           </>

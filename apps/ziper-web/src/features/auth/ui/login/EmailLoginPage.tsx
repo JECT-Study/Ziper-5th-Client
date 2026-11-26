@@ -2,7 +2,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, TextField, showToast } from '../../../../components';
 import { ApiError, errorMessage } from '../../../../shared/api/http';
-import { signInWithEmail } from '../../api/authApi';
+import { useEmailLoginMutation } from '../../api/queries';
 import { isValidEmail } from '../../model/rules';
 import { StepScreen } from '../common/StepScreen';
 import { fields } from '../common/StepScreen.css';
@@ -17,23 +17,28 @@ export function EmailLoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const login = useEmailLoginMutation();
+  // 성공한 뒤 화면을 옮기는 동안에도 버튼을 막아 둔다.
+  const submitting = login.isPending || login.isSuccess;
   // wrong: 이메일·비밀번호 불일치, locked: 여러 번 틀려 잠김(백엔드가 429 로 알린다)
   const [failure, setFailure] = useState<'wrong' | 'locked' | null>(null);
 
-  async function submit() {
-    setSubmitting(true);
-    try {
-      await signInWithEmail(email, password);
-      showToast('로그인 성공');
-      navigate({ to: '/', replace: true });
-    } catch (error) {
-      setSubmitting(false);
-      // 백엔드는 없는 이메일·틀린 비밀번호·소셜 전용 계정을 모두 같은 401 로 준다(계정 유무를 숨기려고).
-      if (error instanceof ApiError && error.status === 401) setFailure('wrong');
-      else if (error instanceof ApiError && error.status === 429) setFailure('locked');
-      else showToast(errorMessage(error, '로그인하지 못했어요. 다시 시도해주세요'));
-    }
+  function submit() {
+    login.mutate(
+      { email, password },
+      {
+        onSuccess: () => {
+          showToast('로그인 성공');
+          navigate({ to: '/', replace: true });
+        },
+        onError: (error) => {
+          // 백엔드는 없는 이메일·틀린 비밀번호·소셜 전용 계정을 모두 같은 401 로 준다(계정 유무를 숨기려고).
+          if (error instanceof ApiError && error.status === 401) setFailure('wrong');
+          else if (error instanceof ApiError && error.status === 429) setFailure('locked');
+          else showToast(errorMessage(error, '로그인하지 못했어요. 다시 시도해주세요'));
+        },
+      },
+    );
   }
 
   return (
