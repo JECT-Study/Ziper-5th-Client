@@ -21,22 +21,16 @@ import {
   Toast,
 } from '../../components';
 import {
-  codePointLength,
-  hasUnsupportedTagCharacters,
-  invalidTagCharactersMessage,
-  isValidTag,
-  normalizeProductMemo,
-  normalizeProductTitle,
-  normalizeTag,
-  parseWholeWon,
-  priceRangeMessage,
   productLimits,
   seasonTags,
   tagInputHint,
-  titleLengthMessage,
   type FallbackIcon,
 } from '@ziper/api/product-fields';
+import { useForm, useStore } from '@tanstack/react-form';
+import * as v from 'valibot';
+import { boardNameSchema, normalizeBoardName } from '../board/board-name';
 import { InlineEntry } from './inline-entry';
+import { newTagSchema, productFields, requiredImage } from './product-schema';
 import { useProductLookup, type ExtractProduct, type ProductLookup } from './product-lookup';
 import { useSaveProduct, type CardImage, type ProductSaveResult } from './use-save-product';
 import { useLinkedImage } from './use-linked-image';
@@ -55,6 +49,9 @@ const imageModes = [
   { value: 'template', label: '도안 고르기' },
 ] as const;
 const won = new Intl.NumberFormat('ko-KR');
+const saveSchema = v.object({ ...productFields, image: requiredImage<CardImage | null>() });
+const toggle = <T,>(selection: T[], value: T) =>
+  selection.includes(value) ? selection.filter((item) => item !== value) : [...selection, value];
 
 type ScreenProps = {
   url: string | null;
@@ -212,23 +209,13 @@ function ProductForm({
         : entryMode === 'manual'
           ? '이 링크는 자동 입력을 지원하지 않아요. 직접 입력해서 저장할 수 있어요.'
           : null;
-  const [name, setName] = useState(product?.name || initialDraft?.name || '');
-  const [price, setPrice] = useState(product?.price != null ? won.format(product.price) : '');
-  const [selectedImage, setImage] = useState<CardImage | null>(
-    linkedImage ? { kind: 'linked-product', url: linkedImage } : (initialDraft?.image ?? null),
-  );
   const {
     attempt,
     status: imageStatus,
     loading: loadingImage,
     settle: settleImage,
   } = useLinkedImage(linkedImage);
-  const linkedImageSelected =
-    selectedImage?.kind === 'linked-product' && selectedImage.url === linkedImage;
-  const image = linkedImageSelected && imageStatus !== 'ready' ? null : selectedImage;
-  const [memo, setMemo] = useState(initialDraft?.memo ?? '');
   const [tags, setTags] = useState(initialTags);
-  const [selectedTags, setSelectedTags] = useState(initialDraft?.tags ?? []);
   const [tag, setTag] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const loadedBoards = useGetBoards();
@@ -239,36 +226,74 @@ function ProductForm({
       : 'loading';
   const createBoardMutation = useCreateBoard();
   const saveProduct = useSaveProduct();
-  const [selectedBoards, setSelectedBoards] = useState(initialDraft?.boardIds ?? []);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [boardError, setBoardError] = useState(false);
-  const [pending, setPending] = useState<'board' | 'save' | null>(null);
   const [saveResult, setSaveResult] = useState<ProductSaveResult | null>(null);
   const [opening, setOpening] = useState<'idle' | 'busy' | 'error'>('idle');
   const boardList = useRef<HTMLUListElement>(null);
   const focusTrigger = useRef<'tag' | 'board' | null>(null);
   const busy = useRef(false);
-  const tagName = tag !== null && isValidTag(tag) ? normalizeTag(tag) : undefined;
-  const newBoardName = boardName?.trim();
-  const canAddTag = Boolean(tagName && !tags.includes(tagName));
-  const canCreateBoard = Boolean(
-    newBoardName &&
+
+  const form = useForm({
+    defaultValues: {
+      productTitle: product?.name || initialDraft?.name || '',
+      price: product?.price != null ? won.format(product.price) : '',
+      memo: initialDraft?.memo ?? '',
+      tags: initialDraft?.tags ?? ([] as string[]),
+      boardIds: initialDraft?.boardIds ?? ([] as number[]),
+      image: (linkedImage
+        ? { kind: 'linked-product', url: linkedImage }
+        : (initialDraft?.image ?? null)) as CardImage | null,
+    },
+    validators: { onMount: saveSchema, onChange: saveSchema },
+    onSubmit: async ({ value }) => {
+      if (!image || busy.current) return;
+      const fields = v.parse(saveSchema, value);
+      busy.current = true;
+      setSaveResult(null);
+      try {
+        setSaveResult(
+          await saveProduct.mutateAsync({
+            url,
+            sharedUrl: sourceURL === url ? null : sourceURL,
+            shop,
+            name: fields.productTitle,
+            price: fields.price,
+            metadataSource: product ? 'CLIENT' : 'MANUAL',
+            image,
+            tags: fields.tags,
+            memo: fields.memo,
+            boardIds: fields.boardIds,
+          }),
+        );
+      } catch {
+        setSaveResult({ status: 'unknown' });
+      } finally {
+        busy.current = false;
+      }
+    },
+  });
+  const selectedImage = useStore(form.store, (state) => state.values.image);
+  const selectedTags = useStore(form.store, (state) => state.values.tags);
+  const selectedBoards = useStore(form.store, (state) => state.values.boardIds);
+  const [valid, saving] = useStore(form.store, (state) => [state.isValid, state.isSubmitting]);
+  const setImage = (next: CardImage | null) => form.setFieldValue('image', next);
+  const linkedImageSelected =
+    selectedImage?.kind === 'linked-product' && selectedImage.url === linkedImage;
+  const image = linkedImageSelected && imageStatus !== 'ready' ? null : selectedImage;
+  const creatingBoard = createBoardMutation.isPending;
+  const pending = saving ? 'save' : creatingBoard ? 'board' : null;
+  const newTag = tag === null ? null : v.safeParse(newTagSchema(tags), tag);
+  const boardNames = typeof boards === 'string' ? [] : boards.map((board) => board.name);
+  const canCreateBoard =
+    boardName !== null &&
     typeof boards !== 'string' &&
-    !boards.some((board) => board.name === newBoardName),
-  );
-  const numericPrice = parseWholeWon(price);
-  const invalidPrice = numericPrice === null;
-  const normalizedName = normalizeProductTitle(name);
-  const invalidName = codePointLength(normalizedName) > productLimits.titleLength;
+    v.is(boardNameSchema(boardNames), boardName);
   const canSave = Boolean(
-    normalizedName &&
-    !invalidName &&
-    !invalidPrice &&
+    valid &&
     image &&
-    selectedTags.length &&
     typeof boards !== 'string' &&
-    selectedBoards.length &&
-    // Only a confirmed no-effect failure may be submitted again.
+    // 서버가 거절해 아무것도 바뀌지 않은 실패만 다시 보낼 수 있다.
     (!saveResult || (saveResult.status === 'rejected' && saveResult.reason === 'failed')),
   );
   const saveError =
@@ -276,11 +301,6 @@ function ProductForm({
       ? saveErrors[saveResult.reason]
       : saveResult?.status === 'unknown' && saveErrors.unknown;
 
-  function toggle<T>(selection: T[], value: T) {
-    return selection.includes(value)
-      ? selection.filter((item) => item !== value)
-      : [...selection, value];
-  }
   function closeTagEntry() {
     focusTrigger.current = 'tag';
     setTag(null);
@@ -297,19 +317,18 @@ function ProductForm({
     }
   }
   function addTag() {
-    if (!tagName || !canAddTag) return;
-    setTags([...tags, tagName]);
-    setSelectedTags([...selectedTags, tagName]);
+    if (!newTag?.success) return;
+    setTags([...tags, newTag.output]);
+    form.setFieldValue('tags', (current) => [...current, newTag.output]);
     closeTagEntry();
   }
   async function createBoard() {
-    if (!newBoardName || !canCreateBoard || busy.current) return;
+    if (!boardName || !canCreateBoard || busy.current) return;
     busy.current = true;
-    setPending('board');
     setBoardError(false);
     try {
       const { data: board } = await createBoardMutation.mutateAsync({
-        data: { name: newBoardName },
+        data: { name: normalizeBoardName(boardName) },
       });
       queryClient.setQueryData<getBoardsResponse>(
         getGetBoardsQueryKey(),
@@ -323,41 +342,12 @@ function ProductForm({
           },
       );
       void queryClient.invalidateQueries({ queryKey: getGetBoardsQueryKey() });
-      setSelectedBoards((list) => [...list, board.boardId]);
+      form.setFieldValue('boardIds', (list) => [...list, board.boardId]);
       closeBoardEntry();
       boardList.current?.scrollTo(0, 0);
     } catch {
       setBoardError(true);
     } finally {
-      setPending(null);
-      busy.current = false;
-    }
-  }
-
-  async function save() {
-    if (!canSave || !image || numericPrice === null || busy.current) return;
-    busy.current = true;
-    setPending('save');
-    setSaveResult(null);
-    try {
-      setSaveResult(
-        await saveProduct.mutateAsync({
-          url,
-          sharedUrl: sourceURL === url ? null : sourceURL,
-          shop,
-          name: normalizedName,
-          price: numericPrice,
-          metadataSource: product ? 'CLIENT' : 'MANUAL',
-          image,
-          tags: selectedTags,
-          memo: normalizeProductMemo(memo),
-          boardIds: selectedBoards,
-        }),
-      );
-    } catch {
-      setSaveResult({ status: 'unknown' });
-    } finally {
-      setPending(null);
       busy.current = false;
     }
   }
@@ -393,7 +383,7 @@ function ProductForm({
         className={styles.form}
         onSubmit={(event) => {
           event.preventDefault();
-          void save();
+          if (canSave && pending === null) void form.handleSubmit();
         }}
       >
         <div className={styles.fields}>
@@ -448,29 +438,40 @@ function ProductForm({
               </div>
             </div>
           )}
-          <TextField
-            label="상품명"
-            variant="box"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onClear={() => setName('')}
-            error={invalidName && titleLengthMessage}
-            required
-          />
-          <TextField
-            label="가격"
-            variant="box"
-            value={price}
-            inputMode="numeric"
-            placeholder="ex)10,000원"
-            error={Boolean(price.trim()) && invalidPrice && priceRangeMessage}
-            onChange={(event) => setPrice(event.target.value)}
-            onBlur={() => {
-              if (!invalidPrice && numericPrice !== null) setPrice(won.format(numericPrice));
-            }}
-            onClear={() => setPrice('')}
-            required
-          />
+          <form.Field name="productTitle">
+            {(field) => (
+              <TextField
+                label="상품명"
+                variant="box"
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+                onClear={() => field.handleChange('')}
+                error={field.state.meta.errors[0]?.message || undefined}
+                required
+              />
+            )}
+          </form.Field>
+          <form.Field name="price">
+            {(field) => (
+              <TextField
+                label="가격"
+                variant="box"
+                value={field.state.value}
+                inputMode="numeric"
+                placeholder="ex)10,000원"
+                error={
+                  (field.state.value.trim() && field.state.meta.errors[0]?.message) || undefined
+                }
+                onChange={(event) => field.handleChange(event.target.value)}
+                onBlur={() => {
+                  const price = v.safeParse(productFields.price, field.state.value);
+                  if (price.success) field.handleChange(won.format(price.output));
+                }}
+                onClear={() => field.handleChange('')}
+                required
+              />
+            )}
+          </form.Field>
           <CardImagePicker image={image} setImage={setImage} />
           <section className={styles.group} aria-label="해시태그">
             <p className={styles.label}>해시태그 (1개 이상)</p>
@@ -479,7 +480,7 @@ function ProductForm({
                 <span className={styles.customTag} key={value}>
                   <ChipFilter
                     selected={selectedTags.includes(value)}
-                    onClick={() => setSelectedTags(toggle(selectedTags, value))}
+                    onClick={() => form.setFieldValue('tags', (current) => toggle(current, value))}
                   >
                     {value}
                   </ChipFilter>
@@ -490,7 +491,9 @@ function ProductForm({
                       aria-label={value + ' 해시태그 삭제'}
                       onClick={() => {
                         setTags(tags.filter((item) => item !== value));
-                        setSelectedTags(selectedTags.filter((item) => item !== value));
+                        form.setFieldValue('tags', (current) =>
+                          current.filter((item) => item !== value),
+                        );
                       }}
                     >
                       <Icon name="xmark-circle-fill" size={16} />
@@ -514,23 +517,27 @@ function ProductForm({
                 label="새 해시태그"
                 value={tag}
                 helperText={tagInputHint}
-                error={hasUnsupportedTagCharacters(tag) ? invalidTagCharactersMessage : undefined}
+                error={(!newTag?.success && newTag?.issues[0].message) || undefined}
                 action="추가"
-                disabled={!canAddTag}
+                disabled={!newTag?.success}
                 onChange={setTag}
                 onConfirm={addTag}
                 onCancel={closeTagEntry}
               />
             )}
           </section>
-          <TextField
-            label="한 줄 메모(선택)"
-            variant="box"
-            value={memo}
-            onChange={(event) => setMemo(event.target.value)}
-            onClear={() => setMemo('')}
-            maxLength={productLimits.memoLength}
-          />
+          <form.Field name="memo">
+            {(field) => (
+              <TextField
+                label="한 줄 메모(선택)"
+                variant="box"
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+                onClear={() => field.handleChange('')}
+                maxLength={productLimits.memoLength}
+              />
+            )}
+          </form.Field>
           <section className={styles.group} aria-label="보드 선택">
             <p className={styles.label}>보드 선택 (1개 이상)</p>
             <div className={styles.boardPanel}>
@@ -561,7 +568,9 @@ function ProductForm({
                             className={styles.boardCheck}
                             checked={selectedBoards.includes(board.boardId)}
                             onChange={() =>
-                              setSelectedBoards(toggle(selectedBoards, board.boardId))
+                              form.setFieldValue('boardIds', (current) =>
+                                toggle(current, board.boardId),
+                              )
                             }
                           >
                             {board.name}
@@ -594,7 +603,7 @@ function ProductForm({
                         variant="secondary"
                         placeholder="보드 이름"
                         helperText="최대 10자까지 입력 가능해요"
-                        loading={pending === 'board'}
+                        loading={creatingBoard}
                         disabled={!canCreateBoard}
                         onChange={setBoardName}
                         onConfirm={() => void createBoard()}

@@ -1,3 +1,4 @@
+import { useForm, useStore } from '@tanstack/react-form';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetBoardsQueryKey,
@@ -9,15 +10,7 @@ import {
 } from '@ziper/api';
 import { ApiError } from '@ziper/api/http';
 import type { ProductCardDetailResponse, UpdateProductCardRequest } from '@ziper/api/schemas';
-import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type MouseEvent,
-  type SubmitEvent,
-} from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import {
   BottomSheet,
   Button,
@@ -29,6 +22,7 @@ import {
   Toaster,
   showToast,
 } from '../../components';
+import * as v from 'valibot';
 import {
   BOARD_NAME_MAX,
   INVALID_BOARD_NAME_MESSAGE,
@@ -38,20 +32,18 @@ import {
 import * as boardStyles from '../product-save/product-save.css';
 import { InlineEntry } from '../product-save/inline-entry';
 import {
+  boardsMessage,
+  newTagSchema,
+  productFields,
+  requiredImage,
+  tagsMessage,
+} from '../product-save/product-schema';
+import {
   codePointLength,
-  hasUnsupportedTagCharacters,
-  invalidTagCharactersMessage,
-  isValidTag,
-  normalizeProductMemo,
-  normalizeProductTitle,
-  normalizeTag,
-  parseWholeWon,
-  priceRangeMessage,
-  productLimits,
   fallbackIcons,
+  normalizeTag,
   seasonTags,
   tagInputHint,
-  titleLengthMessage,
   type FallbackIcon,
 } from '@ziper/api/product-fields';
 import { productRejection, readErrorCode, type ProductErrorCode } from './product-errors';
@@ -59,6 +51,10 @@ import * as styles from './product-detail.css';
 
 type ProductDetail = ProductCardDetailResponse;
 type ProductUpdate = UpdateProductCardRequest;
+const editSchema = v.object({
+  ...productFields,
+  image: requiredImage<'keep' | FallbackIcon | null>(),
+});
 
 const iconLabels: Record<FallbackIcon, string> = {
   TOP: '상의',
@@ -160,18 +156,29 @@ export function ProductEditForm({
   onChecked: (product: ProductDetail) => void;
 }) {
   const formId = useId();
-  const [title, setTitle] = useState(product.productTitle);
-  const [price, setPrice] = useState(() => String(product.price ?? ''));
   const [editingPrice, setEditingPrice] = useState(false);
-  const [memo, setMemo] = useState(product.memo ?? '');
-  const [tags, setTags] = useState(() => [
-    ...new Set(product.tags.map(({ title }) => normalizeTag(title)).filter(Boolean)),
-  ]);
+  const form = useForm({
+    defaultValues: {
+      productTitle: product.productTitle,
+      price: String(product.price ?? ''),
+      memo: product.memo ?? '',
+      tags: [...new Set(product.tags.map(({ title }) => normalizeTag(title)).filter(Boolean))],
+      boardIds: product.boards.map((board) => board.boardId),
+      image: (product.imageUrl || product.imageFileId || product.fallbackIcon ? 'keep' : null) as
+        | 'keep'
+        | FallbackIcon
+        | null,
+    },
+    validators: { onMount: editSchema, onChange: editSchema },
+    onSubmit: ({ value }) => submit(v.parse(editSchema, value)),
+  });
+  const values = useStore(form.store, (state) => state.values);
+  const formValid = useStore(form.store, (state) => state.isValid);
+  const { tags, boardIds, image } = values;
   const [tagOptions, setTagOptions] = useState(() => [...new Set([...seasonTags, ...tags])]);
   const [tagDraft, setTagDraft] = useState<string | null>(null);
   const tagTrigger = useInlineEntryTrigger(tagDraft !== null);
   const imageOptions = useRef<HTMLDivElement>(null);
-  const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.boardId));
   const [boardName, setBoardName] = useState<string | null>(null);
   const boardTrigger = useInlineEntryTrigger(boardName !== null);
   const [boardError, setBoardError] = useState<
@@ -179,7 +186,6 @@ export function ProductEditForm({
   >(null);
   const boardList = useRef<HTMLUListElement>(null);
   const boardActions = useRef<HTMLDivElement>(null);
-  const [image, setImage] = useState<'keep' | FallbackIcon>('keep');
   const [existingImageRejected, setExistingImageRejected] = useState(false);
   const [status, setStatus] = useState<
     'idle' | 'saving' | 'creating-board' | 'unknown' | 'checking' | 'review' | 'auth-required'
@@ -205,8 +211,10 @@ export function ProductEditForm({
   useEffect(() => {
     // 사라진 보드가 수정을 막지 않도록 뺀다.
     if (boards)
-      setBoardIds((ids) => ids.filter((id) => boards.some((board) => board.boardId === id)));
-  }, [boards]);
+      form.setFieldValue('boardIds', (ids) =>
+        ids.filter((id) => boards.some((board) => board.boardId === id)),
+      );
+  }, [boards, form]);
   const retryBoards = () =>
     void queryClient.resetQueries({ queryKey: getGetBoardsQueryKey(), exact: true });
   const boardsFailed = boardsQuery.isError;
@@ -233,56 +241,41 @@ export function ProductEditForm({
     }
   }, [boardError, boardsLoading]);
 
-  const newTag = normalizeTag(tagDraft ?? '');
-  const canAddTag = tagDraft !== null && isValidTag(tagDraft) && !tags.includes(newTag);
-  const amount = parseWholeWon(price.trim().replace(/원$/u, ''));
-  const invalidPrice = amount === null;
-  const invalidTags = tags.some((tag) => !isValidTag(tag));
+  const newTag = tagDraft === null ? null : v.safeParse(newTagSchema(tags), tagDraft);
+  const amount = v.safeParse(productFields.price, values.price);
+  const invalidTags = !v.is(productFields.tags, tags);
   const canKeepImage =
     !existingImageRejected &&
     Boolean(product.imageUrl || product.imageFileId || product.fallbackIcon);
-  const missingImage = image === 'keep' && !canKeepImage;
+  const missingImage = image === null;
   const invalidBoards =
     !boards ||
     !boardIds.length ||
     boardIds.some((id) => !boards.some((board) => board.boardId === id));
-  const normalizedTitle = normalizeProductTitle(title);
-  const titleLength = codePointLength(normalizedTitle);
-  const normalizedMemo = normalizeProductMemo(memo);
-  const memoLength = codePointLength(normalizedMemo);
   const valid =
-    titleLength > 0 &&
-    titleLength <= productLimits.titleLength &&
-    memoLength <= productLimits.memoLength &&
-    !invalidPrice &&
-    tags.length > 0 &&
-    !invalidTags &&
-    tagDraft === null &&
-    boardName === null &&
-    !missingImage &&
-    !invalidBoards;
+    formValid && tagDraft === null && boardName === null && !missingImage && !invalidBoards;
   const locked = (status !== 'idle' && !creatingBoard) || requiresLogin || boardsDenied;
   useEffect(() => {
     if (existingImageRejected) imageOptions.current?.scrollIntoView({ block: 'nearest' });
   }, [existingImageRejected]);
 
-  async function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!valid || locked || waiting || amount === null || busy.current) return;
+  async function submit(fields: v.InferOutput<typeof editSchema>) {
+    if (!valid || locked || waiting || busy.current) return;
     busy.current = true;
     setStatus('saving');
     onBusyChange(true);
     setError('');
+    const keep = fields.image === 'keep';
     const input: ProductUpdate = {
-      productTitle: normalizedTitle,
+      productTitle: fields.productTitle,
       shop: product.shop ?? null,
-      price: amount,
-      memo: normalizedMemo,
-      tags,
-      boardIds,
-      imageUrl: image === 'keep' ? (product.imageUrl ?? null) : null,
-      imageFileId: image === 'keep' ? (product.imageFileId ?? null) : null,
-      fallbackIcon: image === 'keep' ? (product.fallbackIcon ?? null) : image,
+      price: fields.price,
+      memo: fields.memo,
+      tags: fields.tags,
+      boardIds: fields.boardIds,
+      imageUrl: keep ? (product.imageUrl ?? null) : null,
+      imageFileId: keep ? (product.imageFileId ?? null) : null,
+      fallbackIcon: keep ? (product.fallbackIcon ?? null) : (fields.image as FallbackIcon),
     };
     let rejection: ReturnType<typeof productRejection>;
     try {
@@ -312,7 +305,10 @@ export function ProductEditForm({
           : editErrors[reason],
     );
     if (reason === 'board-not-found') retryBoards();
-    if (reason === 'image-unusable') setExistingImageRejected(true);
+    if (reason === 'image-unusable') {
+      setExistingImageRejected(true);
+      if (form.getFieldValue('image') === 'keep') form.setFieldValue('image', null);
+    }
     // PATCH distinguishes a missing product from missing board or image references.
     const inaccessible = reason === 'not-found' || reason === 'forbidden';
     setStatus(reason === 'auth-required' ? reason : inaccessible ? 'unknown' : 'idle');
@@ -395,7 +391,7 @@ export function ProductEditForm({
             },
           },
       );
-      setBoardIds((current) => [...new Set([...current, board.boardId])]);
+      form.setFieldValue('boardIds', (current) => [...new Set([...current, board.boardId])]);
       setBoardName(null);
       boardList.current?.scrollTo(0, 0);
     } catch (error) {
@@ -504,37 +500,58 @@ export function ProductEditForm({
       }
     >
       <Toaster id={formId} />
-      <form id={formId} className={styles.form} onSubmit={(event) => void submit(event)} noValidate>
+      <form
+        id={formId}
+        className={styles.form}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (valid && !locked && !waiting && !busy.current) void form.handleSubmit();
+        }}
+        noValidate
+      >
         <fieldset className={styles.fieldset} disabled={locked}>
           <div className={styles.editFields}>
-            <TextField
-              variant="box"
-              label="상품명"
-              readOnly={locked}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              onClear={() => setTitle('')}
-              error={titleLength > productLimits.titleLength && titleLengthMessage}
-              required
-            />
-            <TextField
-              variant="box"
-              label="가격"
-              readOnly={locked}
-              inputMode="numeric"
-              value={
-                !editingPrice && amount !== null ? `${amount.toLocaleString('ko-KR')}원` : price
-              }
-              onFocus={() => setEditingPrice(true)}
-              onBlur={() => {
-                if (amount !== null) setPrice(String(amount));
-                setEditingPrice(false);
-              }}
-              onChange={(event) => setPrice(event.target.value)}
-              onClear={() => setPrice('')}
-              error={price.trim() !== '' && invalidPrice && priceRangeMessage}
-              required
-            />
+            <form.Field name="productTitle">
+              {(field) => (
+                <TextField
+                  variant="box"
+                  label="상품명"
+                  readOnly={locked}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onClear={() => field.handleChange('')}
+                  error={field.state.meta.errors[0]?.message || undefined}
+                  required
+                />
+              )}
+            </form.Field>
+            <form.Field name="price">
+              {(field) => (
+                <TextField
+                  variant="box"
+                  label="가격"
+                  readOnly={locked}
+                  inputMode="numeric"
+                  value={
+                    !editingPrice && amount.success
+                      ? `${amount.output.toLocaleString('ko-KR')}원`
+                      : field.state.value
+                  }
+                  onFocus={() => setEditingPrice(true)}
+                  onBlur={() => {
+                    if (amount.success) field.handleChange(String(amount.output));
+                    setEditingPrice(false);
+                  }}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onClear={() => field.handleChange('')}
+                  error={
+                    (field.state.value.trim() !== '' && field.state.meta.errors[0]?.message) ||
+                    undefined
+                  }
+                  required
+                />
+              )}
+            </form.Field>
             <div className={styles.fieldGroup} role="group" aria-label="해시태그">
               <span className={styles.legend}>해시태그</span>
               <div className={styles.chips}>
@@ -543,7 +560,7 @@ export function ProductEditForm({
                     key={tag}
                     selected={tags.includes(tag)}
                     onClick={() =>
-                      setTags((current) =>
+                      form.setFieldValue('tags', (current) =>
                         current.includes(tag)
                           ? current.filter((item) => item !== tag)
                           : [...current, tag],
@@ -569,37 +586,37 @@ export function ProductEditForm({
                   label="새 해시태그"
                   value={tagDraft}
                   helperText={tagInputHint}
-                  error={
-                    hasUnsupportedTagCharacters(tagDraft) ? invalidTagCharactersMessage : undefined
-                  }
+                  error={(!newTag?.success && newTag?.issues[0].message) || undefined}
                   action="태그 추가"
-                  disabled={!canAddTag}
+                  disabled={!newTag?.success}
                   onChange={setTagDraft}
                   onConfirm={() => {
+                    if (!newTag?.success) return;
+                    const added = newTag.output;
                     setTagOptions((current) =>
-                      current.includes(newTag) ? current : [...current, newTag],
+                      current.includes(added) ? current : [...current, added],
                     );
-                    setTags((current) => [...current, newTag]);
+                    form.setFieldValue('tags', (current) => [...current, added]);
                     setTagDraft(null);
                   }}
                   onCancel={() => setTagDraft(null)}
                 />
               )}
-              {(invalidTags || tags.length === 0) && (
-                <p className={styles.caption}>6자 이하의 해시태그를 1개 이상 선택해 주세요.</p>
-              )}
+              {invalidTags && <p className={styles.caption}>{tagsMessage}</p>}
             </div>
-            <TextField
-              variant="box"
-              label="한 줄 메모(선택)"
-              readOnly={locked}
-              value={memo}
-              onChange={(event) => setMemo(event.target.value)}
-              onClear={() => setMemo('')}
-              error={
-                memoLength > productLimits.memoLength && '한 줄 메모는 100자까지 저장할 수 있어요.'
-              }
-            />
+            <form.Field name="memo">
+              {(field) => (
+                <TextField
+                  variant="box"
+                  label="한 줄 메모(선택)"
+                  readOnly={locked}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onClear={() => field.handleChange('')}
+                  error={field.state.meta.errors[0]?.message || undefined}
+                />
+              )}
+            </form.Field>
           </div>
           <section className={styles.fieldGroup} aria-label="보드 선택">
             <span className={styles.legend}>보드 선택</span>
@@ -614,7 +631,7 @@ export function ProductEditForm({
                         checked={boardIds.includes(board.boardId)}
                         onChange={(event) => {
                           const { checked } = event.currentTarget;
-                          setBoardIds((ids) =>
+                          form.setFieldValue('boardIds', (ids) =>
                             checked
                               ? [...ids, board.boardId]
                               : ids.filter((id) => id !== board.boardId),
@@ -688,9 +705,7 @@ export function ProductEditForm({
                 </div>
               )}
             </div>
-            {boards && invalidBoards && (
-              <p className={styles.error}>현재 보드를 1개 이상 선택해 주세요.</p>
-            )}
+            {boards && invalidBoards && <p className={styles.error}>{boardsMessage}</p>}
           </section>
           {!canKeepImage && (
             <div
@@ -706,7 +721,7 @@ export function ProductEditForm({
                     key={icon}
                     selected={image === icon}
                     onClick={() => {
-                      setImage(icon);
+                      form.setFieldValue('image', icon);
                       if (missingImage && existingImageRejected) setError('');
                     }}
                   >
