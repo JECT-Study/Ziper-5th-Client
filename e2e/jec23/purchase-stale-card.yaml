@@ -1,0 +1,31 @@
+# Before running: POST /_reset?removedBeforePurchase=1 on the local fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fboards%2F1
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 오버핏 울 블렌드 니트 가디건
+- tapOn: 상품 관리
+- tapOn: 구매 완료
+- tapOn: 이동하기
+- extendedWaitUntil:
+    visible: 현재 상태 확인
+    timeout: 10000
+- assertVisible: '구매 완료로 변경하지 못했어요.*'
+- tapOn: 현재 상태 확인
+- extendedWaitUntil:
+    visible: '상품을 찾을 수 없어요.*'
+    timeout: 10000
+- tapOn: 뒤로 가기
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 10000
+- assertNotVisible: 오버핏 울 블렌드 니트 가디건

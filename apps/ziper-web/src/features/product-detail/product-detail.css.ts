@@ -1,296 +1,181 @@
-import { globalStyle, style } from '@vanilla-extract/css';
-import { vars } from '../../styles/theme.css';
+import { globalStyle, style, styleVariants } from '@vanilla-extract/css';
+import { typography, vars } from '../../styles/theme.css';
 import { viewportHeight } from '../../styles/viewport';
 import * as textField from '../../components/TextField.css';
+import * as chipFilter from '../../components/ChipFilter.css';
 
-// Flow 5 uses a green/Noto palette not present in the shared lime/Pretendard design system.
-// Keep these reference-screen values scoped; do not change existing screens.
-const colors = {
-  green: '#56cf91',
-  pale: '#e4f7ee',
-  border: '#8de5b3',
-  ink: '#177348',
-  muted: '#666',
-  surface: '#f7f7f7',
-  text: '#242424',
-};
 export const page = style({
+  display: 'flex',
+  flexDirection: 'column',
   maxWidth: 480,
   minHeight: viewportHeight,
   margin: '0 auto',
-  paddingBottom: 24,
-  fontFamily: "'Noto Sans KR', " + vars.font.family,
-  lineHeight: 1.5,
-  color: colors.text,
   background: vars.color.background,
 });
-globalStyle(`${page} p, ${page} h2`, { margin: 0 });
-export const header = style({ height: 58, padding: '0 19px', gap: 8 });
-globalStyle(`${header} h1`, {
-  position: 'static',
-  transform: 'none',
-  fontSize: 18,
-  lineHeight: '27px',
-  color: colors.text,
+// Keep the list scrollable without letting long grids push the navigation out of reach.
+export const purchasedPage = style([
+  page,
+  {
+    height: viewportHeight,
+    display: 'grid',
+    gridTemplateRows: 'auto minmax(0, 1fr) auto',
+  },
+]);
+export const purchasedScroll = style({
+  overflowY: 'auto',
+  paddingBottom: 16, // Keep the final control clear of the raised add button.
+  scrollPaddingBottom: 16,
 });
+export const body = style({ display: 'grid', gap: 12, padding: 16 });
+globalStyle(`${body} p, ${body} h2`, { margin: 0 });
+export const footer = style({
+  marginTop: 'auto',
+  position: 'sticky',
+  bottom: 'env(safe-area-inset-bottom, 0px)',
+});
+// Keep the success toast above both actions when a return shortcut shares the footer.
+globalStyle(`body:has(${footer} > button + button)`, { vars: { '--ziper-toast-offset': '150px' } });
+
 export const iconButton = style({
   display: 'grid',
   placeItems: 'center',
   width: 44,
   height: 44,
-  marginRight: -12,
+  marginRight: -10,
   padding: 0,
   background: 'none',
+  color: vars.color.icon.strong,
   border: 0,
   ':disabled': { opacity: 0.4 },
 });
-export const body = style({ display: 'grid', gap: 16, padding: '0 19px' });
 export const imageGroup = style({ display: 'grid', gap: 6, margin: 0 });
 export const image = style({
-  height: 224,
+  aspectRatio: '4 / 3',
   width: '100%',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 16,
-  background: colors.pale,
-  borderRadius: 14,
+  gap: 12,
+  background: vars.palette.gray150,
+  borderRadius: vars.radius.m,
   overflow: 'hidden',
-  position: 'relative',
 });
 export const photo = style({ width: '100%', height: '100%', objectFit: 'cover' });
-export const template = style({ width: 101, height: 101, objectFit: 'contain' });
-export const unavailable = style({ background: '#3d3d3d', color: '#fff' });
-export const unavailableIcon = style({
-  position: 'absolute',
-  top: 42,
-  left: '50%',
-  transform: 'translateX(-50%)',
+export const topsTemplate = style({ width: '95%', height: '94%', objectFit: 'cover' });
+export const categoryTemplate = style({
+  position: 'relative',
+  height: '94%',
+  aspectRatio: '1',
+  overflow: 'hidden',
 });
-export const unavailableLabel = style({
-  position: 'absolute',
-  top: 164,
-  height: 30,
-  width: '100%',
-  textAlign: 'center',
-  fontSize: 13,
-});
+// Preserve the artwork offsets from Figma's 84 × 84 category frames at detail scale.
+const percent = (n: number) => `${(n / 84) * 100}%`;
+export const categoryArtwork = styleVariants(
+  {
+    PANTS: [2, -2, 80, 87],
+    SKIRT: [-21, -1, 128, 86],
+    ACCESSORY: [-21, -5, 126, 94],
+    BEAUTY: [7, -8, 70, 100],
+  } as const,
+  ([left, top, width, height]) => ({
+    position: 'absolute',
+    left: percent(left),
+    top: percent(top),
+    width: percent(width),
+    height: percent(height),
+    objectFit: 'cover',
+  }),
+);
+export const unavailable = style({ background: vars.palette.gray900, color: vars.palette.white });
+export const unavailableLabel = style({ ...typography.body2Medium, textAlign: 'center' });
 export const caption = style({
-  fontSize: 11,
-  color: colors.muted,
-  lineHeight: '17px',
+  ...typography.body3Medium,
+  color: vars.color.text.default,
   overflowWrap: 'anywhere',
 });
-export const info = style({ display: 'grid', gap: 5 });
+export const info = style({ display: 'grid', marginTop: 4 });
+export const shop = style([caption, typography.body2Medium]);
 export const name = style({
-  fontSize: 18,
-  fontWeight: 700,
-  lineHeight: '27px',
+  ...typography.title2Bold,
+  wordBreak: 'keep-all',
   overflowWrap: 'anywhere',
 });
-export const priceRow = style({ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 });
-export const price = style({ fontSize: 22, lineHeight: '33px', fontWeight: 700 });
+export const price = style({ ...typography.title1Bold, marginTop: 8 });
 export const memo = style({
-  padding: 14,
-  borderRadius: 13,
-  background: colors.surface,
+  ...typography.body3Medium,
+  padding: 12,
+  borderRadius: vars.radius.m,
+  background: vars.palette.lime50,
   display: 'grid',
-  gap: 5,
+  gap: 4,
   overflowWrap: 'anywhere',
   whiteSpace: 'pre-wrap',
-  fontSize: 13,
-  lineHeight: '20px',
 });
 export const chips = style({
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 8,
+  gap: 4,
   margin: 0,
   padding: 0,
   listStyle: 'none',
 });
-export const chip = style({
-  padding: '6px 11px',
-  border: '1px solid #f2f2f2',
-  borderRadius: 20,
-  background: colors.surface,
-  fontSize: 12,
-  lineHeight: '18px',
-  overflowWrap: 'anywhere',
-  maxWidth: '100%',
-});
-export const boardChip = style([
-  chip,
-  { background: colors.pale, borderColor: colors.border, color: colors.ink },
+export const addTag = style([
+  chipFilter.base,
+  {
+    selectors: {
+      '&&': { background: vars.color.background, border: `1px solid ${vars.color.border.default}` },
+    },
+  },
 ]);
-export const boards = style({ display: 'grid', gap: 8 });
-export const action = style({
-  selectors: {
-    '&&': {
-      height: 52,
-      borderRadius: 13,
-      fontSize: 15,
-      lineHeight: '23px',
-      background: colors.green,
-      color: colors.text,
-    },
-    '&&:active:not(:disabled)': { background: '#45bf80' },
-    '&&:disabled:not([aria-busy="true"])': { background: '#e5e5e5', color: colors.muted },
-  },
-});
-export const secondary = style([action, { selectors: { '&&': { background: colors.surface } } }]);
-export const feedback = style({
-  fontSize: 13,
+export const chip = style([
+  chipFilter.base,
+  { overflowWrap: 'anywhere', maxWidth: '100%', whiteSpace: 'normal' },
+]);
+export const boards = style({ display: 'grid', gap: 8, marginTop: 12 });
+export const error = style({
+  ...typography.body2Medium,
   padding: 12,
-  borderRadius: 8,
-  background: colors.surface,
+  borderRadius: vars.radius.s,
+  background: vars.palette.gray100,
+  color: vars.color.text.destructive,
   overflowWrap: 'anywhere',
 });
-export const error = style([feedback, { color: vars.color.text.destructive }]);
-export const modal = style({
-  selectors: {
-    '&&': {
-      width: 'calc(100% - 48px)',
-      maxWidth: 327,
-      top: 'max(16px, calc(50dvh - 126px))',
-      margin: '0 auto',
-      maxHeight: 'calc(100dvh - 32px)',
-      overflowY: 'auto',
-      padding: 22,
-      gap: 18,
-      borderRadius: 21,
-      fontFamily: "'Noto Sans KR', " + vars.font.family,
-    },
-  },
+export const editSheet = style({
+  selectors: { '&&': { maxHeight: `calc(${viewportHeight} - 20px)` } },
 });
-globalStyle(`${modal}::backdrop`, { background: 'rgba(0,0,0,0.4)' });
-export const modalTitle = style({
-  margin: 0,
-  textAlign: 'center',
-  fontSize: 18,
-  fontWeight: 700,
-  lineHeight: '27px',
-  whiteSpace: 'pre-line',
-});
-export const buttonRow = style({ display: 'flex', gap: 10 });
-export const form = style({ display: 'grid', gap: 8 });
-globalStyle(`${form} ${textField.root.box}`, { gap: 6 });
-globalStyle(`${form} ${textField.field.box}`, {
-  padding: '12px 13px',
-  minHeight: 46,
-  borderRadius: 13,
-  background: colors.surface,
-});
-globalStyle(`${form} ${textField.label}`, {
-  fontSize: 11,
-  lineHeight: '16px',
-  color: colors.muted,
-});
-globalStyle(`${form} ${textField.input.box}`, { fontSize: 13, lineHeight: '18px' });
-globalStyle(`${form} ${textField.helperTone.default}, ${form} ${textField.counter.default}`, {
-  color: colors.muted,
-});
-export const choice = style({
-  selectors: {
-    '&&': {
-      minHeight: 32,
-      height: 'auto',
-      maxWidth: '100%',
-      whiteSpace: 'normal',
-      overflowWrap: 'anywhere',
-      padding: '6px 11px',
-      fontSize: 12,
-      border: '1px solid #efefef',
-      background: colors.surface,
-    },
-    '&&[aria-pressed="true"]': {
-      background: colors.pale,
-      color: colors.ink,
-      borderColor: colors.border,
-    },
-  },
+export const form = style({ display: 'grid', gap: 16, padding: '0 16px 16px' });
+// Prevent focus zoom in iOS Safari/WebView, without altering shared inputs.
+globalStyle(`${form} ${textField.input.box}`, { fontSize: 16 });
+// Keep the preserved draft legible while a fieldset blocks edits.
+globalStyle(`${form} ${textField.input.box}[readonly]:disabled`, {
+  color: vars.color.text.default,
+  WebkitTextFillColor: vars.color.text.default,
+  opacity: 1,
 });
 export const fieldset = style({
   display: 'grid',
-  gap: 8,
   border: 0,
   padding: 0,
   margin: 0,
   minWidth: 0,
 });
-export const legend = style({ fontSize: 14, fontWeight: 700, marginBottom: 8 });
-export const select = style({
-  fontFamily: 'inherit',
-  padding: 10,
-  borderRadius: 8,
-  border: '1px solid #a2a2a2',
-  background: '#fff',
-  color: colors.text,
-  width: '100%',
-});
-export const success = style({
-  padding: 16,
-  borderRadius: 13,
-  background: colors.pale,
-  display: 'grid',
-  gap: 7,
-  fontSize: 12,
-});
-export const successTitle = style({ color: colors.ink, fontSize: 15, fontWeight: 700 });
-export const results = style({ display: 'grid', gap: 20 });
-export const summary = style({ display: 'flex', justifyContent: 'space-between', fontSize: 13 });
-export const resultCard = style({
-  border: 0,
-  textAlign: 'left',
-  color: 'inherit',
-  fontFamily: 'inherit',
-  padding: 12,
-  borderRadius: 21,
-  background: colors.surface,
-  display: 'grid',
-  gap: 12,
-  width: '100%',
-});
-export const resultImage = style({ height: 220 });
-export const resultName = style({
-  fontSize: 17,
-  lineHeight: '26px',
-  fontWeight: 700,
-  overflowWrap: 'anywhere',
-});
-export const resultNote = style({
-  display: 'flex',
-  gap: 8,
-  alignItems: 'center',
-  color: colors.ink,
-  fontSize: 12,
-});
-export const menu = style({ fontFamily: "'Noto Sans KR', " + vars.font.family });
-globalStyle(`${menu} h2`, { fontSize: 18, lineHeight: '27px', color: colors.text, marginLeft: 3 });
-globalStyle(`${menu}::backdrop`, { background: 'rgba(0,0,0,0.4)' });
-globalStyle(`${menu} button[aria-label="닫기"]`, { display: 'none' });
-export const menuActions = style({ display: 'grid', gap: 20, padding: '4px 19px 0' });
+// D-1 groups the four edit fields; the board picker follows the memo without an extra gap.
+export const editFields = style({ display: 'grid', gap: vars.space[20], minWidth: 0 });
+export const fieldGroup = style({ display: 'grid', gap: 8 });
+export const legend = style({ ...typography.body2Medium, color: vars.color.text.default });
+export const menuActions = style({ padding: '0 16px' });
 export const menuAction = style({
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  height: 50,
-  padding: 0,
+  ...typography.body2Medium,
+  display: 'block',
+  width: '100%',
+  minHeight: 50,
+  padding: '0 8px',
   border: 0,
   background: 'none',
-  font: 'inherit',
-  fontSize: 15,
+  fontFamily: 'inherit',
   textAlign: 'left',
-  color: colors.text,
+  color: vars.color.text.strong,
+  selectors: { '& + &': { borderTop: `1px solid ${vars.palette.gray100}` } },
 });
-export const menuFooter = style({ padding: '20px 19px 30px' });
-export const toast = style({
-  position: 'fixed',
-  bottom: 24,
-  left: '50%',
-  transform: 'translateX(-50%)',
-  width: 'max-content',
-  maxWidth: 'calc(100% - 32px)',
-  zIndex: 2,
-});
+export const successTitle = style(typography.subtitle1Bold);

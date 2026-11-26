@@ -1,0 +1,35 @@
+# Reset the fixture with POST /_reset?invalidEditImageUrl=1 before running.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F8
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- assertNotVisible: 카드 이미지 도안을 선택해 주세요.
+- tapOn: 봄
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: '기존 이미지를 사용할 수 없어요.*'
+    timeout: 10000
+- assertNotVisible: 기존 이미지 유지
+- tapOn: 바지
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    notVisible: 수정 완료
+    timeout: 10000
+- assertVisible: 원본 쇼핑몰로 이동
+- assertVisible: 봄
+- assertVisible: 담긴 보드 · 2개
+- assertNotVisible: '.*(기본 상품 이미지|unavailable-image).*'

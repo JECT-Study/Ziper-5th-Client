@@ -1,0 +1,31 @@
+# Before running: POST /_reset?failEditBoards=1 on the local fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F8
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 보드 목록 다시 불러오기
+    timeout: 10000
+- assertVisible: '보드 목록을 불러오지 못했어요.*'
+- assertNotVisible: 수정 완료
+- tapOn: 보드 목록 다시 불러오기
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- assertNotVisible: 보드 목록 다시 불러오기
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: '담긴 보드 · 2개'
+    timeout: 10000
+- assertNotVisible: 수정 완료

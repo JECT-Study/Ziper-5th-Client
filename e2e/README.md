@@ -9,9 +9,9 @@
 - `subflows/`: 앱 실행(dev client를 Metro에 연결), 딥링크 열기, iOS의 "Open in Ziper?" 확인.
 - `setup.sh ios|android`: `ziper-e2e` 시뮬레이터 또는 AVD를 만들고 부팅한다.
 - `build.sh ios|android`: 개발 바이너리를 빌드해 설치한다.
-- `run.sh ios|android [flow...]`: 웹(3000)과 Metro(8081)가 꺼져 있으면 띄우고 시나리오를 실행한다. 결과는 `e2e/.artifacts/<platform>/`에 남는다(JUnit, 실패 시 화면 정보).
+- `run.sh ios|android [flow...]`: 웹(3000)과 Metro(일반 8081, JEC-23 전용 8082)를 준비하고 시나리오를 실행한다. 결과는 `e2e/.artifacts/<platform>/`에 남는다(JUnit, 실패 시 화면 정보).
 
-시나리오는 웹 dev 서버의 상품 상세 프리뷰 fixture(`?preview=…`, [JEC-23 안내](../docs/jec-23-product-detail.md))와 `/design-system`의 액션 시트 데모를 쓴다. 따라서 백엔드와 로그인이 필요 없다. 화면 진입은 딥링크 `ziper://web?path=<URL 인코딩한 경로>`로 한다.
+기본 `flows/` 시나리오는 웹 dev 서버의 상품 상세 프리뷰 fixture(`?preview=…`, [JEC-23 안내](../docs/jec-23-product-detail.md))와 `/design-system`의 액션 시트 데모를 쓴다. 따라서 백엔드와 로그인이 필요 없다. 화면 진입은 딥링크 `ziper://web?path=<URL 인코딩한 경로>`로 한다.
 
 ## 준비 (최초 1회)
 
@@ -34,6 +34,10 @@ pnpm e2e:ios
 pnpm e2e:android
 pnpm e2e:android e2e/flows/launch.yaml   # 일부만
 ```
+
+`e2e/jec23/`는 상품 수정·구매·구매 목록에 로컬 HTTP fixture를 사용한다. 실행 전 [JEC-23 설정](../docs/jec-23-product-detail.md#로컬-http-통합-검증)에 따라 fixture와 mock 모드의 웹을 띄운다. 실행기는 웹 프록시에서 fixture 응답을 받지 못하거나 8082에 이미 서버가 있으면 중단한다. JEC-23용 Metro는 로컬 fixture 웹 주소를 사용하며, 셸이나 Expo `.env`의 다른 `EXPO_PUBLIC_WEB_URL` 및 기존 8081 Metro를 재사용하지 않는다.
+
+가상 이메일 계정으로 로그인부터 검증하려면 실행 직전에 `curl -fsS -X POST 'http://127.0.0.1:3011/_reset?auth=email'`로 초기화하고, `e2e/jec23/email-session.yaml`을 지정한다. 구매 중 만료 토스트와 로그인 화면으로 강제 이동하지 않는 동작은 `auth=email&expireSessionOnPurchase=1`로 초기화한 뒤 `e2e/jec23/email-purchase-expiry.yaml`로 확인한다. 상태를 공유하므로 플랫폼·시나리오를 순차 실행한다.
 
 ## 실제 쇼핑몰 자동 입력 재검증
 

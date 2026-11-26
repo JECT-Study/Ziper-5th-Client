@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import emptyBoard from '../../assets/board/empty-board.png';
 import { usePlatform } from '../../bridge/provider';
@@ -74,6 +75,7 @@ type BoardDetailScreenProps = {
 export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDetailScreenProps) {
   const { platform, status } = usePlatform();
   const selectTab = useTabNavigation();
+  const navigate = useNavigate();
   const [sort, setSort] = useState<BoardSort>('RECENT');
   const { state, reload, loadMore } = useBoardProducts(boardId, sort);
   const page = state.status === 'ready' ? state.page : null;
@@ -183,9 +185,14 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
               {page.items.map((product) => (
                 <ProductCard
                   key={product.cardId}
-                  product={product}
+                  product={{ ...product, tags: product.tags.map((tag) => tag.title) }}
+                  // Stay in this WebView so Back remounts the board with the edited product.
                   onOpen={() =>
-                    void platform.navigation.push(`/products/${product.cardId}`).catch(() => {})
+                    void navigate({
+                      to: '/products/$cardId',
+                      params: { cardId: String(product.cardId) },
+                      search: { preview: undefined },
+                    }).catch(() => showToast('상품 상세를 열지 못했어요.'))
                   }
                   // TODO: 상품 관리 시트(구매 완료·상품 수정·삭제)와 연결한다.
                   onMore={() => {}}

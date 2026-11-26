@@ -14,6 +14,14 @@ export class ApiError extends Error {
   }
 }
 
+/** An HTTP failure from reissue, not from the requested resource. */
+export class SessionRenewalError extends Error {
+  constructor(cause: ApiError) {
+    super('Session renewal failed', { cause });
+    this.name = 'SessionRenewalError';
+  }
+}
+
 /** 화면에 띄울 문구. 서버가 준 한국어 설명이 있으면 그걸, 없으면 fallback 을 쓴다. */
 export function errorMessage(error: unknown, fallback: string) {
   return error instanceof ApiError && error.detail ? error.detail : fallback;
@@ -74,37 +82,51 @@ export async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 // Refresh Token 은 쓰면 바로 바뀌어서, 요청 여러 개가 동시에 401 을 받아도 재발급은 한 번만 보낸다.
-let refreshing: Promise<boolean> | null = null;
+let sessionRevision = 0;
+let refreshing: { revision: number; result: Promise<boolean> } | null = null;
 // 이번 페이지에서 쿠키로 세션을 확인해 봤는지. 로그아웃 상태로 화면을 옮길 때마다 재발급을 보내지 않으려고 둔다.
 let checked = false;
 
 function refreshAccessToken() {
-  refreshing ??= (async () => {
+  const revision = sessionRevision;
+  if (refreshing?.revision === revision) return refreshing.result;
+  const result = (async () => {
     // Bound the shared rotation independently, within the URL-check wait that can follow rules.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5_000);
     try {
-      const { accessToken } = await parseResponse<{ accessToken: string }>(
+      const result = await parseResponse<{ accessToken?: unknown } | undefined>(
         await send('/api/v1/auth/reissue', {
           method: 'POST',
           session: true,
           signal: controller.signal,
         }),
       );
-      setAccessToken(accessToken);
+      if (revision !== sessionRevision) return false;
+      if (typeof result?.accessToken !== 'string' || !result.accessToken.trim()) {
+        throw new Error('Invalid session response');
+      }
+      setAccessToken(result.accessToken);
+      checked = true;
       return true;
-    } catch {
+    } catch (error) {
+      if (revision !== sessionRevision) return false;
+      // An explicit 401 ends this session, including requests still awaiting a response.
+      if (error instanceof ApiError && error.status === 401) {
+        startSession(null);
+        return false;
+      }
       setAccessToken(null);
-      controller.signal.throwIfAborted(); // A timeout is not a confirmed sign-out.
-      return false;
+      checked = false;
+      throw error instanceof ApiError ? new SessionRenewalError(error) : error;
     } finally {
       clearTimeout(timer);
-      checked = !controller.signal.aborted;
     }
   })().finally(() => {
-    refreshing = null;
+    if (refreshing?.revision === revision) refreshing = null;
   });
-  return refreshing;
+  refreshing = { revision, result };
+  return result;
 }
 
 /** 로그인되어 있는지. 메모리에 Access Token 이 없으면(새로고침 등) 쿠키로 한 번 재발급해 본다. */
@@ -116,13 +138,14 @@ export async function ensureSession(): Promise<boolean> {
 
 /** 로그인·가입 응답의 Access Token 을 세션으로 쓴다. null 이면 로그아웃 상태로 둔다. */
 export function startSession(accessToken: string | null) {
+  sessionRevision += 1;
   setAccessToken(accessToken);
   checked = true;
 }
 
 /**
  * API 요청. 실패하면 ApiError 를 던진다.
- * auth 요청이 재발급까지 실패하면 401 을 던진다. 로그인 화면으로 보낼지는 쓰는 쪽이 정한다.
+ * 재발급이 401 을 반환하면 원래 401 응답을 유지한다. 다른 재발급 HTTP 오류는 별도 유형으로 전파한다.
  */
 export async function requestResponse(
   path: string,
@@ -130,17 +153,32 @@ export async function requestResponse(
 ): Promise<Response> {
   if (!options.auth) return send(path, options);
 
-  const response = await send(path, options, getAccessToken());
-  if (response.status !== 401) return response;
+  const revision = sessionRevision;
+  const token = getAccessToken();
+  const response = await send(path, options, token);
+  if (response.status !== 401 || revision !== sessionRevision) return response;
 
   const { signal } = options;
   signal?.throwIfAborted();
+  const latest = getAccessToken();
+  // A slower 401 can arrive after a parallel request already rotated the token.
+  const renewed = latest && latest !== token ? latest : await awaitRenewal(options);
+  if (!renewed || revision !== sessionRevision) return response;
+  const retried = await send(path, options, renewed);
+  // A rejected renewal must not bounce the login screen back to the app.
+  if (retried.status === 401 && revision === sessionRevision && getAccessToken() === renewed) {
+    startSession(null);
+  }
+  return retried;
+}
+
+async function awaitRenewal({ signal, onRefreshWait }: RequestOptions) {
   const refresh = refreshAccessToken();
   let renewed: boolean;
   if (!signal) renewed = await refresh;
   else {
     // A caller's deadline must not cancel token rotation shared with other requests.
-    const resume = options.onRefreshWait?.();
+    const resume = onRefreshWait?.();
     let cancel!: () => void;
     const aborted = new Promise<never>((_, reject) => {
       cancel = () => reject(signal.reason);
@@ -155,7 +193,7 @@ export async function requestResponse(
       resume?.();
     }
   }
-  return renewed ? send(path, options, getAccessToken()) : response;
+  return renewed ? getAccessToken() : null;
 }
 
 export async function request<T = void>(path: string, options?: RequestOptions): Promise<T> {

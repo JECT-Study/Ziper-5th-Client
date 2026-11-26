@@ -14,6 +14,10 @@ export function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : invalidResponse();
 }
 
+export function choice<const T extends string>(value: unknown, choices: readonly T[]): T {
+  return choices.find((candidate) => candidate === value) ?? invalidResponse();
+}
+
 export function text(value: unknown): string {
   return typeof value === 'string' ? value : invalidResponse();
 }
@@ -41,4 +45,10 @@ export function nullable<T>(read: (value: unknown) => T, value: unknown): T | nu
 export function url(value: unknown): string {
   const string = text(value);
   return isShareURL(string) ? string : invalidResponse();
+}
+
+export function count(value: unknown): number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : invalidResponse();
 }

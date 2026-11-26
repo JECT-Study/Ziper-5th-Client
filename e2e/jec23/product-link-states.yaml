@@ -1,0 +1,29 @@
+# Before running: POST /_reset?shopLinkStates=1 on the local fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fboards%2F1
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 린넨 블라우스
+- extendedWaitUntil:
+    visible: 품절된 상품이에요\.
+    timeout: 10000
+# Sold out keeps the shop reachable; only a removed listing blocks it.
+- assertVisible: 원본 쇼핑몰로 이동
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2Fpurchased
+- extendedWaitUntil:
+    visible: ^품절$
+    timeout: 10000
+- assertVisible: 구매한 셔츠
+- assertVisible: 원본 상품 접근불가

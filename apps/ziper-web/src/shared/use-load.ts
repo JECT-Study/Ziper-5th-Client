@@ -34,19 +34,23 @@ export function useLoad<T>(
             request.abort();
             setState({ status: 'error', error: signal.reason });
           }, timeoutMs);
-    load(signal).then(
-      (value) => {
-        if (signal.aborted) return;
-        clearTimeout(timer);
-        onReady?.(value);
-        setState({ status: 'ready', value });
-      },
-      (error: unknown) => {
-        if (signal.aborted) return;
-        clearTimeout(timer);
-        setState({ status: 'error', error });
-      },
-    );
+    // Skip abandoned effects before sending a request. Some reads (detail) record a visit.
+    queueMicrotask(() => {
+      if (signal.aborted) return;
+      load(signal).then(
+        (value) => {
+          if (signal.aborted) return;
+          clearTimeout(timer);
+          onReady?.(value);
+          setState({ status: 'ready', value });
+        },
+        (error: unknown) => {
+          if (signal.aborted) return;
+          clearTimeout(timer);
+          setState({ status: 'error', error });
+        },
+      );
+    });
     return () => {
       clearTimeout(timer);
       request.abort();
@@ -54,7 +58,10 @@ export function useLoad<T>(
     // The caller's deps describe `load`; callbacks are read from the render that started it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, attempt]);
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const retry = useCallback(() => {
+    setState({ status: 'loading' });
+    setAttempt((n) => n + 1);
+  }, []);
   const update = useCallback(
     (change: (value: T) => T) =>
       setState((current) =>

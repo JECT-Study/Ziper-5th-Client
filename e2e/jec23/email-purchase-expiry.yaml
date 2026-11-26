@@ -1,0 +1,23 @@
+# Before running: POST /_reset?auth=email&expireSessionOnPurchase=1 on the loopback fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- runFlow: subflows/sign-in.yaml
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fboards%2F1
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 오버핏 울 블렌드 니트 가디건
+- tapOn: 상품 관리
+- tapOn: 구매 완료
+- tapOn: 이동하기
+- extendedWaitUntil:
+    notVisible: 상품 관리
+    timeout: 10000
+- assertVisible: 상품 상세
+- assertNotVisible: 상품 관리
+- assertNotVisible: 구매 완료 목록
+- assertNotVisible: 로그인 화면으로 이동

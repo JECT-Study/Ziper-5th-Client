@@ -64,13 +64,20 @@ export const imageButton = style([
   {
     display: 'grid',
     placeItems: 'center',
+    position: 'relative',
     width: '100%',
     aspectRatio: '149.5 / 108.13',
     overflow: 'hidden',
   },
 ]);
 
-export const photo = style({ width: '100%', height: '100%', objectFit: 'cover' });
+export const photo = style({
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+});
 
 export const fallback = style({ height: '80%', objectFit: 'contain' });
 
@@ -79,11 +86,21 @@ export const noImage = style({
   ...typography.caption2Medium,
   color: vars.color.text.default,
   textAlign: 'center',
+  overflowWrap: 'anywhere',
 });
 
 export const more = style([
   plainButton,
-  { position: 'absolute', top: 8, right: 8, display: 'inline-flex', color: vars.color.icon.strong },
+  {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    display: 'grid',
+    placeItems: 'center',
+    width: 44,
+    height: 44,
+    color: vars.color.icon.strong,
+  },
 ]);
 
 export const originalLink = style([
@@ -97,6 +114,7 @@ export const originalLink = style([
     backgroundColor: vars.palette.white,
     ...typography.caption2Medium,
     color: vars.color.text.strong,
+    ':disabled': { color: vars.color.text.default },
   },
 ]);
 
@@ -105,7 +123,14 @@ export const info = style([
   { display: 'flex', flexDirection: 'column', gap: 5.5, width: '100%' },
 ]);
 
-export const shop = style({ ...typography.body3Medium, color: vars.color.text.default });
+export const shop = style({
+  ...typography.body3Medium,
+  color: vars.color.text.default,
+  maxWidth: '100%',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+});
 
 export const title = style({
   display: '-webkit-box',
@@ -135,8 +160,17 @@ export const tag = style({
   backgroundColor: vars.palette.gray100,
   ...typography.subtitle1Semibold,
   color: vars.color.text.strong,
-  whiteSpace: 'nowrap',
+  maxWidth: '100%',
+  overflowWrap: 'anywhere',
 });
+
+export const purchasedTag = style([
+  tag,
+  {
+    backgroundColor: vars.palette.gray900,
+    color: vars.palette.white,
+  },
+]);
 
 // 빈 보드
 // Figma 빈 보드: 정렬 칩 아래 79px 에서 시작한다(가운데 정렬이 아니다).

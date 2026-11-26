@@ -1,0 +1,35 @@
+# Before running: POST /_reset?purchasedPageReissue=403 or 503 on the fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2Fpurchased
+- extendedWaitUntil:
+    visible: 구매한 가방
+    timeout: 15000
+- tapOn: 더 불러오기
+- extendedWaitUntil:
+    visible: 다음 상품 다시 불러오기
+    timeout: 10000
+- assertVisible: 다음 상품을 불러오지 못했어요.
+- assertVisible: 구매한 가방
+- assertNotVisible: 로그인 화면으로 이동
+- assertNotVisible: 구매 완료 목록을 볼 수 있는 권한이 없어요.
+- assertVisible: 최근 등록순
+- tapOn: 다음 상품 다시 불러오기
+- extendedWaitUntil:
+    visible: 구매한 셔츠
+    timeout: 10000
+- assertNotVisible: 다음 상품 다시 불러오기
+- assertNotVisible: 더 불러오기
+- assertVisible: 구매한 가방
+- tapOn:
+    text: ^보드$
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 10000

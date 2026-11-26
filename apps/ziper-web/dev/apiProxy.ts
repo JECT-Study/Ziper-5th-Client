@@ -31,12 +31,19 @@ async function readBody(req: IncomingMessage) {
  * 개발 서버에서만 /api 요청을 백엔드로 넘긴다. 브라우저는 같은 주소로 보내므로 CORS 가 생기지 않는다.
  * nitro 가 요청을 먼저 가로채서 Vite 의 server.proxy 가 동작하지 않으므로 nitro 보다 앞에 둔다.
  */
-export function apiDevProxy(): Plugin {
+export function apiDevProxy(mockTarget?: string): Plugin {
+  const target = mockTarget ?? API;
   return {
     name: 'ziper:api-dev-proxy',
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use('/api', async (req, res) => {
+        // The fixture probe must never leave the dev server in normal mode.
+        if (!mockTarget && req.url?.split('?', 1)[0] === '/_jec23/ready') {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
         const headers = new Headers();
         for (const name of FORWARD_HEADERS) {
           const value = req.headers[name];
@@ -45,9 +52,11 @@ export function apiDevProxy(): Plugin {
         if (headers.has('x-refresh-token-mode')) headers.set('origin', SESSION_ORIGIN);
         const method = req.method ?? 'GET';
         try {
-          const response = await fetch(`${API}/api${req.url}`, {
+          const response = await fetch(`${target}/api${req.url}`, {
             method,
             headers,
+            // A mock response must not redirect a request outside loopback.
+            redirect: mockTarget ? 'error' : undefined,
             body: method === 'GET' || method === 'HEAD' ? undefined : await readBody(req),
           });
           res.statusCode = response.status;

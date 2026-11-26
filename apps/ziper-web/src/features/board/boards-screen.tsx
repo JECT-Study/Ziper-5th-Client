@@ -1,7 +1,9 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { usePlatform } from '../../bridge/provider';
 import { BottomNavigation, Button, ChipFilter, HeaderSub, showToast } from '../../components';
 import { cx } from '../../components/cx';
+import { purchasesEnabled } from '../product-detail/product-detail-api';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
 import type { Board } from './api';
 import { BoardCard, BoardCardSkeleton } from './board-card';
@@ -27,6 +29,7 @@ const isRecent = (board: Board, now: number) => now - Date.parse(board.createdAt
 export function BoardsScreen() {
   const { platform, status } = usePlatform();
   const selectTab = useTabNavigation();
+  const navigate = useNavigate();
   const boards = useBoards();
   const [filter, setFilter] = useState<Filter>('all');
   const list = boards.data?.boards ?? [];
@@ -87,8 +90,12 @@ export function BoardsScreen() {
                 name="구매 완료"
                 productCount={purchased.productCount}
                 previewImages={purchased.previewImages}
-                // TODO: 구매 완료 목록 API(JEC-79)가 나오면 목록 화면으로 연결한다.
-                onOpen={() => showToast('구매 완료 목록은 준비 중이에요')}
+                // TODO: 구매 완료 목록 API(JEC-79)가 배포되면 purchasesEnabled 를 켠다.
+                onOpen={() =>
+                  purchasesEnabled
+                    ? void navigate({ to: '/products/purchased', search: { sort: undefined } })
+                    : showToast('구매 완료 목록은 준비 중이에요')
+                }
                 onMore={() => showToast('구매 완료 목록은 수정하거나 삭제할 수 없어요')}
               />
             )}

@@ -1,0 +1,38 @@
+appId: com.ject.ziper
+---
+- extendedWaitUntil:
+    visible: 로그인 하기
+    timeout: 90000
+- tapOn: 로그인 하기
+- extendedWaitUntil:
+    visible: 가입한 이메일과 비밀번호를 입력해 주세요.
+    timeout: 15000
+# The email field autofocuses.
+- inputText: jec23@example.test
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: ^비밀번호$
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: ^Next$
+- inputText: 'Jec23Fixture!'
+- hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: ^로그인$
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # WebKit exposes the same text for the heading and submit action. Tap the bottom action.
+      - tapOn:
+          point: 50%,91%
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 15000

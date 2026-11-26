@@ -32,6 +32,39 @@ it('reports a popup blocker instead of reporting success', async () => {
     code: 'PERMISSION_DENIED',
   });
 });
+it('reserves the tab before resolving the board URL and never resolves a blocked popup', async () => {
+  const events: string[] = [];
+  const tab = { opener: window, location: { replace: vi.fn() }, close: vi.fn() };
+  const open = vi.spyOn(window, 'open').mockImplementation(() => {
+    events.push('tab');
+    return tab as unknown as Window;
+  });
+  const target = vi.fn(async () => {
+    events.push('request');
+    expect(tab.opener).toBeNull();
+    return 'https://shop.example/item';
+  });
+  await openWebExternal(target);
+  expect(events).toEqual(['tab', 'request']);
+  expect(tab.location.replace).toHaveBeenCalledExactlyOnceWith('https://shop.example/item');
+  open.mockReturnValue(null);
+  await expect(openWebExternal(target)).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
+  expect(target).toHaveBeenCalledOnce();
+});
+it('closes its reserved tab without navigating if the deferred URL cannot be resolved', async () => {
+  const tab = { opener: window, location: { replace: vi.fn() }, close: vi.fn() };
+  vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+  await expect(openWebExternal(async () => 'file:///tmp/item')).rejects.toMatchObject({
+    code: 'INVALID_REQUEST',
+  });
+  await expect(
+    openWebExternal(async () => {
+      throw new Error('request aborted');
+    }),
+  ).rejects.toThrow('request aborted');
+  expect(tab.location.replace).not.toHaveBeenCalled();
+  expect(tab.close).toHaveBeenCalledTimes(2);
+});
 it('closes the temporary tab if navigation fails', async () => {
   const close = vi.fn();
   vi.spyOn(window, 'open').mockReturnValue({

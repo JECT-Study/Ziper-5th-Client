@@ -30,5 +30,12 @@ export default defineConfig({
     ws,
   },
   // 개발용 /api 프록시는 nitro 보다 앞에 둬야 요청을 먼저 받는다.
-  plugins: [apiDevProxy(), vanillaExtractPlugin(), tanstackStart(), nitro(), viteReact()],
+  plugins: [
+    // Route every API call to loopback in QA mode; never fall back to production.
+    apiDevProxy(env.VITE_JEC23_MOCK === '1' ? 'http://127.0.0.1:3011' : undefined),
+    vanillaExtractPlugin(),
+    tanstackStart(),
+    nitro(),
+    viteReact(),
+  ],
 });

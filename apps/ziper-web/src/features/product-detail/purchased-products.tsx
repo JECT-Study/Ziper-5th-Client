@@ -1,70 +1,162 @@
-import type { ProductDetail, ProductPurchases } from '@ziper/api/product-detail';
+import { useLayoutEffect, useState, type MouseEventHandler, type Ref } from 'react';
+import {
+  ProductDetailError,
+  type PurchasedProduct,
+  type ProductPurchases,
+} from '@ziper/api/product-detail';
 import { Button } from '../../components';
-import { useLoad } from '../../shared/use-load';
-import checkCircle from '../../assets/product-detail/check-circle.svg';
-import { ProductImage } from './product-image';
-import * as styles from './product-detail.css';
+import { ProductCard, ProductCardSkeleton } from '../board/product-card';
+import type { ProductSort } from './product-sort';
+import { ProductSortChips } from './product-sort-chips';
+import { useProductPages } from './use-product-pages';
+import { useProductPageFocus } from './use-product-page-focus';
+import * as boardStyles from '../board/board-detail.css';
 
-const won = new Intl.NumberFormat('ko-KR');
-export function PurchasedProducts({
-  api,
-  affectedBoardCount,
-}: {
+type AccessError = 'auth-required' | 'forbidden';
+
+type Props = {
   api: ProductPurchases;
-  affectedBoardCount: number | null;
-}) {
-  const [loaded, retry] = useLoad((signal) => api.list(signal), [api]);
-  const products: readonly ProductDetail[] | null = loaded.status === 'ready' ? loaded.value : null;
-  const error = loaded.status === 'error';
+  missingCards?: ReadonlySet<string>;
+  onOpen?: (product: PurchasedProduct) => void;
+  onOpenOriginal: (product: PurchasedProduct) => void;
+  onAccessDenied?: (code: AccessError, moveFocus: boolean) => void;
+};
 
+export function PurchasedProducts({
+  sort,
+  onSortChange,
+  visitRevision = 0,
+  ...props
+}: Props & {
+  sort?: ProductSort;
+  onSortChange?: (sort: ProductSort) => void;
+  visitRevision?: number;
+}) {
+  const [previewSort, setPreviewSort] = useState<ProductSort>('RECENT');
+  const selected = sort ?? previewSort;
   return (
-    <div className={styles.results}>
-      {affectedBoardCount !== null && (
-        <div className={styles.success} role="status">
-          <p className={styles.successTitle}>✓ 구매 완료 목록으로 이동했어요</p>
-          <p>
-            {affectedBoardCount}개 보드에서 제외하고
-            <br />
-            구매 완료 목록에 하나로 모았어요.
-          </p>
+    <>
+      <ProductSortChips sort={selected} onChange={onSortChange ?? setPreviewSort} />
+      <PurchasedGrid
+        key={selected}
+        sort={selected}
+        revision={
+          (props.missingCards?.size ?? 0) +
+          (selected === 'RECENT' || selected === 'OLDEST' ? visitRevision : 0)
+        }
+        {...props}
+      />
+    </>
+  );
+}
+
+function PurchasedGrid({
+  api,
+  missingCards,
+  sort,
+  onOpen,
+  onOpenOriginal,
+  onAccessDenied,
+  revision,
+}: Props & { sort: ProductSort; revision: number }) {
+  const { page, status, error, retry, canLoadMore, loadMore, refreshing, rejectedCursor } =
+    useProductPages((signal, cursor) => api.list(sort, signal, cursor), revision);
+  const waiting = status === 'loading';
+  const code = error instanceof ProductDetailError ? error.code : undefined;
+  const accessError = code === 'auth-required' || code === 'forbidden' ? code : null;
+  const items = accessError
+    ? undefined
+    : page?.items.filter((product) => !missingCards?.has(product.cardId));
+  const { grid, pager, empty, pageAction } = useProductPageFocus(status, items?.length ?? 0);
+  useLayoutEffect(() => {
+    if (!accessError) return;
+    // Hand off focus before the route replaces the list with its access notice.
+    const anchor = pager.current;
+    onAccessDenied?.(accessError, Boolean(anchor && anchor === anchor.ownerDocument.activeElement));
+  }, [accessError, onAccessDenied, pager]);
+  return (
+    <>
+      {waiting && !page && (
+        <div
+          className={boardStyles.grid}
+          role="status"
+          aria-label="구매 완료 목록을 불러오는 중이에요"
+          aria-busy
+        >
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
         </div>
       )}
-      {error ? (
-        <>
-          <p role="alert" className={styles.error}>
-            구매 완료 목록을 불러오지 못했어요. 완료된 구매 처리는 유지돼요.
-          </p>
-          <Button onClick={retry}>목록 다시 불러오기</Button>
-        </>
-      ) : products ? (
-        <>
-          <div className={styles.summary}>
-            <p>{products.length}개 · 구매 완료</p>
-            <span className={styles.caption}>최근 등록 순</span>
+      {items &&
+        (items.length > 0 ? (
+          <div className={boardStyles.grid} ref={grid}>
+            {items.map((product) => (
+              <ProductCard
+                key={product.cardId}
+                product={product}
+                purchased
+                onOpen={onOpen ? () => onOpen(product) : undefined}
+                onOpenOriginal={() => onOpenOriginal(product)}
+              />
+            ))}
           </div>
-          {products.length === 0 && <p role="status">구매 완료한 상품이 없어요.</p>}
-          {products.map((product) => (
-            <article className={styles.resultCard} key={product.cardId}>
-              <ProductImage product={product} purchased />
-              <span className={styles.chips}>
-                <span className={styles.boardChip}>구매 완료</span>
-                <span className={styles.boardChip}>PURCHASED</span>
-              </span>
-              <span className={styles.caption}>{product.shop}</span>
-              <strong className={styles.resultName}>{product.productTitle}</strong>
-              <strong className={styles.resultName}>
-                {product.price === null ? '가격 정보 없음' : won.format(product.price) + '원'}
-              </strong>
-              <span className={styles.caption}>{product.memo}</span>
-            </article>
-          ))}
-          <p className={styles.resultNote}>
-            <img src={checkCircle} alt="" />
-            구매 완료 상품은 재발견에서 제외돼요.
+        ) : (
+          !refreshing && (
+            <p className={boardStyles.status} role="status" ref={empty} tabIndex={-1}>
+              구매 완료한 상품이 없어요.
+            </p>
+          )
+        ))}
+      <div ref={pager} tabIndex={-1}>
+        {accessError === 'auth-required' ? null : accessError ? (
+          <PurchasedListError forbidden />
+        ) : status === 'error' ? (
+          <PurchasedListError
+            nextPage={Boolean(page && !refreshing && !rejectedCursor)}
+            retry={(event) => pageAction(event, retry, refreshing || rejectedCursor)}
+          />
+        ) : canLoadMore ? (
+          <div className={boardStyles.status}>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={(event) => pageAction(event, loadMore)}
+            >
+              더 불러오기
+            </Button>
+          </div>
+        ) : waiting && page ? (
+          <p className={boardStyles.status} role="status">
+            {refreshing ? '구매 완료 목록을 갱신하는 중이에요.' : '다음 상품을 불러오는 중이에요.'}
           </p>
-        </>
-      ) : (
-        <p role="status">구매 완료 목록을 불러오는 중이에요.</p>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+export function PurchasedListError({
+  forbidden,
+  ref,
+  nextPage,
+  retry,
+}: {
+  forbidden?: boolean;
+  ref?: Ref<HTMLDivElement>;
+  nextPage?: boolean;
+  retry?: MouseEventHandler<HTMLButtonElement>;
+}) {
+  return (
+    <div ref={ref} className={boardStyles.status} role="alert" tabIndex={ref ? -1 : undefined}>
+      {forbidden
+        ? '구매 완료 목록을 볼 수 있는 권한이 없어요.'
+        : nextPage
+          ? '다음 상품을 불러오지 못했어요.'
+          : '구매 완료 목록을 불러오지 못했어요.'}
+      {retry && (
+        <Button variant="secondary" size="small" onClick={retry}>
+          {nextPage ? '다음 상품 다시 불러오기' : '목록 다시 불러오기'}
+        </Button>
       )}
     </div>
   );
