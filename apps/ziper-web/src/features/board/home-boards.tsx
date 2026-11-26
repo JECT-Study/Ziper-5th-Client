@@ -8,7 +8,10 @@ import { useBoardsQuery } from './queries';
 import { useCreateBoardSheet } from './use-create-board';
 import * as styles from './board.css';
 
-/** 홈 화면의 보드 영역: 새 보드 만들기 + 내 보드 가로 목록 */
+// 홈에는 2×2 까지만 보여준다.
+const HOME_BOARD_LIMIT = 4;
+
+/** 홈 화면의 보드 영역: 새 보드 만들기 + 내 보드 2열 목록 */
 export function HomeBoards() {
   const { platform } = usePlatform();
   const boards = useBoardsQuery();
@@ -49,14 +52,13 @@ export function HomeBoards() {
         <div className={styles.homeList} aria-busy={boards.isPending}>
           {!boards.data && (
             <>
-              <BoardCardSkeleton className={styles.homeCard} />
-              <BoardCardSkeleton className={styles.homeCard} />
+              <BoardCardSkeleton />
+              <BoardCardSkeleton />
             </>
           )}
-          {list.map((board) => (
+          {list.slice(0, HOME_BOARD_LIMIT).map((board) => (
             <BoardCard
               key={board.boardId}
-              className={styles.homeCard}
               name={board.name}
               productCount={board.productCount}
               previewImages={board.previewImages}
