@@ -1,11 +1,7 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import { requireSignedIn } from '../features/auth';
-import { BoardDetailScreen } from '../features/board';
+import { BoardDetailScreen } from '../../../features/board';
 
-export const Route = createFileRoute('/boards/$boardId')({
-  // 로그인 여부는 브라우저에서만 확인할 수 있다.
-  ssr: false,
-  beforeLoad: requireSignedIn,
+export const Route = createFileRoute('/_app/boards/$boardId')({
   params: {
     parse: ({ boardId }) => {
       const id = Number(boardId);

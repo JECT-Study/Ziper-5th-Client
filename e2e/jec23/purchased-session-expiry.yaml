@@ -8,7 +8,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fproducts%2Fpurchased
+      LINK: ziper://boards/purchased
 - extendedWaitUntil:
     visible: 구매한 가방
     timeout: 15000

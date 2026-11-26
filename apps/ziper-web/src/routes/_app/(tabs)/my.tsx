@@ -1,14 +1,11 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { usePlatform } from '../bridge/provider';
-import { BottomNavigation, Button, HeaderSub } from '../components';
-import { requireSignedIn, useLogout } from '../features/auth';
-import { useTabNavigation } from '../shared/use-tab-navigation';
-import * as styles from '../styles/my.css';
+import { usePlatform } from '../../../bridge/provider';
+import { BottomNavigation, Button, HeaderSub } from '../../../components';
+import { useLogout } from '../../../features/auth';
+import { useTabNavigation } from '../../../shared/use-tab-navigation';
+import * as styles from '../../../styles/my.css';
 
-export const Route = createFileRoute('/my')({
-  // 로그인 여부는 브라우저에서만 확인할 수 있다.
-  ssr: false,
-  beforeLoad: requireSignedIn,
+export const Route = createFileRoute('/_app/(tabs)/my')({
   head: () => ({ meta: [{ title: '마이 | Ziper' }] }),
   component: MyPage,
 });
@@ -39,7 +36,7 @@ function MyPage() {
         onAdd={
           status === 'initializing'
             ? undefined
-            : () => void platform.navigation.push('/register-product').catch(() => {})
+            : () => void platform.navigation.push('/products/new').catch(() => {})
         }
       />
     </main>

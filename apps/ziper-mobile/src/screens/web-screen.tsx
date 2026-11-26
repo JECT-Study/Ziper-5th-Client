@@ -1,5 +1,12 @@
 import Constants from 'expo-constants';
-import { Stack, useFocusEffect, useNavigation, usePreventRemove, useRouter } from 'expo-router';
+import {
+  Stack,
+  useFocusEffect,
+  useNavigation,
+  usePreventRemove,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Button, Linking, Platform, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +32,21 @@ type WebScope = ReturnType<typeof createHandlers> & {
   back: () => boolean;
 };
 
-export function WebScreen({ path }: { path: string }) {
+export type WebScreenTraits = {
+  /** 웹이 뒤로 가기 버튼이 있는 헤더를 그린다. 첫 화면이어도 뒤로 가기를 웹 대신 처리한다. */
+  webHeader?: boolean;
+  /** 상태 표시줄까지 웹이 그린다. 앱 추출을 쓰는 상품 저장 화면이다. */
+  edgeToEdge?: boolean;
+  /** 외부 공유로 연 화면. 처음 받은 공유를 붙잡고 닫을 때 정리한다. */
+  share?: boolean;
+};
+
+export function WebScreen({
+  path,
+  webHeader = false,
+  edgeToEdge = false,
+  share = false,
+}: { path: string } & WebScreenTraits) {
   const { config, auth, shareInbox } = useMobileServices();
   const { extraction, extractionView } = useProductExtraction();
   // 헤더가 없으니 상태 표시줄 아래부터 웹을 그린다. 아래쪽 여백은 웹이 safe-area 로 처리한다.
@@ -45,11 +66,7 @@ export function WebScreen({ path }: { path: string }) {
   const [blockedURI, setBlockedURI] = useState<string | null>(null);
   const [scopes] = useState(() => new ActiveScope<WebScope>());
   const uri = serviceURL(config, path);
-  const shareScreen = path === '/share-product';
-  const pathname = path.split(/[?#]/, 1)[0];
-  const edgeToEdge = shareScreen || pathname === '/register-product';
-  const hasWebHeader = edgeToEdge || /^\/products\/[^/]+$/.test(pathname);
-  const openedShare = useRef(shareScreen ? shareInbox.read() : null);
+  const openedShare = useRef(share ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
   const live = useRef({
     config,
@@ -75,7 +92,7 @@ export function WebScreen({ path }: { path: string }) {
   );
   const intercept = interceptNativeBack(sheet !== null, depth);
   const disablePrevention = usePreventRemove(
-    intercept || (shareScreen && !blocked && uri !== null && !shareClosing),
+    intercept || (share && !blocked && uri !== null && !shareClosing),
     () => {
       back();
     },
@@ -119,8 +136,8 @@ export function WebScreen({ path }: { path: string }) {
               return true;
             case 'native':
             case 'root':
-              if (!hasWebHeader && !canGoBack) return false;
-              if (shareScreen) {
+              if (!webHeader && !canGoBack) return false;
+              if (share) {
                 if (openedShare.current) shareInbox.dismiss(openedShare.current.id);
                 setShareClosing(true);
                 disablePrevention();
@@ -146,7 +163,7 @@ export function WebScreen({ path }: { path: string }) {
           },
           sheets,
           extraction: edgeToEdge ? extraction : undefined,
-          shareInbox: shareScreen
+          shareInbox: share
             ? {
                 // This screen keeps its original share even after acknowledgement or reload.
                 read: () => (openedShare.current ??= shareInbox.read()),
@@ -161,10 +178,10 @@ export function WebScreen({ path }: { path: string }) {
               sheets.cancel();
               depthRef.current = 0;
               setDepth(0);
-              if (shareScreen) setShareClosing(true);
+              if (share) setShareClosing(true);
               live.current.disablePrevention();
             }
-            live.current.router[kind]({ pathname: '/web', params: { path: nextPath } });
+            live.current.router[kind](nextPath as Href);
           },
           setDepth: (value) => {
             if (live.current.uri !== uri || live.current.blocked) return;
@@ -183,7 +200,7 @@ export function WebScreen({ path }: { path: string }) {
         scopes.deactivate();
       }
     };
-  }, [uri, blocked, scopes, shareInbox, shareScreen, hasWebHeader, edgeToEdge, extraction]);
+  }, [uri, blocked, scopes, shareInbox, share, webHeader, edgeToEdge, extraction]);
 
   const delegate = useMemo<BridgeDelegate<NativeBridge>>(() => {
     // Retained delegates resolve the active scope per call, never capture disposed handlers.
@@ -239,7 +256,7 @@ export function WebScreen({ path }: { path: string }) {
         options={{
           title: 'Ziper',
           headerShown: blocked || uri === null,
-          gestureEnabled: !intercept && !shareScreen,
+          gestureEnabled: !intercept && !share,
           headerBackButtonMenuEnabled: false,
           headerBackVisible: !intercept,
           headerLeft: intercept ? () => <Button title="Back" onPress={back} /> : undefined,

@@ -1,16 +1,13 @@
 import { createFileRoute, notFound, useRouter } from '@tanstack/react-router';
-import { requireSignedIn } from '../features/auth';
-import { purchasesEnabled } from '../features/product-detail/purchases';
-import { parseProductSort } from '../features/product-detail/product-sort';
-import { PurchasedScreen } from '../features/product-detail/purchased-screen';
-import { waitForRouteExit } from '../shared/wait-for-route-exit';
+import { purchasesEnabled } from '../../../features/product-detail/purchases';
+import { parseProductSort } from '../../../features/product-detail/product-sort';
+import { PurchasedScreen } from '../../../features/product-detail/purchased-screen';
+import { waitForRouteExit } from '../../../shared/wait-for-route-exit';
 
-export const Route = createFileRoute('/products/purchased')({
-  ssr: false,
+export const Route = createFileRoute('/_app/boards/purchased')({
   validateSearch: (search: Record<string, unknown>) => ({ sort: parseProductSort(search.sort) }),
   beforeLoad: () => {
     if (!purchasesEnabled) throw notFound();
-    return requireSignedIn();
   },
   head: () => ({ meta: [{ title: '구매 완료 목록 | Ziper' }] }),
   component: PurchasedRoute,

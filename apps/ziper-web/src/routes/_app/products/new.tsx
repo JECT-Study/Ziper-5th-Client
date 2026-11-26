@@ -1,14 +1,14 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { findSharedURL } from '@ziper/product-extraction/link';
 import { useState, type SubmitEvent } from 'react';
-import { usePlatform } from '../bridge/provider';
-import { Button, TextField } from '../components';
-import { ConnectedProductSave } from '../features/product-save/connected-product-save';
-import { ScreenShell } from '../features/product-save/product-save-screen';
-import * as saveStyles from '../features/product-save/product-save.css';
-import * as styles from '../features/product-save/register-product.css';
+import { usePlatform } from '../../../bridge/provider';
+import { Button, TextField } from '../../../components';
+import { ConnectedProductSave } from '../../../features/product-save/connected-product-save';
+import { ScreenShell } from '../../../features/product-save/product-save-screen';
+import * as saveStyles from '../../../features/product-save/product-save.css';
+import * as styles from '../../../features/product-save/register-product.css';
 
-export const Route = createFileRoute('/register-product')({
+export const Route = createFileRoute('/_app/products/new')({
   validateSearch: (search: Record<string, unknown>) => ({
     step: search.step === 'details' ? ('details' as const) : undefined,
   }),

@@ -11,7 +11,7 @@
 - `build.sh ios|android`: 개발 바이너리를 빌드해 설치한다.
 - `run.sh ios|android [flow...]`: 웹(3000)과 Metro(일반 8081, JEC-23 전용 8082)를 준비하고 시나리오를 실행한다. 결과는 `e2e/.artifacts/<platform>/`에 남는다(JUnit, 실패 시 화면 정보).
 
-기본 `flows/` 시나리오는 JEC-23 HTTP fixture(`node e2e/jec23/mock-api.mjs`, `VITE_JEC23_MOCK=1`, [JEC-23 안내](../docs/jec-23-product-detail.md))의 상품과 `/design-system`의 액션 시트 데모를 쓴다. 상품 상세 흐름은 실행 전마다 `POST /_reset`으로 fixture 를 로그인 상태로 되돌린다. 화면 진입은 딥링크 `ziper://web?path=<URL 인코딩한 경로>`로 한다.
+기본 `flows/` 시나리오는 JEC-23 HTTP fixture(`node e2e/jec23/mock-api.mjs`, `VITE_JEC23_MOCK=1`, [JEC-23 안내](../docs/jec-23-product-detail.md))의 상품과 `/design-system`의 액션 시트 데모를 쓴다. 상품 상세 흐름은 실행 전마다 `POST /_reset`으로 fixture 를 로그인 상태로 되돌린다. 화면 진입은 웹 경로와 같은 딥링크(예: `ziper://products/7`)로 한다.
 
 ## 준비 (최초 1회)
 

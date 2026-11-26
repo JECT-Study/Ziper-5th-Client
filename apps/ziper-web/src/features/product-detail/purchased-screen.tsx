@@ -126,7 +126,7 @@ export function PurchasedScreen({
   function add() {
     if (navigating.current) return;
     void platform.navigation
-      .push('/register-product')
+      .push('/products/new')
       .catch(() => showToast('상품 추가 화면을 열지 못했어요.'));
   }
 

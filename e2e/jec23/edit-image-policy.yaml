@@ -8,7 +8,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fproducts%2F8
+      LINK: ziper://products/8
 - extendedWaitUntil:
     visible: 린넨 블라우스
     timeout: 15000

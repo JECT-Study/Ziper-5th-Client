@@ -9,55 +9,30 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteRouteImport } from './routes/_app/route'
 import { Route as DesignSystemRouteImport } from './routes/design-system'
-import { Route as MyRouteImport } from './routes/my'
-import { Route as RegisterProductRouteImport } from './routes/register-product'
-import { Route as ShareProductRouteImport } from './routes/share-product'
-import { Route as BoardsIndexRouteImport } from './routes/boards.index'
-import { Route as BoardsBoardIdRouteImport } from './routes/boards.$boardId'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as LoginEmailRouteImport } from './routes/login/email'
-import { Route as ProductsCardIdRouteImport } from './routes/products.$cardId'
-import { Route as ProductsPurchasedRouteImport } from './routes/products.purchased'
 import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as SignupCompleteRouteImport } from './routes/signup/complete'
 import { Route as SignupTermsRouteImport } from './routes/signup/terms'
+import { Route as ApptabsIndexRouteImport } from './routes/_app/(tabs)/index'
+import { Route as ApptabsMyRouteImport } from './routes/_app/(tabs)/my'
+import { Route as AppBoardsBoardIdRouteImport } from './routes/_app/boards/$boardId'
+import { Route as AppBoardsPurchasedRouteImport } from './routes/_app/boards/purchased'
+import { Route as AppProductsCardIdRouteImport } from './routes/_app/products/$cardId'
+import { Route as AppProductsNewRouteImport } from './routes/_app/products/new'
+import { Route as AppProductsSharedRouteImport } from './routes/_app/products/shared'
 import { Route as AuthCallbackProviderRouteImport } from './routes/auth/callback/$provider'
+import { Route as ApptabsBoardsIndexRouteImport } from './routes/_app/(tabs)/boards/index'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRouteRoute = AppRouteRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignSystemRoute = DesignSystemRouteImport.update({
   id: '/design-system',
   path: '/design-system',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MyRoute = MyRouteImport.update({
-  id: '/my',
-  path: '/my',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegisterProductRoute = RegisterProductRouteImport.update({
-  id: '/register-product',
-  path: '/register-product',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ShareProductRoute = ShareProductRouteImport.update({
-  id: '/share-product',
-  path: '/share-product',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BoardsIndexRoute = BoardsIndexRouteImport.update({
-  id: '/boards/',
-  path: '/boards/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BoardsBoardIdRoute = BoardsBoardIdRouteImport.update({
-  id: '/boards/$boardId',
-  path: '/boards/$boardId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginIndexRoute = LoginIndexRouteImport.update({
@@ -68,16 +43,6 @@ const LoginIndexRoute = LoginIndexRouteImport.update({
 const LoginEmailRoute = LoginEmailRouteImport.update({
   id: '/login/email',
   path: '/login/email',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductsCardIdRoute = ProductsCardIdRouteImport.update({
-  id: '/products/$cardId',
-  path: '/products/$cardId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProductsPurchasedRoute = ProductsPurchasedRouteImport.update({
-  id: '/products/purchased',
-  path: '/products/purchased',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupIndexRoute = SignupIndexRouteImport.update({
@@ -95,131 +60,166 @@ const SignupTermsRoute = SignupTermsRouteImport.update({
   path: '/signup/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApptabsIndexRoute = ApptabsIndexRouteImport.update({
+  id: '/(tabs)/',
+  path: '/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const ApptabsMyRoute = ApptabsMyRouteImport.update({
+  id: '/(tabs)/my',
+  path: '/my',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBoardsBoardIdRoute = AppBoardsBoardIdRouteImport.update({
+  id: '/boards/$boardId',
+  path: '/boards/$boardId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppBoardsPurchasedRoute = AppBoardsPurchasedRouteImport.update({
+  id: '/boards/purchased',
+  path: '/boards/purchased',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppProductsCardIdRoute = AppProductsCardIdRouteImport.update({
+  id: '/products/$cardId',
+  path: '/products/$cardId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppProductsNewRoute = AppProductsNewRouteImport.update({
+  id: '/products/new',
+  path: '/products/new',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppProductsSharedRoute = AppProductsSharedRouteImport.update({
+  id: '/products/shared',
+  path: '/products/shared',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AuthCallbackProviderRoute = AuthCallbackProviderRouteImport.update({
   id: '/auth/callback/$provider',
   path: '/auth/callback/$provider',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApptabsBoardsIndexRoute = ApptabsBoardsIndexRouteImport.update({
+  id: '/(tabs)/boards/',
+  path: '/boards/',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof ApptabsIndexRoute
   '/design-system': typeof DesignSystemRoute
-  '/my': typeof MyRoute
-  '/register-product': typeof RegisterProductRoute
-  '/share-product': typeof ShareProductRoute
-  '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
-  '/products/$cardId': typeof ProductsCardIdRoute
-  '/products/purchased': typeof ProductsPurchasedRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
-  '/boards/': typeof BoardsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/my': typeof ApptabsMyRoute
+  '/boards/$boardId': typeof AppBoardsBoardIdRoute
+  '/boards/purchased': typeof AppBoardsPurchasedRoute
+  '/products/$cardId': typeof AppProductsCardIdRoute
+  '/products/new': typeof AppProductsNewRoute
+  '/products/shared': typeof AppProductsSharedRoute
   '/auth/callback/$provider': typeof AuthCallbackProviderRoute
+  '/boards/': typeof ApptabsBoardsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRoute
-  '/my': typeof MyRoute
-  '/register-product': typeof RegisterProductRoute
-  '/share-product': typeof ShareProductRoute
-  '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
-  '/products/$cardId': typeof ProductsCardIdRoute
-  '/products/purchased': typeof ProductsPurchasedRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
-  '/boards': typeof BoardsIndexRoute
   '/login': typeof LoginIndexRoute
   '/signup': typeof SignupIndexRoute
+  '/my': typeof ApptabsMyRoute
+  '/boards/$boardId': typeof AppBoardsBoardIdRoute
+  '/boards/purchased': typeof AppBoardsPurchasedRoute
+  '/products/$cardId': typeof AppProductsCardIdRoute
+  '/products/new': typeof AppProductsNewRoute
+  '/products/shared': typeof AppProductsSharedRoute
   '/auth/callback/$provider': typeof AuthCallbackProviderRoute
+  '/': typeof ApptabsIndexRoute
+  '/boards': typeof ApptabsBoardsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteRouteWithChildren
   '/design-system': typeof DesignSystemRoute
-  '/my': typeof MyRoute
-  '/register-product': typeof RegisterProductRoute
-  '/share-product': typeof ShareProductRoute
-  '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
-  '/products/$cardId': typeof ProductsCardIdRoute
-  '/products/purchased': typeof ProductsPurchasedRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
-  '/boards/': typeof BoardsIndexRoute
   '/login/': typeof LoginIndexRoute
   '/signup/': typeof SignupIndexRoute
+  '/_app/(tabs)/my': typeof ApptabsMyRoute
+  '/_app/boards/$boardId': typeof AppBoardsBoardIdRoute
+  '/_app/boards/purchased': typeof AppBoardsPurchasedRoute
+  '/_app/products/$cardId': typeof AppProductsCardIdRoute
+  '/_app/products/new': typeof AppProductsNewRoute
+  '/_app/products/shared': typeof AppProductsSharedRoute
   '/auth/callback/$provider': typeof AuthCallbackProviderRoute
+  '/_app/(tabs)/': typeof ApptabsIndexRoute
+  '/_app/(tabs)/boards/': typeof ApptabsBoardsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/design-system'
-    | '/my'
-    | '/register-product'
-    | '/share-product'
-    | '/boards/$boardId'
     | '/login/email'
-    | '/products/$cardId'
-    | '/products/purchased'
     | '/signup/complete'
     | '/signup/terms'
-    | '/boards/'
     | '/login/'
     | '/signup/'
+    | '/my'
+    | '/boards/$boardId'
+    | '/boards/purchased'
+    | '/products/$cardId'
+    | '/products/new'
+    | '/products/shared'
     | '/auth/callback/$provider'
+    | '/boards/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
     | '/design-system'
-    | '/my'
-    | '/register-product'
-    | '/share-product'
-    | '/boards/$boardId'
     | '/login/email'
-    | '/products/$cardId'
-    | '/products/purchased'
     | '/signup/complete'
     | '/signup/terms'
-    | '/boards'
     | '/login'
     | '/signup'
+    | '/my'
+    | '/boards/$boardId'
+    | '/boards/purchased'
+    | '/products/$cardId'
+    | '/products/new'
+    | '/products/shared'
     | '/auth/callback/$provider'
+    | '/'
+    | '/boards'
   id:
     | '__root__'
-    | '/'
+    | '/_app'
     | '/design-system'
-    | '/my'
-    | '/register-product'
-    | '/share-product'
-    | '/boards/$boardId'
     | '/login/email'
-    | '/products/$cardId'
-    | '/products/purchased'
     | '/signup/complete'
     | '/signup/terms'
-    | '/boards/'
     | '/login/'
     | '/signup/'
+    | '/_app/(tabs)/my'
+    | '/_app/boards/$boardId'
+    | '/_app/boards/purchased'
+    | '/_app/products/$cardId'
+    | '/_app/products/new'
+    | '/_app/products/shared'
     | '/auth/callback/$provider'
+    | '/_app/(tabs)/'
+    | '/_app/(tabs)/boards/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRouteRoute: typeof AppRouteRouteWithChildren
   DesignSystemRoute: typeof DesignSystemRoute
-  MyRoute: typeof MyRoute
-  RegisterProductRoute: typeof RegisterProductRoute
-  ShareProductRoute: typeof ShareProductRoute
-  BoardsBoardIdRoute: typeof BoardsBoardIdRoute
   LoginEmailRoute: typeof LoginEmailRoute
-  ProductsCardIdRoute: typeof ProductsCardIdRoute
-  ProductsPurchasedRoute: typeof ProductsPurchasedRoute
   SignupCompleteRoute: typeof SignupCompleteRoute
   SignupTermsRoute: typeof SignupTermsRoute
-  BoardsIndexRoute: typeof BoardsIndexRoute
   LoginIndexRoute: typeof LoginIndexRoute
   SignupIndexRoute: typeof SignupIndexRoute
   AuthCallbackProviderRoute: typeof AuthCallbackProviderRoute
@@ -227,11 +227,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design-system': {
@@ -239,41 +239,6 @@ declare module '@tanstack/react-router' {
       path: '/design-system'
       fullPath: '/design-system'
       preLoaderRoute: typeof DesignSystemRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/my': {
-      id: '/my'
-      path: '/my'
-      fullPath: '/my'
-      preLoaderRoute: typeof MyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/register-product': {
-      id: '/register-product'
-      path: '/register-product'
-      fullPath: '/register-product'
-      preLoaderRoute: typeof RegisterProductRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/share-product': {
-      id: '/share-product'
-      path: '/share-product'
-      fullPath: '/share-product'
-      preLoaderRoute: typeof ShareProductRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/boards/': {
-      id: '/boards/'
-      path: '/boards'
-      fullPath: '/boards/'
-      preLoaderRoute: typeof BoardsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/boards/$boardId': {
-      id: '/boards/$boardId'
-      path: '/boards/$boardId'
-      fullPath: '/boards/$boardId'
-      preLoaderRoute: typeof BoardsBoardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login/': {
@@ -288,20 +253,6 @@ declare module '@tanstack/react-router' {
       path: '/login/email'
       fullPath: '/login/email'
       preLoaderRoute: typeof LoginEmailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/products/$cardId': {
-      id: '/products/$cardId'
-      path: '/products/$cardId'
-      fullPath: '/products/$cardId'
-      preLoaderRoute: typeof ProductsCardIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/products/purchased': {
-      id: '/products/purchased'
-      path: '/products/purchased'
-      fullPath: '/products/purchased'
-      preLoaderRoute: typeof ProductsPurchasedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup/': {
@@ -325,6 +276,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupTermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/(tabs)/': {
+      id: '/_app/(tabs)/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof ApptabsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/(tabs)/my': {
+      id: '/_app/(tabs)/my'
+      path: '/my'
+      fullPath: '/my'
+      preLoaderRoute: typeof ApptabsMyRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/boards/$boardId': {
+      id: '/_app/boards/$boardId'
+      path: '/boards/$boardId'
+      fullPath: '/boards/$boardId'
+      preLoaderRoute: typeof AppBoardsBoardIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/boards/purchased': {
+      id: '/_app/boards/purchased'
+      path: '/boards/purchased'
+      fullPath: '/boards/purchased'
+      preLoaderRoute: typeof AppBoardsPurchasedRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/products/$cardId': {
+      id: '/_app/products/$cardId'
+      path: '/products/$cardId'
+      fullPath: '/products/$cardId'
+      preLoaderRoute: typeof AppProductsCardIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/products/new': {
+      id: '/_app/products/new'
+      path: '/products/new'
+      fullPath: '/products/new'
+      preLoaderRoute: typeof AppProductsNewRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/_app/products/shared': {
+      id: '/_app/products/shared'
+      path: '/products/shared'
+      fullPath: '/products/shared'
+      preLoaderRoute: typeof AppProductsSharedRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/auth/callback/$provider': {
       id: '/auth/callback/$provider'
       path: '/auth/callback/$provider'
@@ -332,22 +332,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/(tabs)/boards/': {
+      id: '/_app/(tabs)/boards/'
+      path: '/boards'
+      fullPath: '/boards/'
+      preLoaderRoute: typeof ApptabsBoardsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
   }
 }
 
+interface AppRouteRouteChildren {
+  ApptabsMyRoute: typeof ApptabsMyRoute
+  AppBoardsBoardIdRoute: typeof AppBoardsBoardIdRoute
+  AppBoardsPurchasedRoute: typeof AppBoardsPurchasedRoute
+  AppProductsCardIdRoute: typeof AppProductsCardIdRoute
+  AppProductsNewRoute: typeof AppProductsNewRoute
+  AppProductsSharedRoute: typeof AppProductsSharedRoute
+  ApptabsIndexRoute: typeof ApptabsIndexRoute
+  ApptabsBoardsIndexRoute: typeof ApptabsBoardsIndexRoute
+}
+
+const AppRouteRouteChildren: AppRouteRouteChildren = {
+  ApptabsMyRoute: ApptabsMyRoute,
+  AppBoardsBoardIdRoute: AppBoardsBoardIdRoute,
+  AppBoardsPurchasedRoute: AppBoardsPurchasedRoute,
+  AppProductsCardIdRoute: AppProductsCardIdRoute,
+  AppProductsNewRoute: AppProductsNewRoute,
+  AppProductsSharedRoute: AppProductsSharedRoute,
+  ApptabsIndexRoute: ApptabsIndexRoute,
+  ApptabsBoardsIndexRoute: ApptabsBoardsIndexRoute,
+}
+
+const AppRouteRouteWithChildren = AppRouteRoute._addFileChildren(
+  AppRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRouteRoute: AppRouteRouteWithChildren,
   DesignSystemRoute: DesignSystemRoute,
-  MyRoute: MyRoute,
-  RegisterProductRoute: RegisterProductRoute,
-  ShareProductRoute: ShareProductRoute,
-  BoardsBoardIdRoute: BoardsBoardIdRoute,
   LoginEmailRoute: LoginEmailRoute,
-  ProductsCardIdRoute: ProductsCardIdRoute,
-  ProductsPurchasedRoute: ProductsPurchasedRoute,
   SignupCompleteRoute: SignupCompleteRoute,
   SignupTermsRoute: SignupTermsRoute,
-  BoardsIndexRoute: BoardsIndexRoute,
   LoginIndexRoute: LoginIndexRoute,
   SignupIndexRoute: SignupIndexRoute,
   AuthCallbackProviderRoute: AuthCallbackProviderRoute,

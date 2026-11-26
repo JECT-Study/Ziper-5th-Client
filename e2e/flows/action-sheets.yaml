@@ -5,7 +5,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fdesign-system
+      LINK: ziper://design-system
 - scrollUntilVisible:
     element: 공통 액션 시트 열기
     direction: DOWN
