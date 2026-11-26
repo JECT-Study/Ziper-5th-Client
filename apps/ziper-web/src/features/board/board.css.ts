@@ -28,7 +28,8 @@ export const collage = style({
   gridTemplateRows: '1fr 1fr',
   columnGap: 3.58,
   rowGap: 3.65,
-  height: 119.65,
+  // 높이를 고정하지 않고 Figma 비율(148 : 119.65)로 둔다. 카드가 넓어져도 썸네일 모양이 그대로다.
+  aspectRatio: '148 / 119.65',
 });
 
 export const tile = style({
@@ -124,19 +125,13 @@ export const sectionLink = style({
   color: vars.color.text.default,
 });
 
-// 홈 보드 목록은 가로로 넘긴다. 카드 폭은 Figma 172.
+// 홈 내 보드는 2열로 폭을 채우고, 최대 4개(2×2)만 보여준다. 나머지는 "전체 보기"로 본다.
 export const homeList = style({
-  display: 'flex',
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: vars.space[8],
-  overflowX: 'auto',
   padding: `0 ${vars.space[16]}`,
-  scrollPaddingInline: vars.space[16],
-  scrollSnapType: 'x proximity',
-  scrollbarWidth: 'none',
-  selectors: { '&::-webkit-scrollbar': { display: 'none' } },
 });
-
-export const homeCard = style({ flex: '0 0 172px', scrollSnapAlign: 'start' });
 
 export const status = style({
   margin: 0,
@@ -180,7 +175,8 @@ export const tabGrid = style({
   padding: `${vars.space[8]} ${vars.space[16]} ${vars.space[24]}`,
 });
 
-export const tabCreateButton = style({ height: 185, ...typography.body2Medium });
+// 옆 카드와 같은 줄이면 그 높이에 맞춰 늘어나고, 혼자일 때도 카드 비율(172 : 188.65)을 지킨다.
+export const tabCreateButton = style({ aspectRatio: '172 / 188.65', ...typography.body2Medium });
 
 export const empty = style({
   gridColumn: '1 / -1',

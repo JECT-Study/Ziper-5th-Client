@@ -178,4 +178,6 @@ export const menuAction = style({
   color: vars.color.text.strong,
   selectors: { '& + &': { borderTop: `1px solid ${vars.palette.gray100}` } },
 });
+// Figma 상품 관리 시트의 "삭제": accent/red
+export const menuActionDanger = style({ color: vars.color.accent.red });
 export const successTitle = style(typography.subtitle1Bold);

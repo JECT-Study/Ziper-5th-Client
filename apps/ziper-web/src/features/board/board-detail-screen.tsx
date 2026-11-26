@@ -15,6 +15,7 @@ import { useTabNavigation } from '../../shared/use-tab-navigation';
 import { openOriginal, type BoardSort } from './api';
 import { ProductCard, ProductCardSkeleton } from './product-card';
 import { useBoardProductsQuery } from './queries';
+import { useProductManage } from './use-product-manage';
 import * as styles from './board-detail.css';
 
 const SORTS: { value: BoardSort; label: string }[] = [
@@ -35,6 +36,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
   const { platform, status } = usePlatform();
   const selectTab = useTabNavigation();
   const navigate = useNavigate();
+  const productManage = useProductManage();
   const [sort, setSort] = useState<BoardSort>('RECENT');
   // 정렬마다 캐시가 따로라, 한 번 본 정렬로 돌아가면 바로 보이고 뒤에서 새로 받는다.
   const products = useBoardProductsQuery(boardId, sort);
@@ -162,8 +164,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
                       search: { preview: undefined },
                     }).catch(() => showToast('상품 상세를 열지 못했어요.'))
                   }
-                  // TODO: 상품 관리 시트(구매 완료·상품 수정·삭제)와 연결한다.
-                  onMore={() => {}}
+                  onMore={() => productManage.open(product)}
                   onOpenOriginal={() => void goOriginal(product.cardId)}
                 />
               ))}
@@ -173,6 +174,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
         )}
       </div>
       <BottomNavigation active="board" onSelect={selectTab} onAdd={addProduct} />
+      {productManage.element}
     </main>
   );
 }
