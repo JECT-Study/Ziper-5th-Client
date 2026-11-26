@@ -1,22 +1,30 @@
-import { useLayoutEffect, useState, type MouseEventHandler, type Ref } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { ApiError } from '@ziper/api/http';
 import {
-  ProductDetailError,
-  type PurchasedProduct,
-  type ProductPurchases,
-} from '@ziper/api/product-detail';
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEventHandler,
+  type Ref,
+} from 'react';
 import { Button } from '../../components';
 import { ProductCard, ProductCardSkeleton } from '../board/product-card';
 import type { ProductSort } from './product-sort';
 import { ProductSortChips } from './product-sort-chips';
-import { useProductPages } from './use-product-pages';
+import { readErrorCode } from './product-errors';
+import {
+  getPurchasedProducts,
+  getPurchasedProductsQueryKey,
+  type PurchasedProduct,
+} from './purchases';
 import { useProductPageFocus } from './use-product-page-focus';
 import * as boardStyles from '../board/board-detail.css';
 
 type AccessError = 'auth-required' | 'forbidden';
 
 type Props = {
-  api: ProductPurchases;
-  missingCards?: ReadonlySet<string>;
+  missingCards?: ReadonlySet<number>;
   onOpen?: (product: PurchasedProduct) => void;
   onOpenOriginal: (product: PurchasedProduct) => void;
   onAccessDenied?: (code: AccessError, moveFocus: boolean) => void;
@@ -51,7 +59,6 @@ export function PurchasedProducts({
 }
 
 function PurchasedGrid({
-  api,
   missingCards,
   sort,
   onOpen,
@@ -59,15 +66,46 @@ function PurchasedGrid({
   onAccessDenied,
   revision,
 }: Props & { sort: ProductSort; revision: number }) {
-  const { page, status, error, retry, canLoadMore, loadMore, refreshing, rejectedCursor } =
-    useProductPages((signal, cursor) => api.list(sort, signal, cursor), revision);
-  const waiting = status === 'loading';
-  const code = error instanceof ProductDetailError ? error.code : undefined;
+  const query = useInfiniteQuery({
+    queryKey: getPurchasedProductsQueryKey(sort),
+    queryFn: ({ pageParam, signal }) => getPurchasedProducts(sort, pageParam, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: ({ data }) => data.nextCursor ?? undefined,
+    staleTime: 0,
+  });
+  const firstRevision = useRef(revision);
+  const { refetch } = query;
+  useEffect(() => {
+    // 방문 기록·삭제가 정렬을 바꿀 수 있어 처음부터 다시 받는다.
+    if (revision !== firstRevision.current) void refetch();
+  }, [revision, refetch]);
+  const waiting = query.isFetching;
+  const status = waiting ? 'loading' : query.isError ? 'error' : 'ready';
+  const { error } = query;
+  const refreshing = query.isRefetching && !query.isFetchingNextPage;
+  const rejectedCursor =
+    query.isFetchNextPageError &&
+    error instanceof ApiError &&
+    error.status === 400 &&
+    (error.code === 'INVALID_REQUEST' || error.code === 'INVALID_CURSOR');
+  const code = query.isError ? readErrorCode(error) : undefined;
   const accessError = code === 'auth-required' || code === 'forbidden' ? code : null;
+  const loaded = query.data && [
+    ...new Map(
+      query.data.pages.flatMap(({ data }) => data.items).map((item) => [item.cardId, item]),
+    ).values(),
+  ];
+  const canLoadMore = !waiting && !query.isError && query.hasNextPage;
+  const retry = () =>
+    void (rejectedCursor || !query.isFetchNextPageError ? refetch() : query.fetchNextPage());
   const items = accessError
     ? undefined
-    : page?.items.filter((product) => !missingCards?.has(product.cardId));
-  const { grid, pager, empty, pageAction } = useProductPageFocus(status, items?.length ?? 0);
+    : loaded?.filter((product) => !missingCards?.has(product.cardId));
+  const { grid, pager, empty, pageAction } = useProductPageFocus(
+    status,
+    items?.length ?? 0,
+    query.dataUpdatedAt + query.errorUpdatedAt,
+  );
   useLayoutEffect(() => {
     if (!accessError) return;
     // Hand off focus before the route replaces the list with its access notice.
@@ -76,7 +114,7 @@ function PurchasedGrid({
   }, [accessError, onAccessDenied, pager]);
   return (
     <>
-      {waiting && !page && (
+      {waiting && !loaded && (
         <div
           className={boardStyles.grid}
           role="status"
@@ -93,7 +131,11 @@ function PurchasedGrid({
             {items.map((product) => (
               <ProductCard
                 key={product.cardId}
-                product={product}
+                product={{
+                  ...product,
+                  tags: product.tags.map(({ title }) => title),
+                  linkStatus: product.link.status,
+                }}
                 purchased
                 onOpen={onOpen ? () => onOpen(product) : undefined}
                 onOpenOriginal={() => onOpenOriginal(product)}
@@ -112,20 +154,22 @@ function PurchasedGrid({
           <PurchasedListError forbidden />
         ) : status === 'error' ? (
           <PurchasedListError
-            nextPage={Boolean(page && !refreshing && !rejectedCursor)}
-            retry={(event) => pageAction(event, retry, refreshing || rejectedCursor)}
+            nextPage={query.isFetchNextPageError && !rejectedCursor}
+            retry={(event) =>
+              pageAction(event, retry, !query.isFetchNextPageError || rejectedCursor)
+            }
           />
         ) : canLoadMore ? (
           <div className={boardStyles.status}>
             <Button
               variant="secondary"
               size="small"
-              onClick={(event) => pageAction(event, loadMore)}
+              onClick={(event) => pageAction(event, () => void query.fetchNextPage())}
             >
               더 불러오기
             </Button>
           </div>
-        ) : waiting && page ? (
+        ) : waiting && loaded ? (
           <p className={boardStyles.status} role="status">
             {refreshing ? '구매 완료 목록을 갱신하는 중이에요.' : '다음 상품을 불러오는 중이에요.'}
           </p>

@@ -1,27 +1,22 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { findSharedURL } from '@ziper/product-extraction/link';
-import { Suspense, useState, type SubmitEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { usePlatform } from '../bridge/provider';
 import { Button, TextField } from '../components';
 import { ConnectedProductSave } from '../features/product-save/connected-product-save';
-import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
 import { ScreenShell } from '../features/product-save/product-save-screen';
 import * as saveStyles from '../features/product-save/product-save.css';
 import * as styles from '../features/product-save/register-product.css';
 
 export const Route = createFileRoute('/register-product')({
-  validateSearch: (search: Record<string, unknown>) => {
-    const preview = parsePreviewMode(search.preview);
-    return {
-      step: search.step === 'details' ? ('details' as const) : undefined,
-      preview: preview === 'unsupported' ? undefined : preview,
-    };
-  },
+  validateSearch: (search: Record<string, unknown>) => ({
+    step: search.step === 'details' ? ('details' as const) : undefined,
+  }),
   component: RegisterProduct,
 });
 
 function RegisterProduct() {
-  const { step, preview } = Route.useSearch();
+  const { step } = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   const { platform, status } = usePlatform();
@@ -50,10 +45,10 @@ function RegisterProduct() {
     try {
       // A stale details URL needs an input entry to return to.
       if (step === 'details') {
-        await navigate({ search: { step: undefined, preview }, replace: true });
+        await navigate({ search: { step: undefined }, replace: true });
       }
       setSubmittedURL(url);
-      await navigate({ search: { step: 'details', preview } });
+      await navigate({ search: { step: 'details' } });
       setTransition('idle');
     } catch {
       setTransition('error');
@@ -71,17 +66,7 @@ function RegisterProduct() {
   }
 
   if (step === 'details' && submittedURL) {
-    return ProductSavePreview && preview ? (
-      <Suspense
-        fallback={
-          <ScreenShell onClose={close}>
-            <p role="status">상품 정보를 불러오는 중이에요.</p>
-          </ScreenShell>
-        }
-      >
-        <ProductSavePreview key={preview} mode={preview} url={submittedURL} onClose={close} />
-      </Suspense>
-    ) : (
+    return (
       <ConnectedProductSave
         key={submittedURL}
         url={submittedURL}

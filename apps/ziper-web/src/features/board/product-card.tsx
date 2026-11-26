@@ -1,6 +1,7 @@
 import { Icon } from '../../components';
 import { cx } from '../../components/cx';
-import type { ProductDetail } from '@ziper/api/product-detail';
+import type { FallbackIcon } from '@ziper/api/product-fields';
+import type { ProductLinkStatusResponseStatus } from '@ziper/api/schemas';
 import { fallbackImages } from './fallback-images';
 import { useProductPhoto } from './use-product-photo';
 import * as styles from './board-detail.css';
@@ -8,10 +9,16 @@ import * as styles from './board-detail.css';
 const won = new Intl.NumberFormat('ko-KR');
 
 type ProductCardProps = {
-  product: Pick<
-    ProductDetail,
-    'imageUrl' | 'imageFileUrl' | 'fallbackIcon' | 'productTitle' | 'price' | 'tags'
-  > & { shop: string | null; linkStatus?: ProductDetail['linkStatus'] };
+  product: {
+    productTitle: string;
+    price: number | null;
+    tags: readonly string[];
+    shop?: string | null;
+    imageUrl?: string | null;
+    imageFileUrl?: string | null;
+    fallbackIcon?: FallbackIcon | null;
+    linkStatus?: ProductLinkStatusResponseStatus;
+  };
   onOpen?: () => void;
   onMore?: () => void;
   onOpenOriginal?: () => void;

@@ -9,6 +9,7 @@ const ignores = [
   '**/.tanstack/**',
   '**/.astro/**',
   '**/routeTree.gen.ts',
+  '**/__generated__/**',
 ];
 
 export default defineConfig({

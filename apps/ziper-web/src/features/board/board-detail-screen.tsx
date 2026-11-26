@@ -1,5 +1,8 @@
 import { useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { openOriginalUrl, useGetBoardProductsInfinite } from '@ziper/api';
+import { errorMessage } from '@ziper/api/http';
+import type { GetBoardProductsSort } from '@ziper/api/schemas';
+import { useEffect, useRef, useState } from 'react';
 import emptyBoard from '../../assets/board/empty-board.png';
 import { usePlatform } from '../../bridge/provider';
 import {
@@ -10,15 +13,12 @@ import {
   HeaderSub,
   showToast,
 } from '../../components';
-import { errorMessage } from '../../shared/api/http';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
-import { openOriginal, type BoardSort } from './api';
 import { ProductCard, ProductCardSkeleton } from './product-card';
-import { useBoardProductsQuery } from './queries';
 import { useProductManage } from './use-product-manage';
 import * as styles from './board-detail.css';
 
-const SORTS: { value: BoardSort; label: string }[] = [
+const SORTS: { value: GetBoardProductsSort; label: string }[] = [
   { value: 'RECENT', label: '최근 등록순' },
   { value: 'OLDEST', label: '오래된 순' },
   { value: 'PRICE_ASC', label: '가격 낮은 순' },
@@ -27,7 +27,6 @@ const SORTS: { value: BoardSort; label: string }[] = [
 
 type BoardDetailScreenProps = {
   boardId: number;
-  /** 방금 만든 보드. "만들었어요" 토스트를 띄운다. */
   created: boolean;
   onCreatedShown: () => void;
 };
@@ -37,18 +36,20 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
   const selectTab = useTabNavigation();
   const navigate = useNavigate();
   const productManage = useProductManage();
-  const [sort, setSort] = useState<BoardSort>('RECENT');
-  // 정렬마다 캐시가 따로라, 한 번 본 정렬로 돌아가면 바로 보이고 뒤에서 새로 받는다.
-  const products = useBoardProductsQuery(boardId, sort);
-  const { fetchNextPage, hasNextPage, isFetchingNextPage } = products;
-  // 받은 쪽들을 하나로 합친다. 보드 이름 등은 첫 쪽 것을 쓴다.
-  const page = useMemo(() => {
-    const pages = products.data?.pages;
-    if (!pages?.length) return null;
-    return { ...pages[0], items: pages.flatMap((p) => p.items) };
-  }, [products.data]);
+  const [sort, setSort] = useState<GetBoardProductsSort>('RECENT');
+  const products = useGetBoardProductsInfinite(
+    boardId,
+    { sort, size: 20 },
+    {
+      query: {
+        initialPageParam: undefined,
+        getNextPageParam: ({ data }) => (data.hasNext ? (data.nextCursor ?? undefined) : undefined),
+      },
+    },
+  );
+  const pages = products.data?.pages;
+  const page = pages && { ...pages[0].data, items: pages.flatMap(({ data }) => data.items) };
 
-  // 방금 만든 보드면 이름을 알게 된 뒤 한 번만 알린다.
   const announced = useRef(false);
   useEffect(() => {
     if (!created || !page || announced.current) return;
@@ -57,21 +58,18 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
     onCreatedShown();
   }, [created, page, onCreatedShown]);
 
-  // 목록 끝이 보이면 다음 쪽을 불러온다. 받는 중에는 또 부르지 않는다.
   const sentinel = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef(() => {});
-  loadMoreRef.current = () => {
-    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
-  };
+  const loadMore = useRef(products.fetchNextPage);
+  loadMore.current = products.fetchNextPage;
   useEffect(() => {
     const target = sentinel.current;
     if (!target) return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) loadMoreRef.current();
+      if (entries.some((entry) => entry.isIntersecting)) void loadMore.current();
     });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasNextPage]);
+  }, [products.hasNextPage]);
 
   const addProduct =
     status === 'initializing'
@@ -83,7 +81,8 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
 
   async function goOriginal(cardId: number) {
     try {
-      await platform.external.open(await openOriginal(cardId));
+      const { data } = await openOriginalUrl(cardId);
+      await platform.external.open(data.productUrl);
     } catch (error) {
       showToast(errorMessage(error, '원본 쇼핑몰을 열지 못했어요.'));
     }
@@ -161,7 +160,6 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
                     void navigate({
                       to: '/products/$cardId',
                       params: { cardId: String(product.cardId) },
-                      search: { preview: undefined },
                     }).catch(() => showToast('상품 상세를 열지 못했어요.'))
                   }
                   onMore={() => productManage.open(product)}
@@ -169,7 +167,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
                 />
               ))}
             </div>
-            {hasNextPage && <div ref={sentinel} className={styles.sentinel} />}
+            {products.hasNextPage && <div ref={sentinel} className={styles.sentinel} />}
           </>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { createFileRoute, notFound, useRouter } from '@tanstack/react-router';
 import { requireSignedIn } from '../features/auth';
-import { purchasesEnabled } from '../features/product-detail/product-detail-api';
+import { purchasesEnabled } from '../features/product-detail/purchases';
 import { parseProductSort } from '../features/product-detail/product-sort';
 import { PurchasedScreen } from '../features/product-detail/purchased-screen';
 import { waitForRouteExit } from '../shared/wait-for-route-exit';
@@ -30,8 +30,7 @@ function PurchasedRoute({ entryError = false }: { entryError?: boolean }) {
       openProduct={(product) =>
         navigate({
           to: '/products/$cardId',
-          params: { cardId: product.cardId },
-          search: { preview: undefined },
+          params: { cardId: String(product.cardId) },
           state: {
             purchasedSource: { sort, index: router.history.location.state.__TSR_index },
           },

@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
+import { useSignupWithOAuth } from '@ziper/api';
+import { ApiError, errorMessage, startSession } from '@ziper/api/http';
 import { Button, showToast } from '../../../../components';
-import { ApiError, errorMessage } from '../../../../shared/api/http';
-import { useSocialSignupMutation } from '../../api/queries';
 import { useAgreements } from '../../hooks/useAgreements';
 import { SIGNUP_FLOW } from '../../model/guards';
 import { clearPendingSignup, loadPendingSignup } from '../../model/pendingSignup';
@@ -15,32 +15,39 @@ import { Terms } from '../common/Terms';
 export function SocialTermsPage() {
   const navigate = useNavigate();
   const { agreed, setAgreed, requiredAgreed } = useAgreements();
-  const signup = useSocialSignupMutation();
-  // 성공한 뒤 화면을 옮기는 동안에도 버튼을 막아 둔다.
-  const submitting = signup.isPending || signup.isSuccess;
+  const signup = useSignupWithOAuth({
+    mutation: {
+      onSuccess: ({ data }) => {
+        startSession(data.accessToken ?? null);
+        clearPendingSignup();
+      },
+    },
+  });
 
   function leave() {
     clearPendingSignup();
     navigate({ to: '/login', replace: true });
   }
 
-  function agree() {
+  async function agree() {
     const signupToken = loadPendingSignup();
     if (!signupToken) return leave();
-    signup.mutate(
-      { signupToken, marketingAgreed: agreed.marketing },
-      {
-        onSuccess: () => navigate({ to: '/signup/complete', replace: true, state: SIGNUP_FLOW }),
-        onError: (error) => {
-          // 가입 토큰은 10분 뒤 만료되고 한 번만 쓸 수 있다. 그러면 소셜 로그인부터 다시 한다.
-          if (error instanceof ApiError && error.status === 401) {
-            showToast('가입 시간이 지났어요. 다시 로그인해주세요');
-            return leave();
-          }
-          showToast(errorMessage(error, '가입하지 못했어요. 다시 시도해주세요'));
+    try {
+      await signup.mutateAsync({
+        data: {
+          signupToken,
+          agreements: { termsOfService: true, privacyPolicy: true, marketing: agreed.marketing },
         },
-      },
-    );
+      });
+      navigate({ to: '/signup/complete', replace: true, state: SIGNUP_FLOW });
+    } catch (error) {
+      // 가입 토큰은 10분 뒤 만료되고 한 번만 쓸 수 있다. 그러면 소셜 로그인부터 다시 한다.
+      if (error instanceof ApiError && error.status === 401) {
+        showToast('가입 시간이 지났어요. 다시 로그인해주세요');
+        return leave();
+      }
+      showToast(errorMessage(error, '가입하지 못했어요. 다시 시도해주세요'));
+    }
   }
 
   return (
@@ -50,7 +57,11 @@ export function SocialTermsPage() {
       title="약관에 동의해주세요"
       description="Ziper 를 시작하려면 아래 약관에 동의가 필요해요"
       actions={
-        <Button disabled={!requiredAgreed} loading={submitting} onClick={agree}>
+        <Button
+          disabled={!requiredAgreed}
+          loading={signup.isPending || signup.isSuccess}
+          onClick={agree}
+        >
           동의하고 시작하기
         </Button>
       }

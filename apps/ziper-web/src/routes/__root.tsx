@@ -1,11 +1,14 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import type { QueryClient } from '@tanstack/react-query';
+import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
+import { onUserChange } from '@ziper/api/http';
+import { useEffect } from 'react';
 import { BridgeProvider, type BridgeProviderConfig } from '../bridge/provider';
 import { Toaster } from '../components';
 import { webAuth } from '../features/auth';
 import { ShareEntry } from '../features/product-save/incoming-share';
 import '../styles/global.css';
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -32,6 +35,9 @@ export const Route = createRootRoute({
 const bridgeConfig: BridgeProviderConfig = { auth: webAuth };
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  useEffect(() => onUserChange(() => queryClient.clear()), [queryClient]);
+
   return (
     <html lang="ko">
       <head>

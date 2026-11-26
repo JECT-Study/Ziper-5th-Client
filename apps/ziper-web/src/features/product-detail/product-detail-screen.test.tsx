@@ -1,15 +1,33 @@
 // @vitest-environment happy-dom
 import { act, StrictMode } from 'react';
-import { done, rejected, unknownOutcome } from '@ziper/api/outcome';
+import { ApiError, startSession } from '@ziper/api/http';
 import { BridgeError } from '@ziper/bridge/contract';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ProductDetailError, type ProductDetailApi } from '@ziper/api/product-detail';
 import { showToast } from '../../components';
-import { ApiError } from '../../shared/api/http';
+import { createTestQueryClient, withQuery } from '../../test/query';
 import { ProductDetailScreen } from './product-detail-screen';
-import { createPreviewApi, sampleProduct } from './preview';
+import {
+  createPreviewApi,
+  done,
+  rejected,
+  Rejection,
+  sampleProduct,
+  sampleTags,
+  serve,
+  unknownOutcome,
+  type TestApi,
+  type TestBoard,
+} from './test-api';
 import { deferred } from '../../../../../packages/bridge/test/deferred';
+
+const flags = vi.hoisted(() => ({ purchases: true }));
+vi.mock('./purchases', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./purchases')>()),
+  get purchasesEnabled() {
+    return flags.purchases;
+  },
+}));
 
 vi.mock('../../components', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../components')>()),
@@ -18,6 +36,8 @@ vi.mock('../../components', async (importOriginal) => ({
 
 const mounted: { root: Root; container: HTMLDivElement }[] = [];
 beforeEach(() => {
+  flags.purchases = true;
+  startSession('token');
   vi.mocked(showToast).mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLDialogElement.prototype, 'showModal').mockImplementation(function (
@@ -40,23 +60,36 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 async function mount(
-  api: ProductDetailApi = createPreviewApi('normal'),
+  api: TestApi = createPreviewApi('normal'),
   options: Partial<Parameters<typeof ProductDetailScreen>[0]> = {},
+  strict = false,
 ) {
+  serve(api);
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
   mounted.push({ root, container });
+  const client = createTestQueryClient();
+  client.setDefaultOptions({ queries: { retry: false, staleTime: 30_000 } });
   const props = {
     cardId: '1',
-    api,
     openExternal: vi.fn(async () => {}),
     openPurchased: vi.fn(async () => {}),
     ...options,
   };
-  await act(async () => root.render(<ProductDetailScreen {...props} />));
-  return { container, root, props };
+  const render = (screenProps: Parameters<typeof ProductDetailScreen>[0]) => {
+    const screen = <ProductDetailScreen {...screenProps} />;
+    root.render(withQuery(strict ? <StrictMode>{screen}</StrictMode> : screen, client));
+  };
+  await act(async () => render(props));
+  await settle();
+  return { container, root, props, render };
 }
+const visibleText = (element: Element) => {
+  const copy = element.cloneNode(true) as Element;
+  copy.querySelectorAll('[aria-hidden="true"]').forEach((hidden) => hidden.remove());
+  return copy.textContent;
+};
 function button(container: HTMLElement, text: string) {
   const found = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
     (element) => element.textContent === text || element.getAttribute('aria-label') === text,
@@ -64,11 +97,13 @@ function button(container: HTMLElement, text: string) {
   expect(found, text).toBeDefined();
   return found!;
 }
+const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 async function click(container: HTMLElement, text: string) {
   const board = [...container.querySelectorAll<HTMLLabelElement>('label')].find(
-    (label) => label.textContent === text && label.querySelector('input[type="checkbox"]'),
+    (label) => visibleText(label) === text && label.querySelector('input[type="checkbox"]'),
   );
   await act(async () => (board?.querySelector('input') ?? button(container, text)).click());
+  await settle();
 }
 async function input(container: HTMLElement, label: string, value: string) {
   const field = [...container.querySelectorAll('label')].find(
@@ -117,15 +152,7 @@ it('renders the full title and preserves a zero price rather than treating it as
 it('sends one detail read even if React probes effects in Strict Mode', async () => {
   const api = createPreviewApi('normal');
   const get = vi.spyOn(api, 'get');
-  const { root, props } = await mount(api);
-  get.mockClear();
-  await act(async () =>
-    root.render(
-      <StrictMode>
-        <ProductDetailScreen {...props} />
-      </StrictMode>,
-    ),
-  );
+  await mount(api, {}, true);
   expect(get).toHaveBeenCalledOnce();
 });
 
@@ -224,8 +251,9 @@ it.each(['auth-required', 'forbidden'] as const)(
   },
 );
 
-it('offers no purchase actions when the adapter does not support them', async () => {
-  const api = { ...createPreviewApi('normal'), purchases: undefined };
+it('offers no purchase actions while the purchase API is unavailable', async () => {
+  flags.purchases = false;
+  const api = createPreviewApi('normal');
   const browser = await mount(api);
   await click(browser.container, '상품 관리');
   expect(browser.container.querySelector('dialog')?.textContent).not.toContain('구매 완료');
@@ -239,7 +267,7 @@ it.each(['forbidden', 'not-found', 'failed'] as const)(
   'shows a feature-specific %s load error',
   async (code) => {
     const api = createPreviewApi('normal');
-    api.get = vi.fn().mockRejectedValue(new ProductDetailError(code));
+    api.get = vi.fn().mockRejectedValue(new Rejection(code));
     const { container } = await mount(api);
     const alert = container.querySelector('[role="alert"]');
     expect(alert).not.toBeNull();
@@ -269,9 +297,10 @@ it('aborts old reads and ignores their late replies after the card changes', asy
       signal = value;
       return pending.promise;
     })
-    .mockResolvedValue({ ...sampleProduct, cardId: '2', productTitle: '새 상품' });
-  const { container, root, props } = await mount(api);
-  await act(async () => root.render(<ProductDetailScreen {...props} cardId="2" />));
+    .mockResolvedValue({ ...sampleProduct, cardId: 2, productTitle: '새 상품' });
+  const { container, props, render } = await mount(api);
+  await act(async () => render({ ...props, cardId: '2' }));
+  await settle();
   expect(signal?.aborted).toBe(true);
   await act(async () => pending.resolve(sampleProduct));
   expect(container.textContent).toContain('새 상품');
@@ -309,7 +338,7 @@ it('deduplicates purchase submits and opens the purchased list once', async () =
     button(container, '이동하기').click();
     button(container, '이동하기').click();
   });
-  expect(purchase).toHaveBeenCalledExactlyOnceWith('1');
+  expect(purchase).toHaveBeenCalledExactlyOnceWith(1);
   await act(async () => pending.resolve());
   expect(props.openPurchased).toHaveBeenCalledExactlyOnceWith(true);
   expect(container.querySelector('dialog')).toBeNull();
@@ -330,7 +359,7 @@ it('keeps a pending purchase open and ignores its reply after the screen is gone
   expect(container.querySelector('dialog')?.open).toBe(true);
   await act(async () => root.render(null));
   await act(async () =>
-    result.resolve(done({ cardId: '1', status: 'PURCHASED', affectedBoardCount: 2 })),
+    result.resolve(done({ cardId: 1, status: 'PURCHASED', affectedBoardCount: 2 })),
   );
   expect(complete).toHaveBeenCalledOnce();
   expect(openPurchased).not.toHaveBeenCalled();
@@ -456,7 +485,7 @@ it('marks sold-out products without blocking the original and falls back from th
     ...sampleProduct,
     imageFileUrl: signed,
     imageUrl: original,
-    linkStatus: 'SOLD_OUT',
+    link: { status: 'SOLD_OUT' },
   });
   const { container } = await mount(api);
   const photo = () => container.querySelector<HTMLImageElement>('figure img')!;
@@ -641,23 +670,21 @@ it.each([
 
 it('filters vanished boards before the user selects a current destination', async () => {
   const api = createPreviewApi('normal');
-  api.listBoards = async () => [{ id: '3', name: '현재 보드' }];
+  api.listBoards = async () => [{ boardId: 3, name: '현재 보드' }];
   const update = vi.spyOn(api, 'update');
   const { container } = await edit(api);
   expect(button(container, '수정 완료').disabled).toBe(true);
   await click(container, '현재 보드');
   expect(button(container, '수정 완료').disabled).toBe(false);
   await click(container, '수정 완료');
-  expect(update).toHaveBeenCalledWith('1', expect.objectContaining({ boardIds: ['3'] }));
+  expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ boardIds: [3] }));
 });
 it.each(['auth-required', 'not-found', 'forbidden'] as const)(
   'handles a confirmed %s after opening the original shop without repeating the visit',
   async (code) => {
     const api = createPreviewApi('normal');
     const get = vi.spyOn(api, 'get');
-    const record = vi
-      .spyOn(api, 'openOriginal')
-      .mockRejectedValueOnce(new ProductDetailError(code));
+    const record = vi.spyOn(api, 'openOriginal').mockRejectedValueOnce(new Rejection(code));
     const { container, props } = await mount(api);
     await click(container, '원본 쇼핑몰로 이동');
     expect(props.openExternal).toHaveBeenCalledExactlyOnceWith(sampleProduct.productUrl);
@@ -679,7 +706,7 @@ it.each(['auth-required', 'not-found', 'forbidden'] as const)(
       expect(container.textContent).toContain(sampleProduct.productTitle);
     }
     expect(get).toHaveBeenCalledOnce();
-    expect(record).toHaveBeenCalledExactlyOnceWith('1', expect.any(AbortSignal));
+    expect(record).toHaveBeenCalledExactlyOnceWith(1, expect.any(AbortSignal));
   },
 );
 
@@ -692,7 +719,7 @@ it('edits existing values and refreshes detail without creating another card', a
   expect(button(container, '수정 완료').disabled).toBe(true);
   await input(container, '상품명', title);
   await input(container, '가격', '0');
-  for (const tag of sampleProduct.tags) await click(container, tag);
+  for (const tag of sampleTags) await click(container, tag);
   await click(container, '봄');
   await click(container, '+직접 추가');
   await input(container, '새 해시태그', '#봄');
@@ -704,12 +731,12 @@ it('edits existing values and refreshes detail without creating another card', a
   expect(container.querySelector('[aria-label="카드 이미지"]')).toBeNull();
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
+    1,
     expect.objectContaining({
       productTitle: title,
       price: 0,
       tags: ['봄', '데이트'],
-      boardIds: ['1', '2'],
+      boardIds: [1, 2],
       imageFileId: sampleProduct.imageFileId,
       imageUrl: sampleProduct.imageUrl,
       fallbackIcon: sampleProduct.fallbackIcon,
@@ -744,7 +771,7 @@ it('shows the won amount on blur but sends a numeric price even when pasted with
   await act(() => price.focus());
   expect(price.value).toBe('45900');
   await click(container, '수정 완료');
-  expect(update).toHaveBeenCalledExactlyOnceWith('1', expect.objectContaining({ price: 45_900 }));
+  expect(update).toHaveBeenCalledExactlyOnceWith(1, expect.objectContaining({ price: 45_900 }));
 });
 
 it('enforces the deployed price and tag rules before submitting', async () => {
@@ -754,7 +781,7 @@ it('enforces the deployed price and tag rules before submitting', async () => {
     expect(button(container, '수정 완료').disabled).toBe(true);
   }
   await input(container, '가격', '1,000,000,000');
-  for (const tag of sampleProduct.tags) await click(container, tag);
+  for (const tag of sampleTags) await click(container, tag);
   expect(button(container, '수정 완료').disabled).toBe(true);
   await click(container, '+직접 추가');
   await input(container, '새 해시태그', '일이삼사오육칠');
@@ -782,10 +809,10 @@ it('accepts the server code-point limits for emoji in memo and tags', async () =
   await click(container, '태그 추가');
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
+    1,
     expect.objectContaining({
       memo,
-      tags: [...sampleProduct.tags, tag],
+      tags: [...sampleTags, tag],
     }),
   );
 });
@@ -809,16 +836,16 @@ it('matches the backend tag normalization and blocks invisible characters before
   await click(container, '태그 추가');
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
+    1,
     expect.objectContaining({
-      tags: [...sampleProduct.tags, '가을', '여행 코디'],
+      tags: [...sampleTags, '가을', '여행 코디'],
     }),
   );
 });
 
 it('keeps unselected custom tags available and allows reselecting them', async () => {
   const { container } = await edit();
-  const existingTag = sampleProduct.tags[0]!;
+  const existingTag = sampleTags[0]!;
   await click(container, existingTag);
   expect(button(container, existingTag).getAttribute('aria-pressed')).toBe('false');
   await click(container, existingTag);
@@ -848,7 +875,7 @@ it('puts board retry in the fixed actions and keeps the draft without reading de
 it('keeps the edited title and asks for a new board if the server rejects a stale selection', async () => {
   const api = createPreviewApi('normal');
   const get = vi.spyOn(api, 'get');
-  const boards = deferred<typeof sampleProduct.boards>();
+  const boards = deferred<readonly TestBoard[]>();
   vi.spyOn(api, 'listBoards')
     .mockResolvedValueOnce(sampleProduct.boards)
     .mockReturnValueOnce(
@@ -868,6 +895,7 @@ it('keeps the edited title and asks for a new board if the server rejects a stal
     '선택한 보드가 바뀌었어요',
   );
   await act(async () => boards.resolve([]));
+  await settle();
   expect(container.textContent).toContain('보드 목록을 불러오지 못했어요. 입력은 유지돼요.');
   expect(update).toHaveBeenCalledOnce();
   await click(container, '보드 목록 다시 불러오기');
@@ -876,10 +904,10 @@ it('keeps the edited title and asks for a new board if the server rejects a stal
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledTimes(2);
   expect(update).toHaveBeenLastCalledWith(
-    '1',
+    1,
     expect.objectContaining({
       productTitle: '보존할 이름',
-      boardIds: ['1'],
+      boardIds: [1],
     }),
   );
   expect(get).toHaveBeenCalledOnce();
@@ -888,16 +916,16 @@ it('keeps the edited title and asks for a new board if the server rejects a stal
 it('keeps the stored image without offering a replacement during an ordinary edit', async () => {
   const api = createPreviewApi('normal');
   const imageUrl = 'https://shop.example/original.png';
-  vi.spyOn(api, 'get').mockResolvedValueOnce({ ...sampleProduct, imageUrl, imageFileId: '81' });
+  vi.spyOn(api, 'get').mockResolvedValueOnce({ ...sampleProduct, imageUrl, imageFileId: 81 });
   const update = vi.spyOn(api, 'update');
   const { container } = await edit(api);
   expect(container.querySelector('[role="group"][aria-label="카드 이미지"]')).toBeNull();
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
+    1,
     expect.objectContaining({
       imageUrl,
-      imageFileId: '81',
+      imageFileId: 81,
       fallbackIcon: sampleProduct.fallbackIcon,
     }),
   );
@@ -923,7 +951,7 @@ it('requires an explicit replacement image without losing edits when the existin
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledTimes(2);
   expect(update).toHaveBeenLastCalledWith(
-    '1',
+    1,
     expect.objectContaining({
       productTitle: '도안 교체 후 저장할 이름',
       fallbackIcon: 'PANTS',
@@ -943,7 +971,7 @@ it('preserves stored non-breaking spaces in unedited text when changing the pric
   await input(container, '가격', '45000');
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
+    1,
     expect.objectContaining({ price: 45000, productTitle, memo }),
   );
 });
@@ -958,7 +986,7 @@ it('counts the memo after Java whitespace trimming without ignoring non-breaking
   expect(container.textContent).toContain('한 줄 메모는 100자까지 저장할 수 있어요.');
   await input(container, '한 줄 메모(선택)', `\u3000${memo}\u2003`);
   await click(container, '수정 완료');
-  expect(update).toHaveBeenCalledExactlyOnceWith('1', expect.objectContaining({ memo }));
+  expect(update).toHaveBeenCalledExactlyOnceWith(1, expect.objectContaining({ memo }));
 });
 
 it('requires at least one active board', async () => {
@@ -1069,7 +1097,7 @@ it.each(['unchanged', 'applied', 'conflict'] as const)(
     await input(container, '상품명', draft);
     await click(container, '수정 완료');
     expect(update).toHaveBeenCalledExactlyOnceWith(
-      '1',
+      1,
       expect.objectContaining({ productTitle: '유지할 초안' }),
     );
     get.mockResolvedValueOnce({
@@ -1091,7 +1119,7 @@ it.each(['unchanged', 'applied', 'conflict'] as const)(
       await click(container, '수정 완료');
       expect(update).toHaveBeenCalledTimes(2);
       expect(update).toHaveBeenLastCalledWith(
-        '1',
+        1,
         expect.objectContaining({ productTitle: '유지할 초안' }),
       );
     } else if (server === 'conflict') {
@@ -1121,7 +1149,7 @@ it.each(['applied', 'unchanged', 'different-original', 'manual-file'] as const)(
       ...before,
       imageUrl: scenario === 'different-original' ? 'https://example.com/new.png' : before.imageUrl,
       imageStatus: scenario === 'manual-file' ? ('NONE' as const) : ('READY' as const),
-      imageFileId: '81',
+      imageFileId: 81,
       imageFileUrl: 'https://example.com/signed.png',
       productTitle: scenario === 'unchanged' ? before.productTitle : '수정한 제목',
     };
@@ -1134,7 +1162,7 @@ it.each(['applied', 'unchanged', 'different-original', 'manual-file'] as const)(
     await click(container.querySelector('dialog')!, '현재 상태 확인');
     expect(get).toHaveBeenCalledTimes(2);
     expect(update).toHaveBeenCalledExactlyOnceWith(
-      '1',
+      1,
       expect.objectContaining({ imageFileId: null }),
     );
 
@@ -1147,7 +1175,7 @@ it.each(['applied', 'unchanged', 'different-original', 'manual-file'] as const)(
       expect(dialog.querySelector('input')?.value).toBe('수정한 제목');
       await click(dialog, '수정 완료');
       expect(update).toHaveBeenCalledTimes(2);
-      expect(update).toHaveBeenLastCalledWith('1', expect.objectContaining({ imageFileId: '81' }));
+      expect(update).toHaveBeenLastCalledWith(1, expect.objectContaining({ imageFileId: 81 }));
     } else {
       expect(container.textContent).not.toContain('수정 완료');
       expect(container.textContent).toContain('최신 상세 보기');
@@ -1165,7 +1193,7 @@ it.each([
   'keeps the draft and stops requests when the session expires during %s',
   async (step) => {
     const api = createPreviewApi('normal');
-    const auth = new ProductDetailError('auth-required');
+    const auth = new Rejection('auth-required');
     const get = vi.spyOn(api, 'get');
     const listBoards = vi.spyOn(api, 'listBoards');
     const update = vi
@@ -1215,7 +1243,7 @@ it.each(['initial list', 'stale selection', 'checked update'] as const)(
     const get = vi.spyOn(api, 'get');
     const choices = vi.spyOn(api, 'listBoards');
     if (step !== 'initial list') choices.mockResolvedValueOnce(sampleProduct.boards);
-    choices.mockRejectedValueOnce(new ProductDetailError('forbidden'));
+    choices.mockRejectedValueOnce(new Rejection('forbidden'));
     const update = vi
       .spyOn(api, 'update')
       .mockResolvedValue(step === 'checked update' ? unknownOutcome : rejected('board-not-found'));
@@ -1275,7 +1303,7 @@ it.each(['not-found', 'forbidden'] as const)(
     await input(container, '상품명', '남아 있는 초안');
     const dialog = container.querySelector('dialog')!;
     await click(dialog, '수정 완료');
-    get.mockRejectedValueOnce(new ProductDetailError(code));
+    get.mockRejectedValueOnce(new Rejection(code));
     await click(dialog, '현재 상태 확인');
     expect(dialog.querySelector('input')?.value).toBe('남아 있는 초안');
     expect(dialog.textContent).not.toMatch(/수정 완료|현재 상태 확인/);
@@ -1327,15 +1355,15 @@ it.each([false, true])(
     expect(create).toHaveBeenCalledExactlyOnceWith(name);
     expect(update).not.toHaveBeenCalled();
     const created = [...container.querySelectorAll('label')].find(
-      (label) => label.textContent === name,
+      (label) => visibleText(label) === name,
     );
     expect(created?.querySelector('input')?.checked).toBe(true);
     await click(container, '수정 완료');
     expect(update).toHaveBeenCalledExactlyOnceWith(
-      '1',
+      1,
       expect.objectContaining({
         productTitle: '보존할 제목',
-        boardIds: ['1', '2', '3'],
+        boardIds: [1, 2, 3],
       }),
     );
     expect(container.textContent).not.toMatch(/복구|휴지통/);
@@ -1379,7 +1407,7 @@ it('keeps a confirmed board name conflict through a failed refresh without repla
   await click(container, '보드 목록 다시 불러오기');
   expect(list).toHaveBeenCalledTimes(3);
   const existing = [...container.querySelectorAll('label')].find(
-    (label) => label.textContent === '공유 보드',
+    (label) => visibleText(label) === '공유 보드',
   );
   expect(existing?.querySelector('input')?.checked).toBe(false);
   await click(container, '공유 보드');
@@ -1387,8 +1415,8 @@ it('keeps a confirmed board name conflict through a failed refresh without repla
   await click(container, '수정 완료');
   expect(create).toHaveBeenCalledExactlyOnceWith('공유 보드');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
-    expect.objectContaining({ productTitle: '보존할 제목', boardIds: ['1', '2', '3'] }),
+    1,
+    expect.objectContaining({ productTitle: '보존할 제목', boardIds: [1, 2, 3] }),
   );
 });
 
@@ -1400,7 +1428,7 @@ it.each([
   async (code, message) => {
     const api = createPreviewApi('normal');
     const list = vi.spyOn(api, 'listBoards');
-    const create = vi.spyOn(api, 'createBoard').mockRejectedValueOnce(new ProductDetailError(code));
+    const create = vi.spyOn(api, 'createBoard').mockRejectedValueOnce(new Rejection(code));
     const { container } = await edit(api);
     await click(container, '새 보드 만들기');
     await input(container, '새 보드 이름', '테스트 이름');
@@ -1429,7 +1457,7 @@ it('reloads choices without repeating board creation when its reply is lost', as
   expect(container.textContent).toContain('이미 있는 보드예요. 목록에서 선택해 주세요.');
   expect(button(container, '완료').disabled).toBe(true);
   const created = [...container.querySelectorAll('label')].find(
-    (label) => label.textContent === '공유 보드',
+    (label) => visibleText(label) === '공유 보드',
   );
   expect(created?.querySelector('input')?.checked).toBe(false);
   expect(create).toHaveBeenCalledOnce();
@@ -1439,10 +1467,10 @@ it('reloads choices without repeating board creation when its reply is lost', as
   await click(container, '공유 보드');
   await click(container, '수정 완료');
   expect(update).toHaveBeenCalledExactlyOnceWith(
-    '1',
+    1,
     expect.objectContaining({
       productTitle: '보존할 제목',
-      boardIds: ['1', '2', '3'],
+      boardIds: [1, 2, 3],
     }),
   );
 });

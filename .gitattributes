@@ -1,2 +1,4 @@
 # Unified patch context prefixes can precede upstream tab indentation.
 patches/*.patch -whitespace
+
+**/__generated__/** linguist-generated=true

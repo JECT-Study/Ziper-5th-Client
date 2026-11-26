@@ -1,12 +1,12 @@
 # Android 하드웨어 Back: 각 상품 관리 시트·구매 확인·수정 단계를 닫은 후 상세에서 나간다.
-# When using the JEC-23 fixture: POST /_reset?expiredSession=1 before this signed-out preview.
+# JEC-23 fixture 를 쓴다: 흐름마다 POST /_reset (로그인 상태) 후 실행한다.
 appId: com.ject.ziper
 ---
 - runFlow: ../../subflows/launch.yaml
 - runFlow:
     file: ../../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fproducts%2F1%3Fpreview%3Dnormal
+      LINK: ziper://web?path=%2Fproducts%2F7
 - extendedWaitUntil:
     visible: 오버핏 울 블렌드 니트 가디건
     timeout: 15000
@@ -27,4 +27,4 @@ appId: com.ject.ziper
 - back
 - assertVisible: 상품 관리
 - back
-- assertVisible: 이메일로 가입하기
+- assertVisible: 내 보드

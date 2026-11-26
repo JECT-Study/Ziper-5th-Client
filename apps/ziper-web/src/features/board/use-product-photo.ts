@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 export function useProductPhoto(
-  { imageFileUrl, imageUrl }: { imageFileUrl: string | null; imageUrl: string | null },
+  { imageFileUrl, imageUrl }: { imageFileUrl?: string | null; imageUrl?: string | null },
   revision = 0,
 ) {
   const [failure, setFailure] = useState<{ revision: number; urls: ReadonlySet<string> }>();

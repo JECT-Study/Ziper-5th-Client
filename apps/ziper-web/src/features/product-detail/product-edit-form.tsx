@@ -1,11 +1,14 @@
-import { unknownOutcome } from '@ziper/api/outcome';
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  type ProductBoard,
-  type ProductDetail,
-  type ProductDetailApi,
-  ProductDetailError,
-  type ProductUpdate,
-} from '@ziper/api/product-detail';
+  getGetBoardsQueryKey,
+  getProductCardDetail,
+  useCreateBoard,
+  useGetBoards,
+  useUpdateProductCard,
+  type getBoardsResponse,
+} from '@ziper/api';
+import { ApiError } from '@ziper/api/http';
+import type { ProductCardDetailResponse, UpdateProductCardRequest } from '@ziper/api/schemas';
 import {
   useEffect,
   useId,
@@ -34,8 +37,6 @@ import {
 } from '../board/board-name';
 import * as boardStyles from '../product-save/product-save.css';
 import { InlineEntry } from '../product-save/inline-entry';
-import { useLoad } from '../../shared/use-load';
-import { ApiError } from '../../shared/api/http';
 import {
   codePointLength,
   hasUnsupportedTagCharacters,
@@ -53,7 +54,11 @@ import {
   titleLengthMessage,
   type FallbackIcon,
 } from '@ziper/api/product-fields';
+import { productRejection, readErrorCode, type ProductErrorCode } from './product-errors';
 import * as styles from './product-detail.css';
+
+type ProductDetail = ProductCardDetailResponse;
+type ProductUpdate = UpdateProductCardRequest;
 
 const iconLabels: Record<FallbackIcon, string> = {
   TOP: '상의',
@@ -64,47 +69,45 @@ const iconLabels: Record<FallbackIcon, string> = {
 };
 
 function editableFields(product: ProductDetail) {
-  const { productTitle, shop, price, memo, tags, boards, imageUrl, imageFileId, fallbackIcon } =
-    product;
   return {
-    productTitle,
-    shop,
-    price,
-    memo,
-    tags,
-    boardIds: boards.map(({ id }) => id),
-    imageUrl,
-    imageFileId,
-    fallbackIcon,
+    productTitle: product.productTitle,
+    shop: product.shop ?? null,
+    price: product.price,
+    memo: product.memo ?? '',
+    tags: product.tags.map(({ title }) => title),
+    boardIds: product.boards.map(({ boardId }) => boardId),
+    imageUrl: product.imageUrl ?? null,
+    imageFileId: product.imageFileId ?? null,
+    fallbackIcon: product.fallbackIcon ?? null,
   };
 }
 
-type EditableFields = Omit<ProductUpdate, 'price'> & { price: number | null };
+type EditableFields = ReturnType<typeof editableFields>;
 
-function snapshot(value: EditableFields) {
+function snapshot(value: EditableFields | ProductUpdate) {
   const { productTitle, shop, price, memo, tags, boardIds, imageUrl, imageFileId, fallbackIcon } =
     value;
   return JSON.stringify([
     productTitle,
-    shop,
+    shop ?? null,
     price,
-    memo,
+    memo ?? '',
     [...tags].sort(),
-    [...boardIds].sort(),
-    imageUrl,
-    imageFileId,
-    fallbackIcon,
+    [...boardIds].sort((a, b) => a - b),
+    imageUrl ?? null,
+    imageFileId ?? null,
+    fallbackIcon ?? null,
   ]);
 }
 
-function matchesSnapshot(latest: ProductDetail, expected: EditableFields) {
+function matchesSnapshot(latest: ProductDetail, expected: EditableFields | ProductUpdate) {
   const fields = editableFields(latest);
   // A mirror worker may attach a file without changing the source image or editable fields.
   // On a manual retry, onChecked rebases "keep image" to the fresh file ID.
   if (
     latest.imageStatus === 'READY' &&
     fields.imageFileId !== null &&
-    expected.imageFileId === null &&
+    !expected.imageFileId &&
     expected.imageUrl &&
     fields.imageUrl === expected.imageUrl
   ) {
@@ -113,10 +116,7 @@ function matchesSnapshot(latest: ProductDetail, expected: EditableFields) {
   return snapshot(fields) === snapshot(expected);
 }
 
-const editErrors: Record<
-  Exclude<ProductDetailError['code'], 'failed' | 'auth-required'>,
-  string
-> = {
+const editErrors: Record<Exclude<ProductErrorCode, 'failed' | 'auth-required'>, string> = {
   forbidden: '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.',
   'not-found': '이 상품을 수정할 수 없어요. 상세 화면에서 다시 확인해 주세요.',
   'board-not-found': '선택한 보드가 바뀌었어요. 담을 보드를 다시 확인해 주세요.',
@@ -146,7 +146,6 @@ export type EditRecovery = 'unknown' | 'auth-required' | 'forbidden' | 'not-foun
 
 export function ProductEditForm({
   product,
-  api,
   onSaved,
   onCancel,
   onBusyChange,
@@ -154,7 +153,6 @@ export function ProductEditForm({
   onChecked,
 }: {
   product: ProductDetail;
-  api: ProductDetailApi;
   onSaved: (product: ProductDetail) => void;
   onCancel: () => void;
   onBusyChange: (busy: boolean) => void;
@@ -165,15 +163,15 @@ export function ProductEditForm({
   const [title, setTitle] = useState(product.productTitle);
   const [price, setPrice] = useState(() => String(product.price ?? ''));
   const [editingPrice, setEditingPrice] = useState(false);
-  const [memo, setMemo] = useState(product.memo);
+  const [memo, setMemo] = useState(product.memo ?? '');
   const [tags, setTags] = useState(() => [
-    ...new Set(product.tags.map(normalizeTag).filter(Boolean)),
+    ...new Set(product.tags.map(({ title }) => normalizeTag(title)).filter(Boolean)),
   ]);
   const [tagOptions, setTagOptions] = useState(() => [...new Set([...seasonTags, ...tags])]);
   const [tagDraft, setTagDraft] = useState<string | null>(null);
   const tagTrigger = useInlineEntryTrigger(tagDraft !== null);
   const imageOptions = useRef<HTMLDivElement>(null);
-  const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.id));
+  const [boardIds, setBoardIds] = useState(product.boards.map((board) => board.boardId));
   const [boardName, setBoardName] = useState<string | null>(null);
   const boardTrigger = useInlineEntryTrigger(boardName !== null);
   const [boardError, setBoardError] = useState<
@@ -198,23 +196,21 @@ export function ProductEditForm({
       checkRequest.current?.abort();
     };
   }, []);
-  const [loadedBoards, retryBoards, updateBoards] = useLoad(
-    (signal) => api.listBoards(signal),
-    [api],
-    {
-      timeoutMs: 10_000,
-      // Drop boards that no longer exist so they can't block the update.
-      onReady: (list) =>
-        setBoardIds((ids) => ids.filter((id) => list.some((board) => board.id === id))),
-    },
-  );
-  const boards: readonly ProductBoard[] | null =
-    loadedBoards.status === 'ready' ? loadedBoards.value : null;
-  const boardsFailed = loadedBoards.status === 'error';
-  const boardReadError =
-    boardsFailed && loadedBoards.error instanceof ProductDetailError
-      ? loadedBoards.error.code
-      : undefined;
+  const queryClient = useQueryClient();
+  const boardsQuery = useGetBoards({ query: { refetchOnMount: 'always' } });
+  const updateProductCard = useUpdateProductCard();
+  const createBoardMutation = useCreateBoard();
+  const boardsLoading = boardsQuery.isFetching && !boardsQuery.isSuccess;
+  const boards = boardsQuery.isSuccess ? boardsQuery.data.data.boards : null;
+  useEffect(() => {
+    // 사라진 보드가 수정을 막지 않도록 뺀다.
+    if (boards)
+      setBoardIds((ids) => ids.filter((id) => boards.some((board) => board.boardId === id)));
+  }, [boards]);
+  const retryBoards = () =>
+    void queryClient.resetQueries({ queryKey: getGetBoardsQueryKey(), exact: true });
+  const boardsFailed = boardsQuery.isError;
+  const boardReadError = boardsFailed ? readErrorCode(boardsQuery.error) : undefined;
   const boardsDenied = boardReadError === 'forbidden';
   const requiresLogin = status === 'auth-required' || boardReadError === 'auth-required';
   const creatingBoard = status === 'creating-board';
@@ -232,10 +228,10 @@ export function ProductEditForm({
   }, [requiresLogin, onReconcile, formId]);
   useEffect(() => {
     // Reloading the choices can push the inline error below the fixed sheet footer.
-    if (boardError && loadedBoards.status !== 'loading') {
+    if (boardError && !boardsLoading) {
       boardActions.current?.scrollIntoView({ block: 'nearest' });
     }
-  }, [boardError, loadedBoards.status]);
+  }, [boardError, boardsLoading]);
 
   const newTag = normalizeTag(tagDraft ?? '');
   const canAddTag = tagDraft !== null && isValidTag(tagDraft) && !tags.includes(newTag);
@@ -247,7 +243,9 @@ export function ProductEditForm({
     Boolean(product.imageUrl || product.imageFileId || product.fallbackIcon);
   const missingImage = image === 'keep' && !canKeepImage;
   const invalidBoards =
-    !boards || !boardIds.length || boardIds.some((id) => !boards.some((board) => board.id === id));
+    !boards ||
+    !boardIds.length ||
+    boardIds.some((id) => !boards.some((board) => board.boardId === id));
   const normalizedTitle = normalizeProductTitle(title);
   const titleLength = codePointLength(normalizedTitle);
   const normalizedMemo = normalizeProductMemo(memo);
@@ -277,28 +275,35 @@ export function ProductEditForm({
     setError('');
     const input: ProductUpdate = {
       productTitle: normalizedTitle,
-      shop: product.shop,
+      shop: product.shop ?? null,
       price: amount,
       memo: normalizedMemo,
       tags,
       boardIds,
-      imageUrl: image === 'keep' ? product.imageUrl : null,
-      imageFileId: image === 'keep' ? product.imageFileId : null,
-      fallbackIcon: image === 'keep' ? product.fallbackIcon : image,
+      imageUrl: image === 'keep' ? (product.imageUrl ?? null) : null,
+      imageFileId: image === 'keep' ? (product.imageFileId ?? null) : null,
+      fallbackIcon: image === 'keep' ? (product.fallbackIcon ?? null) : image,
     };
-    const result = await api.update(product.cardId, input).catch(() => unknownOutcome);
+    let rejection: ReturnType<typeof productRejection>;
+    try {
+      const { data } = await updateProductCard.mutateAsync({ cardId: product.cardId, data: input });
+      if (!alive.current) return;
+      if (data.cardId === product.cardId) return onSaved(data);
+      rejection = null;
+    } catch (error) {
+      rejection = productRejection(error, { edit: true });
+    }
     if (!alive.current) return;
-    if (result.status === 'done') return onSaved(result.value);
     onBusyChange(false);
     busy.current = false;
-    if (result.status === 'unknown') {
+    if (!rejection) {
       unconfirmed.current = { before: product, input };
       setStatus('unknown');
       onReconcile('unknown');
       setError('수정 결과를 확인할 수 없어요. 다시 제출하기 전에 현재 상태를 확인해 주세요.');
       return;
     }
-    const { reason, detail } = result;
+    const { code: reason, detail } = rejection;
     setError(
       reason === 'auth-required'
         ? ''
@@ -320,12 +325,13 @@ export function ProductEditForm({
     if (!attempt || checkRequest.current) return;
     const controller = new AbortController();
     checkRequest.current = controller;
-    const timer = setTimeout(() => controller.abort(), 10_000);
     setStatus('checking');
     onBusyChange(true);
     setError('');
     try {
-      const latest = await api.get(product.cardId, controller.signal);
+      const { data: latest } = await getProductCardDetail(product.cardId, {
+        signal: controller.signal,
+      });
       controller.signal.throwIfAborted();
       if (!alive.current) return;
       unconfirmed.current = null;
@@ -347,7 +353,7 @@ export function ProductEditForm({
       }
     } catch (error) {
       if (!alive.current) return;
-      const code = error instanceof ProductDetailError ? error.code : 'failed';
+      const code = readErrorCode(error);
       setStatus(code === 'auth-required' ? code : 'unknown');
       if (code === 'not-found' || code === 'forbidden') {
         unconfirmed.current = null;
@@ -359,7 +365,6 @@ export function ProductEditForm({
         );
       }
     } finally {
-      clearTimeout(timer);
       checkRequest.current = null;
       if (alive.current) onBusyChange(false);
     }
@@ -372,23 +377,37 @@ export function ProductEditForm({
     setStatus('creating-board');
     setBoardError(null);
     try {
-      const board = await api.createBoard(normalizedBoardName);
+      const { data: board } = await createBoardMutation.mutateAsync({
+        data: { name: normalizedBoardName },
+      });
       if (!alive.current) return;
-      updateBoards((current) => [board, ...current.filter((item) => item.id !== board.id)]);
-      setBoardIds((current) => [...new Set([...current, board.id])]);
+      queryClient.setQueryData<getBoardsResponse>(
+        getGetBoardsQueryKey(),
+        (current) =>
+          current && {
+            ...current,
+            data: {
+              ...current.data,
+              boards: [
+                { ...board, previewImages: [] },
+                ...current.data.boards.filter((item) => item.boardId !== board.boardId),
+              ],
+            },
+          },
+      );
+      setBoardIds((current) => [...new Set([...current, board.boardId])]);
       setBoardName(null);
       boardList.current?.scrollTo(0, 0);
     } catch (error) {
       if (!alive.current) return;
-      if (error instanceof ProductDetailError) {
-        if (error.code === 'auth-required') {
-          setStatus('auth-required');
-          return;
-        }
-        if (error.code === 'forbidden' || error.code === 'failed') {
-          setBoardError(error.code === 'failed' ? 'invalid' : 'forbidden');
-          return;
-        }
+      const code = productRejection(error)?.code;
+      if (code === 'auth-required') {
+        setStatus('auth-required');
+        return;
+      }
+      if (code === 'forbidden' || code === 'failed') {
+        setBoardError(code === 'failed' ? 'invalid' : 'forbidden');
+        return;
       }
       setBoardError(error instanceof ApiError && error.status === 409 ? 'duplicate' : 'unknown');
       // A concurrent create or a lost reply can leave an existing board. Re-read, never replay POST.
@@ -419,19 +438,14 @@ export function ProductEditForm({
         : error;
   useLayoutEffect(() => {
     const anchor = footer.current;
-    if (
-      !anchor ||
-      waiting ||
-      loadedBoards.status === 'loading' ||
-      anchor.ownerDocument.activeElement !== anchor
-    )
+    if (!anchor || waiting || boardsLoading || anchor.ownerDocument.activeElement !== anchor)
       return;
     // Don't land on the draft-discard button when there is no recovery action.
     const target =
       anchor.querySelector<HTMLElement>('button[data-edit-action]:not(:disabled)') ??
       anchor.querySelector<HTMLElement>('[role="alert"]');
     target?.focus();
-  }, [waiting, loadedBoards.status, message]);
+  }, [waiting, boardsLoading, message]);
   return (
     <BottomSheet
       open
@@ -594,14 +608,16 @@ export function ProductEditForm({
               {boards && (
                 <ul className={boardStyles.boardList} ref={boardList}>
                   {boards.map((board) => (
-                    <li key={board.id} className={boardStyles.boardRow}>
+                    <li key={board.boardId} className={boardStyles.boardRow}>
                       <Checkbox
                         className={boardStyles.boardCheck}
-                        checked={boardIds.includes(board.id)}
+                        checked={boardIds.includes(board.boardId)}
                         onChange={(event) => {
                           const { checked } = event.currentTarget;
                           setBoardIds((ids) =>
-                            checked ? [...ids, board.id] : ids.filter((id) => id !== board.id),
+                            checked
+                              ? [...ids, board.boardId]
+                              : ids.filter((id) => id !== board.boardId),
                           );
                           if (
                             checked &&
@@ -614,11 +630,9 @@ export function ProductEditForm({
                         }}
                       >
                         {board.name}
-                        {board.productCount !== undefined && (
-                          <span aria-hidden="true" className={boardStyles.boardCount}>
-                            {board.productCount}개
-                          </span>
-                        )}
+                        <span aria-hidden="true" className={boardStyles.boardCount}>
+                          {board.productCount}개
+                        </span>
                       </Checkbox>
                     </li>
                   ))}

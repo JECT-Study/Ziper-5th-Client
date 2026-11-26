@@ -1,5 +1,5 @@
 # JEC-23 상품 수정: 상품 관리 바텀시트 → 수정 시트 → 저장 후 상세로 복귀.
-# When using the JEC-23 fixture: POST /_reset?expiredSession=1 before this signed-out preview.
+# JEC-23 fixture 를 쓴다: 흐름마다 POST /_reset (로그인 상태) 후 실행한다.
 appId: com.ject.ziper
 ---
 - runFlow: ../subflows/start-dev-client.yaml
@@ -9,7 +9,7 @@ appId: com.ject.ziper
 - runFlow:
     file: ../subflows/open-link.yaml
     env:
-      LINK: ziper://web?path=%2Fproducts%2F1%3Fpreview%3Dnormal
+      LINK: ziper://web?path=%2Fproducts%2F7
 - extendedWaitUntil:
     visible: 오버핏 울 블렌드 니트 가디건
     timeout: 15000

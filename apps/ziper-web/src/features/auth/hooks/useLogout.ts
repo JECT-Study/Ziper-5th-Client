@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { usePlatform } from '../../../bridge/provider';
 
@@ -8,14 +7,11 @@ import { usePlatform } from '../../../bridge/provider';
  */
 export function useLogout() {
   const { platform } = usePlatform();
-  const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
 
   async function logout() {
     setPending(true);
     await platform.auth.logout().catch((error) => console.error('로그아웃 중 오류', error));
-    // 다음에 다른 계정으로 로그인해도 이전 사람의 보드 등이 보이지 않게 캐시를 비운다.
-    queryClient.clear();
     setPending(false);
   }
 

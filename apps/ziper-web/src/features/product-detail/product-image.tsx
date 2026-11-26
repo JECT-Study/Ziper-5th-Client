@@ -1,4 +1,4 @@
-import type { ProductDetail } from '@ziper/api/product-detail';
+import type { ProductCardDetailResponse } from '@ziper/api/schemas';
 import { useEffect } from 'react';
 import tops from '../../assets/product-detail/tops.png';
 import unavailableImage from '../../assets/product-detail/unavailable-image.png';
@@ -16,12 +16,12 @@ export function ProductImage({
   revision,
   onDefaultImage,
 }: {
-  product: ProductDetail;
+  product: ProductCardDetailResponse;
   revision: number;
   onDefaultImage?: () => void;
 }) {
   const { photo, onPhotoError } = useProductPhoto(product, revision);
-  const unavailable = product.linkStatus === 'REMOVED';
+  const unavailable = product.link.status === 'REMOVED';
   const usingDefault =
     !unavailable &&
     !photo &&

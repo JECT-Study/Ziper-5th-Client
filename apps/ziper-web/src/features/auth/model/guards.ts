@@ -1,6 +1,6 @@
 // 라우트 가드. 세션은 브라우저에서만 확인할 수 있어서(쿠키 재발급), 가드를 쓰는 라우트는 ssr: false 로 둔다.
 import { redirect, type ParsedLocation } from '@tanstack/react-router';
-import { ensureSession } from '../../../shared/api/http';
+import { ensureSession } from '@ziper/api/http';
 import { loadPendingSignup } from './pendingSignup';
 
 declare module '@tanstack/react-router' {

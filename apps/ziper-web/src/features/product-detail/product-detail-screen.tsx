@@ -1,9 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  ProductDetailError,
-  type ProductDetail,
-  type ProductDetailApi,
-} from '@ziper/api/product-detail';
-import { unknownOutcome } from '@ziper/api/outcome';
+  getGetProductCardDetailQueryKey,
+  openOriginalUrl,
+  useGetProductCardDetail,
+} from '@ziper/api';
+import type { ProductCardDetailResponse } from '@ziper/api/schemas';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { Button, Footer, HeaderSub, Icon, Modal, showToast } from '../../components';
@@ -11,11 +12,12 @@ import { ProductManageSheet, type ProductAction } from './product-manage-sheet';
 import { ProductImage } from './product-image';
 import { ProductEditForm, type EditRecovery } from './product-edit-form';
 import { useBackLayer } from '../../shared/use-back-layer';
-import { useLoad } from '../../shared/use-load';
+import { productRejection, readErrorCode, type ProductErrorCode } from './product-errors';
+import { purchaseProduct, purchasesEnabled } from './purchases';
 import * as styles from './product-detail.css';
 
 const won = new Intl.NumberFormat('ko-KR');
-const loadErrors = {
+const loadErrors: Record<ProductErrorCode, string> = {
   'auth-required': '로그인한 뒤 상품을 확인해 주세요.',
   forbidden: '이 상품을 볼 수 있는 권한이 없어요.',
   'not-found': '상품을 찾을 수 없어요. 삭제되었거나 더 이상 제공되지 않는 상품이에요.',
@@ -24,9 +26,14 @@ const loadErrors = {
   failed: '상품 정보를 불러오지 못했어요.',
 };
 
+type Product = ProductCardDetailResponse;
+type Reply = { data: Product; status: number; headers: Headers };
+
+const isCardId = (value: string) =>
+  /^[1-9]\d{0,15}$/.test(value) && Number.isSafeInteger(Number(value));
+
 export function ProductDetailScreen({
   cardId,
-  api,
   onBack,
   openPurchased,
   fromPurchasedList = false,
@@ -34,7 +41,6 @@ export function ProductDetailScreen({
   platformReady = true,
 }: {
   cardId: string;
-  api: ProductDetailApi;
   onBack?: () => void | Promise<unknown>;
   openPurchased?: (replace: boolean) => Promise<unknown>;
   fromPurchasedList?: boolean;
@@ -74,30 +80,27 @@ export function ProductDetailScreen({
   const manageButton = useRef<HTMLButtonElement>(null);
   const actionMessage = useRef<HTMLDivElement>(null);
   const focusAfterConfirmation = useRef(false);
-  const [loaded, retry, updateProduct] = useLoad(
-    (signal) => api.get(cardId, signal),
-    [api, cardId],
-    {
-      timeoutMs: 10_000,
-      onReady(next) {
-        setUncertain(false);
-        busy.current = false;
-        setPending(null);
-        setError(
-          uncertain && next.status === 'PLANNED'
-            ? '아직 구매 예정 상품이에요. 구매 완료로 변경하려면 다시 선택해 주세요.'
-            : '',
-        );
-      },
-    },
-  );
+  const validId = isCardId(cardId);
+  const id = Number(cardId);
+  const queryClient = useQueryClient();
+  const queryKey = getGetProductCardDetailQueryKey(id);
+  const detail = useGetProductCardDetail(id, { query: { enabled: validId } });
+  const updateProduct = (change: (current: Product) => Product) =>
+    queryClient.setQueryData<Reply>(
+      queryKey,
+      (current) => current && { ...current, data: change(current.data) },
+    );
+  // 보드·구매 목록 등 다른 화면의 캐시는 돌아갔을 때 다시 받게 한다.
+  const invalidateOthers = () =>
+    void queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== queryKey[0] });
+  const loading = validId && detail.isPending;
   useLayoutEffect(() => {
     const body = detailBody.current;
-    if (loaded.status === 'loading' || !body || body.ownerDocument.activeElement !== body) return;
+    if (loading || !body || body.ownerDocument.activeElement !== body) return;
     // Focus the refreshed result only if the keyboard user stayed here during the read.
     const result = body.querySelector<HTMLElement>('[data-reload-result]');
     (result ?? body.querySelector('h2'))?.focus();
-  }, [loaded.status]);
+  }, [loading]);
   useLayoutEffect(() => {
     if (pending || !focusAfterConfirmation.current) return;
     focusAfterConfirmation.current = false;
@@ -108,21 +111,16 @@ export function ProductDetailScreen({
     // Land on the message, not on a button that a held confirmation key could activate.
     (actionMessage.current ?? body.querySelector<HTMLElement>('[data-reload-result]'))?.focus();
   }, [pending, view]);
-  const product = !accessError && loaded.status === 'ready' ? loaded.value : null;
-  const loadCode =
+  const product = !accessError && validId ? (detail.data?.data ?? null) : null;
+  const loadCode: ProductErrorCode | null =
     (accessError === 'mutation-forbidden' ? 'forbidden' : accessError) ??
-    (loaded.status === 'error'
-      ? loaded.error instanceof ProductDetailError
-        ? loaded.error.code
-        : 'failed'
-      : null);
+    (!validId ? 'not-found' : detail.isError ? readErrorCode(detail.error) : null);
   const authReadFailed = loadCode === 'auth-required' && !accessError;
   useEffect(() => {
     if (authReadFailed) showToast(loadErrors['auth-required']);
   }, [authReadFailed]);
-  const purchases = api.purchases;
-  const canPurchase = Boolean(purchases) && product?.status === 'PLANNED';
-  const removed = product?.linkStatus === 'REMOVED';
+  const canPurchase = purchasesEnabled && product?.status === 'PLANNED';
+  const removed = product?.link.status === 'REMOVED';
 
   useEffect(() => {
     alive.current = true;
@@ -151,14 +149,18 @@ export function ProductDetailScreen({
   }
 
   async function purchase(event: MouseEvent<HTMLButtonElement>) {
-    if (!product || !purchases || !canPurchase || uncertain || !begin('purchase')) return;
+    if (!product || !canPurchase || uncertain || !begin('purchase')) return;
     focusAfterConfirmation.current = event.detail === 0;
     purchaseAttempted.current = true;
     try {
-      const result = await purchases.complete(product.cardId).catch(() => unknownOutcome);
+      const result = await purchaseProduct(product.cardId).then(
+        ({ data }) => ({ done: data.cardId === product.cardId && data.status === 'PURCHASED' }),
+        (error: unknown) => ({ done: false, rejection: productRejection(error) }),
+      );
       if (!alive.current) return;
-      if (result.status === 'done') {
-        updateProduct((current) => ({ ...current, status: result.value.status }));
+      if (result.done) {
+        updateProduct((current) => ({ ...current, status: 'PURCHASED' }));
+        invalidateOthers();
         // Drop the confirmation entry first so Back from the list cannot reopen it.
         const atDetail = await discardLayer();
         if (!alive.current) return;
@@ -174,7 +176,7 @@ export function ProductDetailScreen({
         return;
       }
       setView('detail');
-      const reason = result.status === 'rejected' ? result.reason : null;
+      const reason = 'rejection' in result ? (result.rejection?.code ?? null) : null;
       if (reason === 'auth-required' || reason === 'forbidden') {
         setAccessError(reason === 'forbidden' ? 'mutation-forbidden' : reason);
         if (reason === 'auth-required') showToast('로그인이 만료되어 구매 상태를 바꿀 수 없어요.');
@@ -216,8 +218,8 @@ export function ProductDetailScreen({
     }
   }
 
-  async function original(card: Pick<ProductDetail, 'cardId' | 'productUrl' | 'linkStatus'>) {
-    if (card.linkStatus === 'REMOVED' || !platformReady || !begin('original')) return;
+  async function original(card: Product) {
+    if (card.link.status === 'REMOVED' || !platformReady || !begin('original')) return;
     const operation = new AbortController();
     openingOriginal.current = operation;
     let opened = false;
@@ -225,21 +227,23 @@ export function ProductDetailScreen({
       // Call the opener in the click stack, before contacting the API.
       await openExternal(card.productUrl);
       opened = true;
-      if (!operation.signal.aborted) await api.openOriginal(card.cardId, operation.signal);
+      if (!operation.signal.aborted)
+        await openOriginalUrl(card.cardId, { signal: operation.signal });
     } catch (reason) {
       if (operation.signal.aborted) return;
-      if (opened && reason instanceof ProductDetailError) {
-        if (reason.code === 'auth-required' || reason.code === 'not-found') {
+      const rejection = opened ? productRejection(reason) : null;
+      if (rejection) {
+        if (rejection.code === 'auth-required' || rejection.code === 'not-found') {
           setView('detail');
-          setAccessError(reason.code);
-          if (reason.code === 'auth-required') {
+          setAccessError(rejection.code);
+          if (rejection.code === 'auth-required') {
             showToast('로그인이 만료되어 방문 기록을 남기지 못했어요.');
           } else {
             setError('쇼핑몰은 열었지만 방문 기록은 남기지 못했어요.');
           }
           return;
         }
-        if (reason.code === 'forbidden') {
+        if (rejection.code === 'forbidden') {
           setError('쇼핑몰은 열었지만 방문 기록을 남길 권한이 없어요.');
           return;
         }
@@ -256,14 +260,23 @@ export function ProductDetailScreen({
       finish();
     }
   }
-  function reload(event?: MouseEvent<HTMLButtonElement>) {
+  async function reload(event?: MouseEvent<HTMLButtonElement>) {
     if (leaving.current) return;
     if (event?.detail === 0) detailBody.current?.focus({ preventScroll: true });
+    const wasUncertain = uncertain;
     setEditToast(null);
     setView('detail');
     setAccessError(null);
     setError('');
-    retry();
+    await queryClient.resetQueries({ queryKey, exact: true });
+    const latest = queryClient.getQueryData<Reply>(queryKey)?.data;
+    if (!alive.current || !latest) return;
+    setUncertain(false);
+    busy.current = false;
+    setPending(null);
+    if (wasUncertain && latest.status === 'PLANNED') {
+      setError('아직 구매 예정 상품이에요. 구매 완료로 변경하려면 다시 선택해 주세요.');
+    }
   }
 
   function closeLayer() {
@@ -271,7 +284,7 @@ export function ProductDetailScreen({
     if (view === 'edit') {
       const recovery = editRecovery.current;
       editRecovery.current = null;
-      if (recovery === 'unknown') return reload();
+      if (recovery === 'unknown') return void reload();
       if (recovery) setAccessError(recovery);
     }
     // A normal cancel or a confirmed read failure needs no additional detail request.
@@ -351,7 +364,7 @@ export function ProductDetailScreen({
             {loadCode === 'not-found' && fromPurchasedList && openPurchased ? (
               purchasedReturn
             ) : (
-              <Button disabled={Boolean(pending)} onClick={reload}>
+              <Button disabled={Boolean(pending)} onClick={(event) => void reload(event)}>
                 {statusCheckFailed ? '현재 상태 확인' : '다시 확인'}
               </Button>
             )}
@@ -372,9 +385,7 @@ export function ProductDetailScreen({
               <h2 className={styles.name} tabIndex={-1}>
                 {product.productTitle}
               </h2>
-              <strong className={styles.price}>
-                {product.price === null ? '가격 정보 없음' : won.format(product.price) + '원'}
-              </strong>
+              <strong className={styles.price}>{won.format(product.price)}원</strong>
             </div>
             <div className={styles.memo}>
               <span className={styles.caption}>한 줄 메모</span>
@@ -383,8 +394,8 @@ export function ProductDetailScreen({
             {product.tags.length > 0 && (
               <ul className={styles.chips} aria-label="상품 태그">
                 {product.tags.map((tag) => (
-                  <li className={styles.chip} key={tag}>
-                    {tag}
+                  <li className={styles.chip} key={tag.tagId}>
+                    {tag.title}
                   </li>
                 ))}
               </ul>
@@ -393,7 +404,7 @@ export function ProductDetailScreen({
               <p className={styles.caption}>담긴 보드 · {product.boards.length}개</p>
               <ul className={styles.chips}>
                 {product.boards.map((board) => (
-                  <li className={styles.chip} key={board.id}>
+                  <li className={styles.chip} key={board.boardId}>
                     {board.name}
                   </li>
                 ))}
@@ -404,7 +415,7 @@ export function ProductDetailScreen({
                 ✓ 구매 완료한 상품이에요
               </p>
             )}
-            {product.linkStatus === 'SOLD_OUT' && (
+            {product.link.status === 'SOLD_OUT' && (
               <p className={styles.caption}>품절된 상품이에요.</p>
             )}
             {removed && <p className={styles.caption}>원본 상품의 판매가 종료되었어요.</p>}
@@ -416,7 +427,7 @@ export function ProductDetailScreen({
         <Footer className={styles.footer} layout="stack">
           {actionError}
           {uncertain ? (
-            <Button disabled={Boolean(pending)} onClick={reload}>
+            <Button disabled={Boolean(pending)} onClick={(event) => void reload(event)}>
               현재 상태 확인
             </Button>
           ) : (
@@ -443,11 +454,11 @@ export function ProductDetailScreen({
         <ProductEditForm
           key={product.cardId}
           product={product}
-          api={api}
           onSaved={(updated) => {
             finish();
             editRecovery.current = null;
             updateProduct(() => updated);
+            invalidateOthers();
             setImageRevision((n) => n + 1);
             setView('detail');
             setEditToast(showToast('상품 정보 수정을 완료했어요', { compact: true }));
