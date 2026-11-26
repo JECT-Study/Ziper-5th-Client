@@ -1,21 +1,20 @@
+import { useGetBoards } from '@ziper/api';
 import { usePlatform } from '../../bridge/provider';
 import { Button } from '../../components';
 import { cx } from '../../components/cx';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
 import { BoardCard, BoardCardSkeleton } from './board-card';
 import { useBoardManage } from './use-board-manage';
-import { useBoardsQuery } from './queries';
 import { useCreateBoardSheet } from './use-create-board';
 import * as styles from './board.css';
 
-// 홈에는 2×2 까지만 보여준다.
 const HOME_BOARD_LIMIT = 4;
 
-/** 홈 화면의 보드 영역: 새 보드 만들기 + 내 보드 2열 목록 */
 export function HomeBoards() {
   const { platform } = usePlatform();
-  const boards = useBoardsQuery();
-  const list = boards.data?.boards ?? [];
+  const boards = useGetBoards();
+  const data = boards.data?.data;
+  const list = data?.boards ?? [];
   const create = useCreateBoardSheet(list.map((board) => board.name));
   const manage = useBoardManage(list);
   const selectTab = useTabNavigation();
@@ -41,7 +40,7 @@ export function HomeBoards() {
         </button>
       </div>
 
-      {boards.isError && !boards.data ? (
+      {boards.isError && !data ? (
         <div className={styles.status}>
           <p role="alert">보드를 불러오지 못했어요.</p>
           <Button variant="secondary" size="small" onClick={() => void boards.refetch()}>
@@ -50,7 +49,7 @@ export function HomeBoards() {
         </div>
       ) : (
         <div className={styles.homeList} aria-busy={boards.isPending}>
-          {!boards.data && (
+          {!data && (
             <>
               <BoardCardSkeleton />
               <BoardCardSkeleton />

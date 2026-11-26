@@ -1,6 +1,11 @@
 import { useEffect, useRef, type MouseEvent } from 'react';
 
-export function useProductPageFocus(status: 'loading' | 'ready' | 'error', count: number) {
+/** settledAt: 같은 상태로 끝난 요청도 구분하도록 응답마다 바뀌는 값 */
+export function useProductPageFocus(
+  status: 'loading' | 'ready' | 'error',
+  count: number,
+  settledAt: number,
+) {
   const grid = useRef<HTMLDivElement>(null);
   const pager = useRef<HTMLDivElement>(null);
   const empty = useRef<HTMLParagraphElement>(null);
@@ -28,7 +33,7 @@ export function useProductPageFocus(status: 'loading' | 'ready' | 'error', count
       empty.current ??
       grid.current?.lastElementChild?.querySelector<HTMLButtonElement>('button:not(:disabled)');
     target?.focus();
-  }, [status]);
+  }, [status, settledAt]);
 
   return { grid, pager, empty, pageAction };
 }

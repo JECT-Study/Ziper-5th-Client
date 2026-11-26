@@ -1,7 +1,13 @@
-import { BridgeError, providers, type Session, type WebAuthService } from '@ziper/bridge/contract';
-import { signInWithSocialToken, signOut } from '../api/authApi';
-import { ensureSession } from '../../../shared/api/http';
-import { getAccessToken, userIdOf } from '../../../shared/api/session';
+import {
+  BridgeError,
+  providers,
+  type Provider,
+  type Session,
+  type WebAuthService,
+} from '@ziper/bridge/contract';
+import { loginWithOAuth, logout } from '@ziper/api';
+import { ensureSession, getAccessToken, startSession, userIdOf } from '@ziper/api/http';
+import { savePendingSignup } from './pendingSignup';
 import { isWebLoginConfigured, startWebLogin } from './webOAuth';
 
 // 브릿지는 "일회용 교환 코드"를 웹이 백엔드 세션으로 바꾸는 구조인데, 백엔드에는 그런 API 가 없다.
@@ -14,7 +20,7 @@ function signedIn(accessToken: string): Session {
   };
 }
 
-function parseHandoff(code: string): { provider: string; token: string } {
+function parseHandoff(code: string): { provider: Provider; token: string } {
   try {
     const value = JSON.parse(code) as { provider?: unknown; token?: unknown };
     if (
@@ -23,7 +29,7 @@ function parseHandoff(code: string): { provider: string; token: string } {
       typeof value.token === 'string' &&
       value.token.length > 0
     )
-      return { provider: value.provider, token: value.token };
+      return { provider: value.provider as Provider, token: value.token };
   } catch {
     // 아래에서 실패로 처리한다.
   }
@@ -45,10 +51,15 @@ export const webAuth: WebAuthService = {
     },
     async exchange({ handoffCode }) {
       const { provider, token } = parseHandoff(handoffCode);
-      const result = await signInWithSocialToken(provider, token);
-      // 처음 온 사람은 아직 회원이 아니다. signupRequired 로 알려서 약관 화면을 거치게 한다.
-      if (result.status === 'signupRequired') return { status: 'signupRequired', profile: null };
-      return signedIn(result.accessToken);
+      const { data } = await loginWithOAuth(provider, { token });
+      // 처음 온 사람은 아직 회원이 아니다. 약관 화면을 거쳐 가입한다.
+      if (data.authType === 'SIGNUP_REQUIRED') {
+        savePendingSignup(data.signupToken ?? '');
+        return { status: 'signupRequired', profile: null };
+      }
+      if (!data.accessToken) throw new BridgeError('AUTH_FAILED');
+      startSession(data.accessToken);
+      return signedIn(data.accessToken);
     },
     async current() {
       if (!(await ensureSession())) return null;
@@ -59,6 +70,9 @@ export const webAuth: WebAuthService = {
     async nativeHandoff() {
       return { handoffCode: 'web-session' };
     },
-    logout: signOut,
+    async logout() {
+      startSession(null);
+      await logout({});
+    },
   },
 };

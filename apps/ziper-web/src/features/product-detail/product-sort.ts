@@ -1,6 +1,6 @@
-import type { PurchaseSort } from '@ziper/api/product-detail';
+import type { GetBoardProductsSort } from '@ziper/api/schemas';
 
-export type ProductSort = PurchaseSort;
+export type ProductSort = GetBoardProductsSort;
 
 export const productSortLabels = {
   RECENT: '최근 등록순',

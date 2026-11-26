@@ -1,30 +1,13 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { Suspense } from 'react';
 import { BridgeError } from '@ziper/bridge/contract';
 import { usePlatform } from '../bridge/provider';
 import { useIncomingShare } from '../features/product-save/incoming-share';
 import { ConnectedProductSave } from '../features/product-save/connected-product-save';
-import { ProductSavePreview, parsePreviewMode } from '../features/product-save/preview-config';
 import { ScreenShell } from '../features/product-save/product-save-screen';
 
 export const Route = createFileRoute('/share-product')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    preview: parsePreviewMode(search.preview),
-  }),
-  component: ShareProductRoute,
+  component: Incoming,
 });
-
-function ShareProductRoute() {
-  const { preview } = Route.useSearch();
-  const navigate = Route.useNavigate();
-  return ProductSavePreview && preview ? (
-    <Suspense fallback={null}>
-      <ProductSavePreview key={preview} mode={preview} onClose={() => navigate({ to: '/' })} />
-    </Suspense>
-  ) : (
-    <Incoming />
-  );
-}
 
 function Incoming() {
   const { platform, status } = usePlatform();

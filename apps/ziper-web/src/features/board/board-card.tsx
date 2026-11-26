@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Icon } from '../../components';
 import { cx } from '../../components/cx';
-import type { BoardPreviewImage } from './api';
+import type { BoardPreviewImageResponse as BoardPreviewImage } from '@ziper/api/schemas';
 import { fallbackImages } from './fallback-images';
 import * as styles from './board.css';
 

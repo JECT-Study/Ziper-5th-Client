@@ -1,10 +1,10 @@
-import type {
-  CardImage,
-  ProductLookup,
-  ProductSaveApi,
-  ProductSaveResult,
-} from '@ziper/api/product-save';
-import { unknownOutcome } from '@ziper/api/outcome';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  getGetBoardsQueryKey,
+  useCreateBoard,
+  useGetBoards,
+  type getBoardsResponse,
+} from '@ziper/api';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import accessory from '../../assets/product-save/accessory.png';
 import beauty from '../../assets/product-save/beauty.png';
@@ -36,8 +36,9 @@ import {
   titleLengthMessage,
   type FallbackIcon,
 } from '@ziper/api/product-fields';
-import { useLoad } from '../../shared/use-load';
 import { InlineEntry } from './inline-entry';
+import { useProductLookup, type ExtractProduct, type ProductLookup } from './product-lookup';
+import { useSaveProduct, type CardImage, type ProductSaveResult } from './use-save-product';
 import { useLinkedImage } from './use-linked-image';
 import * as styles from './product-save.css';
 
@@ -57,9 +58,9 @@ const won = new Intl.NumberFormat('ko-KR');
 
 type ScreenProps = {
   url: string | null;
-  api: ProductSaveApi;
+  extract?: ExtractProduct | null;
   onClose: () => void | Promise<unknown>;
-  onViewProduct?: (cardId: string) => Promise<unknown>;
+  onViewProduct?: (cardId: number) => Promise<unknown>;
   entryMode?: 'auto' | 'manual' | 'web';
   initialDraft?: InitialDraft;
   savedMessage?: string;
@@ -116,9 +117,6 @@ export function ScreenShell({
 }
 
 type Ready = Extract<ProductLookup, { status: 'ready' }>;
-type ScreenData =
-  | Ready
-  | { status: 'loading' | 'error' | 'duplicate' | 'unsupported' | 'auth-required' };
 
 const authMessage = '로그인한 뒤 상품을 저장할 수 있어요.';
 const saveErrors = {
@@ -135,35 +133,20 @@ type InitialDraft = {
   memo: string;
   image: CardImage | null;
   tags: string[];
-  boardIds: string[];
+  boardIds: number[];
 };
 
 export function ProductSaveScreen({
   url,
-  api,
+  extract = null,
   paused = false,
   ...formProps
 }: ScreenProps & { paused?: boolean }) {
   const { onClose } = formProps;
-  const [loaded, setLoaded] = useState<ScreenData>({ status: 'loading' });
-  const [attempt, retry] = useState(0);
-  // Resume only unfinished lookups; a completed form keeps its fields and edits.
-  const pausedLookup = paused && loaded.status === 'loading';
-  useEffect(() => {
-    if (!url || pausedLookup) return;
-    const request = new AbortController();
-    const { signal } = request;
-    const load = async () => {
-      try {
-        const lookup = await api.lookup(url, signal);
-        if (!signal.aborted) setLoaded(lookup);
-      } catch {
-        if (!signal.aborted) setLoaded({ status: 'error' });
-      }
-    };
-    void load();
-    return () => request.abort();
-  }, [api, url, attempt, pausedLookup]);
+  const lookup = useProductLookup(url, extract, paused);
+  const loaded = lookup.data ?? {
+    status: lookup.isError ? ('error' as const) : ('loading' as const),
+  };
 
   if (!url)
     return (
@@ -172,7 +155,7 @@ export function ProductSaveScreen({
       </ScreenShell>
     );
   if (loaded.status === 'ready')
-    return <ProductForm {...formProps} lookup={loaded} sourceURL={url} api={api} />;
+    return <ProductForm {...formProps} lookup={loaded} sourceURL={url} />;
   return (
     <ScreenShell onClose={onClose}>
       {loaded.status === 'unsupported' && <UnsupportedLink />}
@@ -188,14 +171,7 @@ export function ProductSaveScreen({
       {loaded.status === 'error' && (
         <>
           <p role="alert">상품 정보를 불러오지 못했어요.</p>
-          <Button
-            onClick={() => {
-              setLoaded({ status: 'loading' });
-              retry((n) => n + 1);
-            }}
-          >
-            다시 시도
-          </Button>
+          <Button onClick={() => void lookup.refetch()}>다시 시도</Button>
         </>
       )}
     </ScreenShell>
@@ -217,7 +193,6 @@ function SharedLink({ url }: { url: string }) {
 function ProductForm({
   lookup,
   sourceURL,
-  api,
   onClose,
   onViewProduct,
   entryMode,
@@ -255,12 +230,15 @@ function ProductForm({
   const [tags, setTags] = useState(initialTags);
   const [selectedTags, setSelectedTags] = useState(initialDraft?.tags ?? []);
   const [tag, setTag] = useState<string | null>(null);
-  const [loadedBoards, retryBoards, updateBoards] = useLoad(
-    (signal) => api.listBoards(signal),
-    [api],
-    { timeoutMs: 8_000 },
-  );
-  const boards = loadedBoards.status === 'ready' ? loadedBoards.value : loadedBoards.status;
+  const queryClient = useQueryClient();
+  const loadedBoards = useGetBoards();
+  const boards = loadedBoards.data
+    ? loadedBoards.data.data.boards
+    : loadedBoards.isError
+      ? 'error'
+      : 'loading';
+  const createBoardMutation = useCreateBoard();
+  const saveProduct = useSaveProduct();
   const [selectedBoards, setSelectedBoards] = useState(initialDraft?.boardIds ?? []);
   const [boardName, setBoardName] = useState<string | null>(null);
   const [boardError, setBoardError] = useState(false);
@@ -298,7 +276,7 @@ function ProductForm({
       ? saveErrors[saveResult.reason]
       : saveResult?.status === 'unknown' && saveErrors.unknown;
 
-  function toggle(selection: string[], value: string) {
+  function toggle<T>(selection: T[], value: T) {
     return selection.includes(value)
       ? selection.filter((item) => item !== value)
       : [...selection, value];
@@ -330,9 +308,22 @@ function ProductForm({
     setPending('board');
     setBoardError(false);
     try {
-      const board = await api.createBoard(newBoardName);
-      updateBoards((list) => [board, ...list]);
-      setSelectedBoards((list) => [...list, board.id]);
+      const { data: board } = await createBoardMutation.mutateAsync({
+        data: { name: newBoardName },
+      });
+      queryClient.setQueryData<getBoardsResponse>(
+        getGetBoardsQueryKey(),
+        (current) =>
+          current && {
+            ...current,
+            data: {
+              ...current.data,
+              boards: [{ ...board, previewImages: [] }, ...current.data.boards],
+            },
+          },
+      );
+      void queryClient.invalidateQueries({ queryKey: getGetBoardsQueryKey() });
+      setSelectedBoards((list) => [...list, board.boardId]);
       closeBoardEntry();
       boardList.current?.scrollTo(0, 0);
     } catch {
@@ -350,7 +341,7 @@ function ProductForm({
     setSaveResult(null);
     try {
       setSaveResult(
-        await api.save({
+        await saveProduct.mutateAsync({
           url,
           sharedUrl: sourceURL === url ? null : sourceURL,
           shop,
@@ -364,7 +355,7 @@ function ProductForm({
         }),
       );
     } catch {
-      setSaveResult(unknownOutcome);
+      setSaveResult({ status: 'unknown' });
     } finally {
       setPending(null);
       busy.current = false;
@@ -383,7 +374,7 @@ function ProductForm({
               onClick={async () => {
                 setOpening('busy');
                 try {
-                  await onViewProduct(saveResult.value.cardId);
+                  await onViewProduct(saveResult.cardId);
                 } catch {
                   setOpening('error');
                 }
@@ -552,7 +543,11 @@ function ProductForm({
                   <p className={styles.error} role="alert">
                     보드를 불러오지 못했어요.
                   </p>
-                  <Button variant="secondary" size="small" onClick={retryBoards}>
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onClick={() => void loadedBoards.refetch()}
+                  >
                     보드 다시 불러오기
                   </Button>
                 </>
@@ -561,11 +556,13 @@ function ProductForm({
                   {boards.length > 0 ? (
                     <ul className={styles.boardList} ref={boardList}>
                       {boards.map((board) => (
-                        <li className={styles.boardRow} key={board.id}>
+                        <li className={styles.boardRow} key={board.boardId}>
                           <Checkbox
                             className={styles.boardCheck}
-                            checked={selectedBoards.includes(board.id)}
-                            onChange={() => setSelectedBoards(toggle(selectedBoards, board.id))}
+                            checked={selectedBoards.includes(board.boardId)}
+                            onChange={() =>
+                              setSelectedBoards(toggle(selectedBoards, board.boardId))
+                            }
                           >
                             {board.name}
                             <span aria-hidden="true" className={styles.boardCount}>

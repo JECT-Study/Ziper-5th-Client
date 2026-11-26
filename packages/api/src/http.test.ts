@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { deferred } from '../../../../../packages/bridge/test/deferred';
+import { deferred } from '../../bridge/test/deferred';
 
 beforeEach(() => vi.resetModules());
 
@@ -71,7 +71,7 @@ it.each([
 it.each([false, true])(
   'only clears the rejected renewed token (concurrent login: %s)',
   async (signedIn) => {
-    const { ensureSession, request, startSession } = await import('./http');
+    const { ensureSession, http, startSession } = await import('./http');
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
@@ -83,17 +83,19 @@ it.each([false, true])(
     vi.stubGlobal('fetch', fetch);
     startSession('old');
 
-    await expect(request('/api/v1/products/7', { auth: true })).rejects.toMatchObject({
+    await expect(http('/api/v1/products/7', { method: 'GET' })).rejects.toMatchObject({
       status: 401,
     });
-    expect(fetch.mock.calls[2]?.[1]?.headers).toEqual({ Authorization: 'Bearer renewed' });
+    expect(new Headers(fetch.mock.calls[2]?.[1]?.headers).get('Authorization')).toBe(
+      'Bearer renewed',
+    );
     await expect(ensureSession()).resolves.toBe(signedIn);
     expect(fetch).toHaveBeenCalledTimes(3);
   },
 );
 
 it('uses the token already renewed by a parallel detail read when the earlier 401 arrives late', async () => {
-  const { request, startSession } = await import('./http');
+  const { http, startSession } = await import('./http');
   const late = deferred<Response>();
   const fetch = vi
     .fn<typeof globalThis.fetch>()
@@ -105,10 +107,12 @@ it('uses the token already renewed by a parallel detail read when the earlier 40
   vi.stubGlobal('fetch', fetch);
   startSession('old');
 
-  const edit = request('/api/v1/products/7', { method: 'PATCH', auth: true });
-  await expect(request('/api/v1/products/7', { auth: true })).resolves.toEqual({ cardId: 7 });
+  const edit = http('/api/v1/products/7', { method: 'PATCH' });
+  await expect(http('/api/v1/products/7', { method: 'GET' })).resolves.toMatchObject({
+    data: { cardId: 7 },
+  });
   late.resolve(new Response(null, { status: 401 }));
-  await expect(edit).resolves.toEqual({ updated: true });
+  await expect(edit).resolves.toMatchObject({ data: { updated: true } });
   expect(fetch.mock.calls.map(([url, init]) => [url, init?.method])).toEqual([
     ['/api/v1/products/7', 'PATCH'],
     ['/api/v1/products/7', 'GET'],
@@ -116,13 +120,15 @@ it('uses the token already renewed by a parallel detail read when the earlier 40
     ['/api/v1/products/7', 'GET'],
     ['/api/v1/products/7', 'PATCH'],
   ]);
-  expect(fetch.mock.calls[4]?.[1]?.headers).toEqual({ Authorization: 'Bearer renewed' });
+  expect(new Headers(fetch.mock.calls[4]?.[1]?.headers).get('Authorization')).toBe(
+    'Bearer renewed',
+  );
 });
 
 it.each([401, 403, 503])(
   'handles a late edit after parallel reissue returns %i',
   async (status) => {
-    const { request, startSession, ensureSession } = await import('./http');
+    const { http, startSession, ensureSession } = await import('./http');
     const late = deferred<Response>();
     const unauthorized = () => new Response(null, { status: 401 });
     const fetch = vi
@@ -135,12 +141,12 @@ it.each([401, 403, 503])(
     vi.stubGlobal('fetch', fetch);
     startSession('old');
 
-    const edit = request('/api/v1/products/7', { method: 'PATCH', auth: true });
+    const edit = http('/api/v1/products/7', { method: 'PATCH' });
     const result =
       status === 401
         ? expect(edit).rejects.toMatchObject({ status: 401 })
-        : expect(edit).resolves.toEqual({ updated: true });
-    await expect(request('/api/v1/boards', { auth: true })).rejects.toMatchObject(
+        : expect(edit).resolves.toMatchObject({ data: { updated: true } });
+    await expect(http('/api/v1/boards', { method: 'GET' })).rejects.toMatchObject(
       status === 401 ? { status } : { name: 'SessionRenewalError', cause: { status } },
     );
     late.resolve(unauthorized());
@@ -161,7 +167,7 @@ it.each([401, 403, 503])(
 );
 
 it('distinguishes a reissue 403 from a resource 403 after a later successful reissue', async () => {
-  const { ApiError, SessionRenewalError, request, startSession } = await import('./http');
+  const { ApiError, SessionRenewalError, http, startSession } = await import('./http');
   const fetch = vi
     .fn<typeof globalThis.fetch>()
     .mockResolvedValueOnce(new Response(null, { status: 401 }))
@@ -171,7 +177,7 @@ it('distinguishes a reissue 403 from a resource 403 after a later successful rei
     .mockResolvedValueOnce(Response.json({ code: 'FORBIDDEN' }, { status: 403 }));
   vi.stubGlobal('fetch', fetch);
   startSession('old');
-  const list = () => request('/api/v1/products/purchased?cursor=next', { auth: true });
+  const list = () => http('/api/v1/products/purchased?cursor=next', { method: 'GET' });
   await expect(list()).rejects.toBeInstanceOf(SessionRenewalError);
   expect(fetch).toHaveBeenCalledTimes(2);
   await expect(list()).rejects.toBeInstanceOf(ApiError);
@@ -187,14 +193,14 @@ it('distinguishes a reissue 403 from a resource 403 after a later successful rei
 it.each(['new-login', null])(
   'does not replay a prior user mutation after the session changes to %s',
   async (token) => {
-    const { request, startSession } = await import('./http');
+    const { http, startSession } = await import('./http');
     const late = deferred<Response>();
     const fetch = vi.fn<typeof globalThis.fetch>().mockReturnValueOnce(late.promise);
     vi.stubGlobal('fetch', fetch);
     startSession('old');
-    const edit = expect(
-      request('/api/v1/products/7', { method: 'PATCH', auth: true }),
-    ).rejects.toMatchObject({ status: 401 });
+    const edit = expect(http('/api/v1/products/7', { method: 'PATCH' })).rejects.toMatchObject({
+      status: 401,
+    });
     startSession(token);
     late.resolve(new Response(null, { status: 401 }));
     await edit;
@@ -208,7 +214,7 @@ it.each([
 ] as const)(
   'does not overwrite a session change to %s while reissue is in flight',
   async (token, reply) => {
-    const { ensureSession, request, startSession } = await import('./http');
+    const { ensureSession, http, startSession } = await import('./http');
     const reissue = deferred<Response>();
     const started = deferred<void>();
     const fetch = vi
@@ -221,7 +227,7 @@ it.each([
     vi.stubGlobal('fetch', fetch);
     startSession('old');
     const purchase = expect(
-      request('/api/v1/products/7/purchase', { method: 'POST', auth: true }),
+      http('/api/v1/products/7/purchase', { method: 'POST' }),
     ).rejects.toMatchObject({ status: 401 });
     await started.promise;
     startSession(token);
@@ -231,3 +237,16 @@ it.each([
     expect(fetch).toHaveBeenCalledTimes(2);
   },
 );
+
+it('notifies only when a different account signs in', async () => {
+  const { onUserChange, startSession } = await import('./http');
+  const token = (sub: string) => `x.${btoa(JSON.stringify({ sub }))}.y`;
+  const listener = vi.fn();
+  onUserChange(listener);
+  startSession(token('1'));
+  startSession(null);
+  startSession(token('1'));
+  expect(listener).not.toHaveBeenCalled();
+  startSession(token('2'));
+  expect(listener).toHaveBeenCalledOnce();
+});

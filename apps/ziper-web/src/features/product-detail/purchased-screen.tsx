@@ -1,17 +1,17 @@
-import { ProductDetailError, type PurchasedProduct } from '@ziper/api/product-detail';
+import { openOriginalUrl } from '@ziper/api';
 import { BridgeError } from '@ziper/bridge/contract';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePlatform } from '../../bridge/provider';
 import { BottomNavigation, HeaderIconButton, HeaderSub, showToast } from '../../components';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
-import { productDetailApi, productPurchases } from './product-detail-api';
+import { productRejection } from './product-errors';
+import type { PurchasedProduct } from './purchases';
 import { error as errorStyle, purchasedPage, purchasedScroll } from './product-detail.css';
 import type { ProductSort } from './product-sort';
 import { PurchasedListError, PurchasedProducts } from './purchased-products';
 
-type AccessError = Extract<ProductDetailError['code'], 'auth-required' | 'forbidden'>;
+type AccessError = 'auth-required' | 'forbidden';
 
-/** 구매 완료 목록. 라우트는 정렬·이동만 넘기고, 목록·원본 이동·접근 오류는 여기서 다룬다. */
 export function PurchasedScreen({
   sort,
   onSortChange,
@@ -22,7 +22,6 @@ export function PurchasedScreen({
 }: {
   sort: ProductSort;
   onSortChange: (sort: ProductSort) => void;
-  /** 라우트 진입(세션 확인)이 실패했다. */
   entryError?: boolean;
   onRetryEntry: () => void;
   openProduct: (product: PurchasedProduct) => Promise<unknown>;
@@ -34,7 +33,7 @@ export function PurchasedScreen({
   const navigating = useRef(false);
   const [backFailed, setBackFailed] = useState(false);
   const [visitRevision, setVisitRevision] = useState(0);
-  const [missingCards, setMissingCards] = useState<ReadonlySet<string>>(() => new Set());
+  const [missingCards, setMissingCards] = useState<ReadonlySet<number>>(() => new Set());
   const [accessError, setAccessError] = useState<AccessError | null>(null);
   const accessNotice = useRef<HTMLDivElement>(null);
   const focusAccessNotice = useRef(false);
@@ -54,7 +53,8 @@ export function PurchasedScreen({
   const ready = !accessError && !entryError && (status === 'native' || status === 'web');
 
   async function openOriginal(product: PurchasedProduct) {
-    if (!ready || navigating.current || opening.current || product.linkStatus === 'REMOVED') return;
+    if (!ready || navigating.current || opening.current || product.link.status === 'REMOVED')
+      return;
     const operation = new AbortController();
     opening.current = operation;
     let opened = false;
@@ -64,21 +64,22 @@ export function PurchasedScreen({
       opened = true;
       if (operation.signal.aborted) return;
       mayHaveRecorded = true;
-      await productDetailApi.openOriginal(product.cardId, operation.signal);
+      await openOriginalUrl(product.cardId, { signal: operation.signal });
     } catch (error) {
       if (operation.signal.aborted) return;
-      if (opened && error instanceof ProductDetailError) {
+      const code = opened ? productRejection(error)?.code : undefined;
+      if (code) {
         mayHaveRecorded = false;
-        if (error.code === 'auth-required') {
-          restrictAccess(error.code);
+        if (code === 'auth-required') {
+          restrictAccess(code);
           return;
         }
-        if (error.code === 'not-found') {
+        if (code === 'not-found') {
           setMissingCards((ids) => new Set([...ids, product.cardId]));
           showToast('쇼핑몰은 열었지만 저장한 상품을 찾을 수 없어요.');
           return;
         }
-        if (error.code === 'forbidden') {
+        if (code === 'forbidden') {
           showToast('쇼핑몰은 열었지만 방문 기록을 남길 권한이 없어요.');
           return;
         }
@@ -150,7 +151,6 @@ export function PurchasedScreen({
           <PurchasedListError retry={onRetryEntry} />
         ) : (
           <PurchasedProducts
-            api={productPurchases}
             missingCards={missingCards}
             visitRevision={visitRevision}
             onAccessDenied={restrictAccess}

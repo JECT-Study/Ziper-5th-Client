@@ -1,14 +1,14 @@
 import { useNavigate } from '@tanstack/react-router';
+import { useGetBoards } from '@ziper/api';
+import type { BoardSummaryResponse } from '@ziper/api/schemas';
 import { useState } from 'react';
 import { usePlatform } from '../../bridge/provider';
 import { BottomNavigation, Button, ChipFilter, HeaderSub, showToast } from '../../components';
 import { cx } from '../../components/cx';
-import { purchasesEnabled } from '../product-detail/product-detail-api';
+import { purchasesEnabled } from '../product-detail/purchases';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
-import type { Board } from './api';
 import { BoardCard, BoardCardSkeleton } from './board-card';
 import { useBoardManage } from './use-board-manage';
-import { useBoardsQuery } from './queries';
 import { useCreateBoardSheet } from './use-create-board';
 import * as styles from './board.css';
 import * as page from './board-detail.css';
@@ -21,25 +21,25 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'purchased', label: '구매 완료' },
 ];
 
-// "최근" 칩은 최근 7일 안에 만든 보드만 보여준다.
 const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
-const isRecent = (board: Board, now: number) => now - Date.parse(board.createdAt) <= RECENT_MS;
+const isRecent = (board: BoardSummaryResponse, now: number) =>
+  now - board.createdAt.getTime() <= RECENT_MS;
 
-/** 하단 "보드" 탭: 내 보드 전체를 2열로 보여준다. */
 export function BoardsScreen() {
   const { platform, status } = usePlatform();
   const selectTab = useTabNavigation();
   const navigate = useNavigate();
-  const boards = useBoardsQuery();
+  const boards = useGetBoards();
+  const data = boards.data?.data;
   const [filter, setFilter] = useState<Filter>('all');
-  const list = boards.data?.boards ?? [];
+  const list = data?.boards ?? [];
   const create = useCreateBoardSheet(list.map((board) => board.name));
   const manage = useBoardManage(list);
 
   const now = Date.now();
   const shown =
     filter === 'all' ? list : filter === 'recent' ? list.filter((b) => isRecent(b, now)) : [];
-  const purchased = boards.data?.purchasedSummary;
+  const purchased = data?.purchasedSummary;
 
   const openBoard = (boardId: number) =>
     void platform.navigation.push(`/boards/${boardId}`).catch(() => {});
@@ -60,7 +60,7 @@ export function BoardsScreen() {
           ))}
         </div>
 
-        {boards.isError && !boards.data ? (
+        {boards.isError && !data ? (
           <div className={styles.status}>
             <p role="alert">보드를 불러오지 못했어요.</p>
             <Button variant="secondary" size="small" onClick={() => void boards.refetch()}>
@@ -68,8 +68,8 @@ export function BoardsScreen() {
             </Button>
           </div>
         ) : (
-          <div className={styles.tabGrid} aria-busy={boards.isPending}>
-            {!boards.data && (
+          <div className={styles.tabGrid} aria-busy={!data}>
+            {!data && (
               <>
                 <BoardCardSkeleton />
                 <BoardCardSkeleton />
@@ -99,10 +99,10 @@ export function BoardsScreen() {
                 onMore={() => showToast('구매 완료 목록은 수정하거나 삭제할 수 없어요')}
               />
             )}
-            {boards.data && filter === 'recent' && shown.length === 0 && (
+            {data && filter === 'recent' && shown.length === 0 && (
               <p className={styles.empty}>최근 7일 안에 만든 보드가 없어요</p>
             )}
-            {boards.data && filter !== 'purchased' && (
+            {data && filter !== 'purchased' && (
               <button
                 type="button"
                 className={cx(styles.createButton, styles.tabCreateButton)}

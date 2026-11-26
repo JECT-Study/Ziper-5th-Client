@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { showToast } from '../../../../components';
-import { errorMessage } from '../../../../shared/api/http';
+import { errorMessage } from '@ziper/api/http';
 import { SIGNUP_FLOW } from '../../model/guards';
 import { CodeStep } from './steps/CodeStep';
 import { EmailStep } from './steps/EmailStep';

@@ -22,7 +22,9 @@
     "typecheck:bridge": "tsc -p packages/bridge/tsconfig.json",
     "lint": "vp lint",
     "fmt": "vp fmt",
-    "check": "vp check"
+    "check": "vp check",
+    "typecheck:api": "pnpm --filter @ziper/api typecheck",
+    "codegen:api": "pnpm --filter @ziper/api codegen:generate"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

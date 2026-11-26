@@ -3,7 +3,7 @@ import { BridgeError, type Provider } from '@ziper/bridge/contract';
 import tooltipTriangle from '../../../../assets/login/tooltip-triangle.svg';
 import welcomeImage from '../../../../assets/login/welcome.png';
 import { Button, Divider, SocialLoginButton, showToast } from '../../../../components';
-import { errorMessage } from '../../../../shared/api/http';
+import { errorMessage } from '@ziper/api/http';
 import { LoadingOverlay } from '../common/LoadingOverlay';
 import * as styles from './login.css';
 import { useSocialLogin } from './useSocialLogin';

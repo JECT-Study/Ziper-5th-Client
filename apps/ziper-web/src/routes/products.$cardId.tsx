@@ -1,13 +1,8 @@
 import { createFileRoute, useLocation, useRouter } from '@tanstack/react-router';
-import { Suspense } from 'react';
 import { usePlatform } from '../bridge/provider';
 import type { ProductSort } from '../features/product-detail/product-sort';
-import { purchasesEnabled, productDetailApi } from '../features/product-detail/product-detail-api';
 import { ProductDetailScreen } from '../features/product-detail/product-detail-screen';
-import {
-  parseDetailPreview,
-  ProductDetailPreview,
-} from '../features/product-detail/preview-config';
+import { purchasesEnabled } from '../features/product-detail/purchases';
 import { discardStaleBackLayer } from '../shared/use-back-layer';
 import { waitForRouteExit } from '../shared/wait-for-route-exit';
 
@@ -19,16 +14,12 @@ declare module '@tanstack/react-router' {
 }
 
 export const Route = createFileRoute('/products/$cardId')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    preview: parseDetailPreview(search.preview),
-  }),
   head: () => ({ meta: [{ title: '상품 상세 | Ziper' }] }),
   component: ProductDetailRoute,
 });
 
 function ProductDetailRoute() {
   const { cardId } = Route.useParams();
-  const { preview } = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   const { platform, status } = usePlatform();
@@ -57,28 +48,20 @@ function ProductDetailRoute() {
     });
   }
 
-  const props = {
-    cardId,
-    onBack: async () => {
-      if (router.history.canGoBack()) {
-        if (!(await waitForRouteExit(router.history, () => router.history.back()))) {
-          throw new Error('Could not leave product detail');
-        }
-      } else if (status === 'native') await platform.navigation.back();
-      else if (status === 'web') await navigate({ to: '/boards', replace: true });
-    },
-    platformReady: status === 'web' || status === 'native',
-    openExternal: (url: string) => platform.external.open(url),
-  };
-  return ProductDetailPreview && preview ? (
-    <Suspense fallback={<p role="status">상품 정보를 불러오는 중이에요.</p>}>
-      <ProductDetailPreview key={cardId + preview} {...props} mode={preview} />
-    </Suspense>
-  ) : (
+  return (
     <ProductDetailScreen
       key={cardId}
-      {...props}
-      api={productDetailApi}
+      cardId={cardId}
+      onBack={async () => {
+        if (router.history.canGoBack()) {
+          if (!(await waitForRouteExit(router.history, () => router.history.back()))) {
+            throw new Error('Could not leave product detail');
+          }
+        } else if (status === 'native') await platform.navigation.back();
+        else if (status === 'web') await navigate({ to: '/boards', replace: true });
+      }}
+      platformReady={status === 'web' || status === 'native'}
+      openExternal={(url: string) => platform.external.open(url)}
       fromPurchasedList={Boolean(source)}
       openPurchased={purchasesEnabled ? openPurchased : undefined}
     />

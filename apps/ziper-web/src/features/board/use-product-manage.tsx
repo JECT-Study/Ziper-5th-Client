@@ -1,13 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useDeleteProductCard } from '@ziper/api';
+import { errorMessage } from '@ziper/api/http';
+import type { BoardProductItemResponse as BoardProduct } from '@ziper/api/schemas';
 import { useState } from 'react';
 import { Button, Modal, showToast } from '../../components';
-import { errorMessage } from '../../shared/api/http';
 import { useBackLayer } from '../../shared/use-back-layer';
 import { waitForHistory } from '../../shared/wait-for-route-exit';
-import { purchasesEnabled } from '../product-detail/product-detail-api';
+import { purchasesEnabled } from '../product-detail/purchases';
 import { ProductManageSheet, type ProductAction } from '../product-detail/product-manage-sheet';
-import type { BoardProduct } from './api';
-import { useMoveProductToTrash } from './queries';
 
 /**
  * 보드 상세 상품 카드의 ... 흐름: 상품 관리 시트(상품 상세와 같은 시트) → 삭제 확인 → 휴지통으로 보내기.
@@ -19,7 +20,10 @@ export function useProductManage() {
   const [target, setTarget] = useState<{ product: BoardProduct; step: 'menu' | 'delete' } | null>(
     null,
   );
-  const moveToTrash = useMoveProductToTrash();
+  const queryClient = useQueryClient();
+  const moveToTrash = useDeleteProductCard({
+    mutation: { onSuccess: () => queryClient.invalidateQueries() },
+  });
   const deleting = moveToTrash.isPending;
   const close = () => setTarget(null);
 
@@ -40,21 +44,23 @@ export function useProductManage() {
       navigate({
         to: '/products/$cardId',
         params: { cardId: String(product.cardId) },
-        search: { preview: undefined },
       }).catch(() => showToast('상품 상세를 열지 못했어요.')),
     );
   }
 
   function remove() {
     if (!target || deleting) return;
-    moveToTrash.mutate(target.product.cardId, {
-      onSuccess: () => {
-        close();
-        showToast('휴지통으로 옮겼어요');
+    moveToTrash.mutate(
+      { cardId: target.product.cardId },
+      {
+        onSuccess: () => {
+          close();
+          showToast('휴지통으로 옮겼어요');
+        },
+        onError: (error) =>
+          showToast(errorMessage(error, '상품을 삭제하지 못했어요. 다시 시도해 주세요.')),
       },
-      onError: (error) =>
-        showToast(errorMessage(error, '상품을 삭제하지 못했어요. 다시 시도해 주세요.')),
-    });
+    );
   }
 
   const element = (

@@ -1,18 +1,20 @@
-# 클라이언트 API 경계
+# @ziper/api
 
-## 공통
+백엔드 OpenAPI(`openapi.json`)에서 orval 로 만든 fetcher·TanStack Query 훅·MSW 핸들러입니다. `src/__generated__`는 직접 고치지 않습니다.
 
-- `@ziper/api/outcome`: 서버 상태를 바꾸는 요청(상품 등록·수정·구매 완료)의 결과 타입. `rejected`는 서버가 거절해 아무것도 바뀌지 않은 경우라 고쳐서 다시 보낼 수 있습니다. `unknown`은 응답 유실·5xx 등으로 이미 반영됐을 수 있는 경우라, 서버 상태를 다시 확인하기 전에는 재전송하지 않습니다. 조회는 기존처럼 예외를 던집니다.
-- `@ziper/api/product-fields`: 서버가 검증하는 필드 규칙(가격 상한, 상품명·메모·태그·보드 이름 길이), 계절 태그, 도안 목록. 저장·수정 폼이 같은 규칙을 씁니다.
+```sh
+pnpm --filter @ziper/api codegen:fetch         # api.ziper.cc/v3/api-docs 에서 스펙 갱신
+pnpm --filter @ziper/api codegen:generate      # 코드 생성
+```
 
-## 상품 저장 (JEC-17)
+- `@ziper/api`: fetcher와 `useXxx`·`getXxxQueryOptions`·`getXxxQueryKey`. 응답은 `{ data, status, headers }`입니다.
+- `@ziper/api/schemas`: 요청·응답 타입.
+- `@ziper/api/msw`: 테스트용 MSW 핸들러.
+- `@ziper/api/http`: 모든 요청이 지나는 mutator. Access Token, 401 재발급, 웹 쿠키 모드, `ApiError`(RFC 7807)를 다룹니다.
+- `@ziper/api/product-fields`: 저장·수정 폼이 쓰는 서버 필드 규칙.
 
-`@ziper/api/product-save`는 외부 공유·앱 내 링크 등록이 공유하는 클라이언트 인터페이스입니다. 일반 화면은 [배포 계약](https://github.com/JECT-Study/Ziper-5th-Server/actions/runs/44993618174)에 따라 URL 확인·보드·멀티파트 이미지 업로드·상품 등록을 호출합니다. 지원몰 여부는 수동 입력 가능 여부와 별개입니다.
+`orval/transformer.js`는 스펙의 빈틈(성공 상태 코드, 문자열 enum, 빠진 required, 모호한 operationId)을 생성 전에 메웁니다. 백엔드 스펙이 고쳐지면 해당 항목을 지웁니다.
 
-등록 성공 응답(`201`)의 유효한 카드 ID를 확인한 뒤에만 저장 성공을 표시합니다. 상품 등록의 응답 유실이나 5xx는 DB에 저장됐을 수 있으므로 같은 화면에서 재전송하지 않습니다. 이미 등록한 링크는 URL 확인 또는 등록 충돌 응답으로 안내합니다.
+서버 상태를 바꾸는 요청이 5xx·응답 유실로 끝나면 이미 반영됐을 수 있습니다. `isRejected(error)`가 아니면 서버 상태를 다시 확인하기 전에는 같은 요청을 보내지 않습니다.
 
-앱은 현재 추출 규칙을 ETag로 캐시하고, 지원 쇼핑몰 링크를 메인 브릿지와 분리된 WebView에서 최대 8초 동안 읽습니다. 허용 목록 외 링크, 차단, 타임아웃, 브라우저 단독 및 이전 앱 버전은 수동 입력으로 이어집니다. 현재 배포 규칙의 `SERVER_MIRROR`만 이미지 URL 자동 연결을 지원합니다. `CLIENT_UPLOAD` 규칙에서는 직접 업로드 또는 도안을 선택합니다.
-
-## 상품 상세·상태 관리 (JEC-23)
-
-`@ziper/api/product-detail`은 클라이언트 인터페이스입니다. 웹 어댑터가 배포된 상세·수정·보드 조회·원본 이동 API의 응답을 이 인터페이스로 변환합니다. 구매 동작은 서버 배포 전까지 개발 프리뷰에만 제공됩니다. 계약과 검증 방법은 [JEC-23 문서](../../docs/jec-23-product-detail.md)를 참고하세요.
+구매 완료 전환·목록(JEC-79)은 아직 스펙에 없어 웹의 해당 기능에서 `http`로 직접 부릅니다.

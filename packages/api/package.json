@@ -3,9 +3,32 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./product-save": "./src/product-save.ts",
-    "./product-detail": "./src/product-detail.ts",
-    "./product-fields": "./src/product-fields.ts",
-    "./outcome": "./src/outcome.ts"
+    ".": "./src/__generated__/index.ts",
+    "./schemas": "./src/__generated__/index.schemas.ts",
+    "./msw": "./src/__generated__/index.msw.ts",
+    "./http": "./src/http.ts",
+    "./product-fields": "./src/product-fields.ts"
+  },
+  "scripts": {
+    "codegen:fetch": "curl -fsS https://api.ziper.cc/v3/api-docs -o openapi.json && vp fmt openapi.json",
+    "codegen:generate": "orval --config orval.config.ts",
+    "codegen": "pnpm codegen:fetch && pnpm codegen:generate",
+    "test": "vp test run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.108.4"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "@types/node": "^24.0.0",
+    "msw": "^3.0.7",
+    "openapi3-ts": "^4.6.2",
+    "orval": "^8.49.0",
+    "typescript": "~6.0.3",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.5.0"
+  },
+  "peerDependencies": {
+    "react": ">=19"
   }
 }
