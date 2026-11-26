@@ -4,6 +4,7 @@ import {
   deleteBoard,
   fetchBoardProducts,
   fetchBoards,
+  moveProductToTrash,
   renameBoard,
   type BoardSort,
 } from './api';
@@ -67,4 +68,10 @@ export function useDeleteBoard() {
       return queryClient.invalidateQueries({ queryKey: boardKeys.all });
     },
   });
+}
+
+/** 상품을 휴지통으로 보낸다. 여러 보드의 개수·썸네일이 바뀌므로 보드 쿼리를 모두 다시 받는다. */
+export function useMoveProductToTrash() {
+  const invalidate = useInvalidateBoards();
+  return useMutation({ mutationFn: moveProductToTrash, onSuccess: invalidate });
 }

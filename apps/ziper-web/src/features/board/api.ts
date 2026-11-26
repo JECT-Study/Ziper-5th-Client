@@ -104,3 +104,11 @@ export function renameBoard(boardId: number, name: string) {
 export function deleteBoard(boardId: number) {
   return request(`/api/v1/boards/${boardId}`, { method: 'DELETE', auth: true });
 }
+
+/**
+ * 상품을 휴지통으로 보낸다(30일 보관). 이 상품이 담긴 모든 보드에서 빠진다.
+ * 특정 보드에서만 빼는 API 는 아직 없다(백엔드 명세 "특정 보드에서 상품 제거", 2026-12-02 예정).
+ */
+export function moveProductToTrash(cardId: number) {
+  return request(`/api/v1/products/${cardId}`, { method: 'DELETE', auth: true });
+}
