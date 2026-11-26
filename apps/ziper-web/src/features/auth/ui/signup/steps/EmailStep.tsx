@@ -4,6 +4,7 @@ import { StepScreen } from '../../common/StepScreen';
 export function EmailStep({
   email,
   valid,
+  error,
   sending,
   onChange,
   onBack,
@@ -11,6 +12,7 @@ export function EmailStep({
 }: {
   email: string;
   valid: boolean;
+  error?: string;
   sending: boolean;
   onChange: (value: string) => void;
   onBack: () => void;
@@ -36,7 +38,7 @@ export function EmailStep({
         value={email}
         onChange={(e) => onChange(e.target.value)}
         onClear={() => onChange('')}
-        error={email.length > 0 && !valid ? '이메일 형식이 올바르지 않습니다' : undefined}
+        error={email.length > 0 ? error : undefined}
         autoFocus
       />
     </StepScreen>

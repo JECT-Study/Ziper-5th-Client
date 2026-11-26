@@ -1,12 +1,22 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router';
 import { findSharedURL } from '@ziper/product-extraction/link';
-import { useState, type SubmitEvent } from 'react';
+import { useForm, useStore } from '@tanstack/react-form';
+import { useState } from 'react';
+import * as v from 'valibot';
 import { usePlatform } from '../../../bridge/provider';
 import { Button, TextField } from '../../../components';
 import { ConnectedProductSave } from '../../../features/product-save/connected-product-save';
 import { ScreenShell } from '../../../features/product-save/product-save-screen';
 import * as saveStyles from '../../../features/product-save/product-save.css';
 import * as styles from '../../../features/product-save/register-product.css';
+
+const linkSchema = v.object({
+  url: v.pipe(
+    v.string(),
+    v.transform(findSharedURL),
+    v.string('올바른 상품 링크를 입력해 주세요.'),
+  ),
+});
 
 export const Route = createFileRoute('/_app/products/new')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -20,39 +30,37 @@ function RegisterProduct() {
   const navigate = Route.useNavigate();
   const router = useRouter();
   const { platform, status } = usePlatform();
-  const [draft, setDraft] = useState('');
   const [submittedURL, setSubmittedURL] = useState<string | null>(null);
+  // 입력 중에는 오류를 숨기고, 입력을 마치거나 제출할 때만 보여 준다.
   const [validationVisible, setValidationVisible] = useState(false);
   const [transition, setTransition] = useState<'idle' | 'opening' | 'error'>('idle');
-  const url = findSharedURL(draft);
+  const form = useForm({
+    defaultValues: { url: '' },
+    validators: { onChange: linkSchema },
+    onSubmitInvalid: () => setValidationVisible(true),
+    onSubmit: async ({ value }) => {
+      const { url } = v.parse(linkSchema, value);
+      setTransition('opening');
+      try {
+        // 오래된 상세 주소에는 돌아갈 입력 화면이 필요하다.
+        if (step === 'details') {
+          await navigate({ search: { step: undefined }, replace: true });
+        }
+        setSubmittedURL(url);
+        await navigate({ search: { step: 'details' } });
+        setTransition('idle');
+      } catch {
+        setTransition('error');
+      }
+    },
+  });
+  const draft = useStore(form.store, (state) => state.values.url);
 
   function updateDraft(value: string) {
-    setDraft(value);
+    form.setFieldValue('url', value);
     setSubmittedURL(null);
     setValidationVisible(false);
     setTransition('idle');
-  }
-
-  async function next(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (transition === 'opening') return;
-    if (!url) {
-      setValidationVisible(true);
-      return;
-    }
-
-    setTransition('opening');
-    try {
-      // A stale details URL needs an input entry to return to.
-      if (step === 'details') {
-        await navigate({ search: { step: undefined }, replace: true });
-      }
-      setSubmittedURL(url);
-      await navigate({ search: { step: 'details' } });
-      setTransition('idle');
-    } catch {
-      setTransition('error');
-    }
   }
 
   function close() {
@@ -78,7 +86,14 @@ function RegisterProduct() {
 
   return (
     <ScreenShell onClose={close} back busy={transition === 'opening'}>
-      <form className={saveStyles.form} noValidate onSubmit={(event) => void next(event)}>
+      <form
+        className={saveStyles.form}
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (transition !== 'opening') void form.handleSubmit();
+        }}
+      >
         <div className={saveStyles.fields}>
           <div className={styles.intro}>
             <h2 className={styles.heading}>
@@ -92,30 +107,34 @@ function RegisterProduct() {
                 : '쇼핑몰 상품 페이지의 주소를 입력해 주세요.'}
             </p>
           </div>
-          <TextField
-            variant="box"
-            className={saveStyles.linkField}
-            label="상품 링크"
-            type="url"
-            inputMode="url"
-            enterKeyHint="go"
-            autoCapitalize="none"
-            autoComplete="off"
-            spellCheck={false}
-            readOnly={transition === 'opening'}
-            placeholder="https://"
-            value={draft}
-            error={validationVisible && !url && '올바른 상품 링크를 입력해 주세요.'}
-            onBlur={() => setValidationVisible(Boolean(draft.trim()))}
-            onPaste={(event) => {
-              const pastedURL = findSharedURL(event.clipboardData.getData('text'));
-              if (!pastedURL) return;
-              event.preventDefault();
-              updateDraft(pastedURL);
-            }}
-            onChange={(event) => updateDraft(event.target.value)}
-            onClear={() => updateDraft('')}
-          />
+          <form.Field name="url">
+            {(field) => (
+              <TextField
+                variant="box"
+                className={saveStyles.linkField}
+                label="상품 링크"
+                type="url"
+                inputMode="url"
+                enterKeyHint="go"
+                autoCapitalize="none"
+                autoComplete="off"
+                spellCheck={false}
+                readOnly={transition === 'opening'}
+                placeholder="https://"
+                value={field.state.value}
+                error={(validationVisible && field.state.meta.errors[0]?.message) || undefined}
+                onBlur={() => setValidationVisible(Boolean(draft.trim()))}
+                onPaste={(event) => {
+                  const pastedURL = findSharedURL(event.clipboardData.getData('text'));
+                  if (!pastedURL) return;
+                  event.preventDefault();
+                  updateDraft(pastedURL);
+                }}
+                onChange={(event) => updateDraft(event.target.value)}
+                onClear={() => updateDraft('')}
+              />
+            )}
+          </form.Field>
         </div>
         <footer className={saveStyles.footer}>
           {transition === 'error' && (

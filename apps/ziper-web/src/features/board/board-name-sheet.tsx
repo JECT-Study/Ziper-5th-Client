@@ -1,16 +1,16 @@
 import { codePointLength } from '@ziper/api/product-fields';
-import { useState, type FormEvent } from 'react';
+import { useForm } from '@tanstack/react-form';
+import { useState } from 'react';
+import * as v from 'valibot';
 import { BottomSheet, Button, TextField } from '../../components';
 import { useBackLayer } from '../../shared/use-back-layer';
 import {
   BOARD_NAME_MAX,
-  INVALID_BOARD_NAME_MESSAGE,
-  checkBoardName,
+  DUPLICATE_BOARD_NAME_MESSAGE,
+  boardNameSchema,
   normalizeBoardName,
 } from './board-name';
 import * as styles from './board.css';
-
-const DUPLICATE = '이미 사용 중인 보드 이름이에요';
 
 type BoardNameSheetProps = {
   open: boolean;
@@ -46,27 +46,25 @@ function BoardNameSheetContent({
   onClose,
   onSubmit,
 }: Omit<BoardNameSheetProps, 'open' | 'backLayer'>) {
-  const [value, setValue] = useState(initialName);
-  const [submitting, setSubmitting] = useState(false);
-  // 서버가 중복이라고 한 이름. 화면에 받아 둔 목록에 없던 이름(다른 기기에서 만든 보드)도 막는다.
+  // 서버가 중복이라고 한 이름. 받아 둔 목록에 없던 이름(다른 기기에서 만든 보드)도 막는다.
   const [rejected, setRejected] = useState<string[]>([]);
-
-  const check = checkBoardName(value, [...takenNames, ...rejected]);
-  const name = normalizeBoardName(value);
-  const unchanged = initialName !== '' && name === initialName;
-  const canSubmit = check === 'ok' && !unchanged && !submitting;
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!canSubmit) return;
-    setSubmitting(true);
-    try {
-      const result = await onSubmit(name);
-      if (result === 'duplicate') setRejected((names) => [...names, name]);
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const schema = v.object({ name: boardNameSchema([...takenNames, ...rejected]) });
+  const isUnchanged = (value: string) =>
+    initialName !== '' && normalizeBoardName(value) === initialName;
+  const form = useForm({
+    defaultValues: { name: initialName },
+    validators: { onMount: schema, onChange: schema },
+    onSubmit: async ({ value }) => {
+      if (isUnchanged(value.name)) return;
+      const name = normalizeBoardName(value.name);
+      if ((await onSubmit(name)) !== 'duplicate') return;
+      setRejected((names) => [...names, name]);
+      form.setFieldMeta('name', (meta) => ({
+        ...meta,
+        errorMap: { onChange: [{ message: DUPLICATE_BOARD_NAME_MESSAGE }] },
+      }));
+    },
+  });
 
   return (
     <BottomSheet
@@ -75,34 +73,57 @@ function BoardNameSheetContent({
       onClose={onClose}
       footer={
         <div className={styles.sheetFooter}>
-          <Button type="submit" form="board-name-form" disabled={!canSubmit} loading={submitting}>
-            {submitLabel}
-          </Button>
+          <form.Subscribe
+            selector={(state) => [
+              state.canSubmit && !isUnchanged(state.values.name),
+              state.isSubmitting,
+            ]}
+          >
+            {([canSubmit, submitting]) => (
+              <Button
+                type="submit"
+                form="board-name-form"
+                disabled={!canSubmit || submitting}
+                loading={submitting}
+              >
+                {submitLabel}
+              </Button>
+            )}
+          </form.Subscribe>
         </div>
       }
     >
-      <form id="board-name-form" onSubmit={submit} className={styles.sheetBody}>
-        <TextField
-          variant="box"
-          id="board-name"
-          aria-label="보드 이름"
-          placeholder="보드 이름을 입력해 주세요"
-          value={value}
-          counter={`${codePointLength(name)}/${BOARD_NAME_MAX}`}
-          autoFocus
-          enterKeyHint="done"
-          onChange={(event) => setValue(event.target.value)}
-          onClear={() => setValue('')}
-          error={
-            check === 'duplicate'
-              ? DUPLICATE
-              : check === 'invalid'
-                ? INVALID_BOARD_NAME_MESSAGE
-                : undefined
-          }
-          success={check === 'ok' && !unchanged}
-          helperText={check === 'ok' && !unchanged ? '사용가능한 이름이에요' : undefined}
-        />
+      <form
+        id="board-name-form"
+        className={styles.sheetBody}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void form.handleSubmit();
+        }}
+      >
+        <form.Field name="name">
+          {(field) => {
+            const message = field.state.meta.errors[0]?.message;
+            const available = field.state.meta.isValid && !isUnchanged(field.state.value);
+            return (
+              <TextField
+                variant="box"
+                id="board-name"
+                aria-label="보드 이름"
+                placeholder="보드 이름을 입력해 주세요"
+                value={field.state.value}
+                counter={`${codePointLength(normalizeBoardName(field.state.value))}/${BOARD_NAME_MAX}`}
+                autoFocus
+                enterKeyHint="done"
+                onChange={(event) => field.handleChange(event.target.value)}
+                onClear={() => field.handleChange('')}
+                error={message || undefined}
+                success={available}
+                helperText={available ? '사용가능한 이름이에요' : undefined}
+              />
+            );
+          }}
+        </form.Field>
       </form>
     </BottomSheet>
   );

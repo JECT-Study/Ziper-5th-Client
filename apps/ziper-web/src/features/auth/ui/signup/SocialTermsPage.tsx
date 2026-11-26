@@ -1,12 +1,17 @@
+import { useForm } from '@tanstack/react-form';
 import { useNavigate } from '@tanstack/react-router';
 import { useSignupWithOAuth } from '@ziper/api';
 import { ApiError, errorMessage, startSession } from '@ziper/api/http';
+import * as v from 'valibot';
 import { Button, showToast } from '../../../../components';
-import { useAgreements } from '../../hooks/useAgreements';
 import { SIGNUP_FLOW } from '../../model/guards';
 import { clearPendingSignup, loadPendingSignup } from '../../model/pendingSignup';
+import { agreementsSchema } from '../../model/rules';
+import { noAgreements } from '../../model/terms';
 import { StepScreen } from '../common/StepScreen';
 import { Terms } from '../common/Terms';
+
+const termsSchema = v.object({ agreements: agreementsSchema });
 
 /**
  * 소셜 로그인으로 처음 온 사람이 보는 약관 동의 화면.
@@ -14,7 +19,6 @@ import { Terms } from '../common/Terms';
  */
 export function SocialTermsPage() {
   const navigate = useNavigate();
-  const { agreed, setAgreed, requiredAgreed } = useAgreements();
   const signup = useSignupWithOAuth({
     mutation: {
       onSuccess: ({ data }) => {
@@ -24,19 +28,25 @@ export function SocialTermsPage() {
     },
   });
 
+  const form = useForm({
+    defaultValues: { agreements: noAgreements },
+    validators: { onMount: termsSchema, onChange: termsSchema },
+    onSubmit: ({ value }) => agree(value.agreements.marketing),
+  });
+
   function leave() {
     clearPendingSignup();
     navigate({ to: '/login', replace: true });
   }
 
-  async function agree() {
+  async function agree(marketing: boolean) {
     const signupToken = loadPendingSignup();
     if (!signupToken) return leave();
     try {
       await signup.mutateAsync({
         data: {
           signupToken,
-          agreements: { termsOfService: true, privacyPolicy: true, marketing: agreed.marketing },
+          agreements: { termsOfService: true, privacyPolicy: true, marketing },
         },
       });
       navigate({ to: '/signup/complete', replace: true, state: SIGNUP_FLOW });
@@ -57,16 +67,22 @@ export function SocialTermsPage() {
       title="약관에 동의해주세요"
       description="Ziper 를 시작하려면 아래 약관에 동의가 필요해요"
       actions={
-        <Button
-          disabled={!requiredAgreed}
-          loading={signup.isPending || signup.isSuccess}
-          onClick={agree}
-        >
-          동의하고 시작하기
-        </Button>
+        <form.Subscribe selector={(state) => state.canSubmit}>
+          {(canSubmit) => (
+            <Button
+              disabled={!canSubmit}
+              loading={signup.isPending || signup.isSuccess}
+              onClick={() => void form.handleSubmit()}
+            >
+              동의하고 시작하기
+            </Button>
+          )}
+        </form.Subscribe>
       }
     >
-      <Terms agreed={agreed} onChange={setAgreed} />
+      <form.Field name="agreements">
+        {(field) => <Terms agreed={field.state.value} onChange={field.handleChange} />}
+      </form.Field>
     </StepScreen>
   );
 }
