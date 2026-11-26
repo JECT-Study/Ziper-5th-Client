@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import emptyBoard from '../../assets/board/empty-board.png';
 import { usePlatform } from '../../bridge/provider';
 import {
@@ -12,8 +12,9 @@ import {
 } from '../../components';
 import { errorMessage } from '../../shared/api/http';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
-import { fetchBoardProducts, openOriginal, type BoardProductPage, type BoardSort } from './api';
+import { openOriginal, type BoardSort } from './api';
 import { ProductCard, ProductCardSkeleton } from './product-card';
+import { useBoardProductsQuery } from './queries';
 import * as styles from './board-detail.css';
 
 const SORTS: { value: BoardSort; label: string }[] = [
@@ -22,48 +23,6 @@ const SORTS: { value: BoardSort; label: string }[] = [
   { value: 'PRICE_ASC', label: '가격 낮은 순' },
   { value: 'PRICE_DESC', label: '가격 높은 순' },
 ];
-
-type Products =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; page: BoardProductPage; loadingMore: boolean };
-
-/** 정렬이 바뀌면 처음부터 다시 불러오고, 목록 끝에 닿으면 다음 페이지를 붙인다. */
-function useBoardProducts(boardId: number, sort: BoardSort) {
-  const [state, setState] = useState<Products>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let alive = true;
-    setState({ status: 'loading' });
-    fetchBoardProducts(boardId, sort).then(
-      (page) => alive && setState({ status: 'ready', page, loadingMore: false }),
-      () => alive && setState({ status: 'error' }),
-    );
-    return () => {
-      alive = false;
-    };
-  }, [boardId, sort, attempt]);
-
-  async function loadMore() {
-    if (state.status !== 'ready' || state.loadingMore || !state.page.hasNext) return;
-    const { page } = state;
-    setState({ ...state, loadingMore: true });
-    try {
-      const next = await fetchBoardProducts(boardId, sort, page.nextCursor);
-      setState({
-        status: 'ready',
-        page: { ...next, items: [...page.items, ...next.items] },
-        loadingMore: false,
-      });
-    } catch {
-      // 다음 페이지만 실패하면 지금 목록은 두고, 끝에 다시 닿을 때 또 시도한다.
-      setState({ status: 'ready', page, loadingMore: false });
-    }
-  }
-
-  return { state, reload: () => setAttempt((n) => n + 1), loadMore };
-}
 
 type BoardDetailScreenProps = {
   boardId: number;
@@ -77,8 +36,15 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
   const selectTab = useTabNavigation();
   const navigate = useNavigate();
   const [sort, setSort] = useState<BoardSort>('RECENT');
-  const { state, reload, loadMore } = useBoardProducts(boardId, sort);
-  const page = state.status === 'ready' ? state.page : null;
+  // 정렬마다 캐시가 따로라, 한 번 본 정렬로 돌아가면 바로 보이고 뒤에서 새로 받는다.
+  const products = useBoardProductsQuery(boardId, sort);
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = products;
+  // 받은 쪽들을 하나로 합친다. 보드 이름 등은 첫 쪽 것을 쓴다.
+  const page = useMemo(() => {
+    const pages = products.data?.pages;
+    if (!pages?.length) return null;
+    return { ...pages[0], items: pages.flatMap((p) => p.items) };
+  }, [products.data]);
 
   // 방금 만든 보드면 이름을 알게 된 뒤 한 번만 알린다.
   const announced = useRef(false);
@@ -89,19 +55,21 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
     onCreatedShown();
   }, [created, page, onCreatedShown]);
 
-  // 목록 끝이 보이면 다음 페이지를 불러온다.
+  // 목록 끝이 보이면 다음 쪽을 불러온다. 받는 중에는 또 부르지 않는다.
   const sentinel = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef(loadMore);
-  loadMoreRef.current = loadMore;
+  const loadMoreRef = useRef(() => {});
+  loadMoreRef.current = () => {
+    if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+  };
   useEffect(() => {
     const target = sentinel.current;
     if (!target) return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void loadMoreRef.current();
+      if (entries.some((entry) => entry.isIntersecting)) loadMoreRef.current();
     });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [page?.hasNext]);
+  }, [hasNextPage]);
 
   const addProduct =
     status === 'initializing'
@@ -139,7 +107,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
           ))}
         </div>
 
-        {state.status === 'loading' && (
+        {products.isPending && (
           <div className={styles.grid} aria-busy>
             {Array.from({ length: 4 }, (_, i) => (
               <ProductCardSkeleton key={i} />
@@ -147,10 +115,10 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
           </div>
         )}
 
-        {state.status === 'error' && (
+        {products.isError && !page && (
           <div className={styles.status} role="alert">
             보드를 불러오지 못했어요.
-            <Button variant="secondary" size="small" onClick={reload}>
+            <Button variant="secondary" size="small" onClick={() => void products.refetch()}>
               다시 시도
             </Button>
           </div>
@@ -200,7 +168,7 @@ export function BoardDetailScreen({ boardId, created, onCreatedShown }: BoardDet
                 />
               ))}
             </div>
-            {page.hasNext && <div ref={sentinel} className={styles.sentinel} />}
+            {hasNextPage && <div ref={sentinel} className={styles.sentinel} />}
           </>
         )}
       </div>

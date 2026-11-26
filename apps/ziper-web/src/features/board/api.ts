@@ -29,8 +29,8 @@ export type PurchasedSummary = {
 export type BoardList = { boards: Board[]; purchasedSummary: PurchasedSummary };
 
 /** 최신 생성순 */
-export function fetchBoards() {
-  return request<BoardList>('/api/v1/boards', { auth: true });
+export function fetchBoards(signal?: AbortSignal) {
+  return request<BoardList>('/api/v1/boards', { auth: true, signal });
 }
 
 export function createBoard(name: string) {
@@ -69,10 +69,18 @@ export type BoardProductPage = {
   hasNext: boolean;
 };
 
-export function fetchBoardProducts(boardId: number, sort: BoardSort, cursor?: string | null) {
+export function fetchBoardProducts(
+  boardId: number,
+  sort: BoardSort,
+  cursor?: string | null,
+  signal?: AbortSignal,
+) {
   const params = new URLSearchParams({ sort, size: '20' });
   if (cursor) params.set('cursor', cursor);
-  return request<BoardProductPage>(`/api/v1/boards/${boardId}/products?${params}`, { auth: true });
+  return request<BoardProductPage>(`/api/v1/boards/${boardId}/products?${params}`, {
+    auth: true,
+    signal,
+  });
 }
 
 /** 원본 쇼핑몰로 간다고 기록하고(재발견 주기 초기화), 열 주소를 받는다. 보드 목록 응답에는 주소가 없다. */

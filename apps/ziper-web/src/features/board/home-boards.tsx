@@ -3,18 +3,18 @@ import { Button } from '../../components';
 import { cx } from '../../components/cx';
 import { useTabNavigation } from '../../shared/use-tab-navigation';
 import { BoardCard, BoardCardSkeleton } from './board-card';
-import { useBoards } from './use-boards';
 import { useBoardManage } from './use-board-manage';
+import { useBoardsQuery } from './queries';
 import { useCreateBoardSheet } from './use-create-board';
 import * as styles from './board.css';
 
 /** 홈 화면의 보드 영역: 새 보드 만들기 + 내 보드 가로 목록 */
 export function HomeBoards() {
   const { platform } = usePlatform();
-  const boards = useBoards();
+  const boards = useBoardsQuery();
   const list = boards.data?.boards ?? [];
   const create = useCreateBoardSheet(list.map((board) => board.name));
-  const manage = useBoardManage(list, boards.reload);
+  const manage = useBoardManage(list);
   const selectTab = useTabNavigation();
 
   return (
@@ -38,15 +38,15 @@ export function HomeBoards() {
         </button>
       </div>
 
-      {boards.status === 'error' && !boards.data ? (
+      {boards.isError && !boards.data ? (
         <div className={styles.status}>
           <p role="alert">보드를 불러오지 못했어요.</p>
-          <Button variant="secondary" size="small" onClick={boards.reload}>
+          <Button variant="secondary" size="small" onClick={() => void boards.refetch()}>
             다시 시도
           </Button>
         </div>
       ) : (
-        <div className={styles.homeList} aria-busy={boards.status === 'loading' && !boards.data}>
+        <div className={styles.homeList} aria-busy={boards.isPending}>
           {!boards.data && (
             <>
               <BoardCardSkeleton className={styles.homeCard} />
