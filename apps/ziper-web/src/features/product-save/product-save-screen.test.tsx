@@ -111,6 +111,48 @@ const sendForm = () =>
 const extractedProduct = { name: '니트', price: 35_690, imageURL: 'https://cdn.example/pdp.jpg' };
 const linkedPreview = () => container.querySelector(`img[src="${extractedProduct.imageURL}"]`)!;
 
+it('normalizes title and tag limits when saving a new product', async () => {
+  const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(done({ cardId: '1' }));
+  await mount(save, extractedProduct);
+  await act(() => button('+직접 추가').click());
+  const tag = container.querySelector<HTMLInputElement>('input[aria-label="새 해시태그"]')!;
+  const change = (value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(tag, value);
+      tag.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  await change('가\u200B을');
+  expect(button('추가').disabled).toBe(true);
+  expect(tag.getAttribute('aria-invalid')).toBe('true');
+  await change(`# ${'봄'.normalize('NFD')}`);
+  expect(button('추가').disabled).toBe(true);
+  await change('💚'.repeat(7));
+  expect(button('추가').disabled).toBe(true);
+  const valid = '💚'.repeat(6);
+  await change(`## ${valid}`);
+  await act(() => button('추가').click());
+  await act(() => {
+    linkedPreview().dispatchEvent(new Event('load'));
+    container.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
+  });
+  const title = `${'니'.repeat(198)} 트`;
+  const titleInput = [...container.querySelectorAll('input')].find(
+    (field) => field.value === '니트',
+  )!;
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      titleInput,
+      title.replace(' ', '    '),
+    );
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(button('보드에 저장하기').disabled).toBe(false);
+  await act(sendForm);
+  expect(save).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ name: title, tags: [valid] }),
+  );
+});
+
 it('keeps extracted fields and draft edits when only the boards request needs a retry', async () => {
   const save = vi.fn<ProductSaveApi['save']>().mockResolvedValue(done({ cardId: '1' }));
   const listBoards = vi

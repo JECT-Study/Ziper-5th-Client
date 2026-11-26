@@ -14,6 +14,7 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
   success?: boolean;
   /** maxLength 와 함께 쓰면 "글자 수/최대" 를 보여준다. */
   showCounter?: boolean;
+  counter?: string;
   /** 값이 있을 때 지우기(x) 버튼을 보여준다. */
   onClear?: () => void;
   /** 입력칸 오른쪽에 넣을 요소. 예: 인증 타이머 */
@@ -29,6 +30,7 @@ export function TextField({
   error,
   success,
   showCounter,
+  counter: customCounter,
   onClear,
   trailing,
   loading,
@@ -50,7 +52,8 @@ export function TextField({
   const hasError = Boolean(error);
   const tone = hasError ? 'error' : success ? 'success' : 'default';
   const counter =
-    showCounter && input.maxLength !== undefined ? `${value.length}/${input.maxLength}` : null;
+    customCounter ??
+    (showCounter && input.maxLength !== undefined ? `${value.length}/${input.maxLength}` : null);
 
   const description = [describedBy, message || counter ? helperId : undefined]
     .filter(Boolean)

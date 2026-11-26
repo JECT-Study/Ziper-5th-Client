@@ -20,13 +20,46 @@ export function codePointLength(value: string) {
   return [...value].length;
 }
 
+/** Java String.strip() preserves non-breaking spaces, unlike JavaScript trim(). */
+export function normalizeProductMemo(value: string) {
+  return value.replace(
+    // eslint-disable-next-line no-control-regex
+    /^[\t-\r\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]+|[\t-\r\u001c-\u0020\u1680\u2000-\u2006\u2008-\u200a\u2028\u2029\u205f\u3000]+$/gu,
+    '',
+  );
+}
+
+/** Apply the server's plain-text whitespace normalization before counting or submitting. */
+export function normalizeProductTitle(value: string) {
+  return normalizeProductMemo(value.replace(/[\t\n\v\f\r ]+/g, ' '));
+}
+
 export function isValidTitle(value: string) {
-  const length = codePointLength(value.trim());
+  const length = codePointLength(normalizeProductTitle(value));
   return length > 0 && length <= productLimits.titleLength;
 }
 
+const unsupportedTagCharacters = /[\p{Cc}\p{Cf}]/u;
+export const tagInputHint = '해시태그는 6자까지 입력할 수 있어요.';
+export const invalidTagCharactersMessage = '해시태그에 보이지 않는 문자는 사용할 수 없어요.';
+
+export function hasUnsupportedTagCharacters(value: string) {
+  return unsupportedTagCharacters.test(value);
+}
+
+/** Matches the server's NFC, leading # removal, and Unicode separator handling. */
 export function normalizeTag(value: string) {
-  return value.trim().replace(/^#+/, '').trim();
+  return value
+    .normalize('NFC')
+    .replace(/^[#\p{Z}]+/u, '')
+    .replace(/\p{Z}+/gu, ' ')
+    .trimEnd();
+}
+
+export function isValidTag(value: string) {
+  if (hasUnsupportedTagCharacters(value)) return false;
+  const length = codePointLength(normalizeTag(value));
+  return length > 0 && length <= productLimits.tagLength;
 }
 
 /** Parses "39000" or "39,000" as whole won within the server range; anything else is null. */

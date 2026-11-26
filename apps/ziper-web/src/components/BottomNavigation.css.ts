@@ -44,4 +44,5 @@ export const add = style({
   border: 'none',
   borderRadius: vars.radius.full,
   background: 'none',
+  ':disabled': { opacity: 0.5 },
 });

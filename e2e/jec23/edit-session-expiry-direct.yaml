@@ -1,0 +1,40 @@
+# Before each run: POST /_reset?expireSessionOnEdit=1 on the fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fboards%2F1
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 린넨 블라우스
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- tapOn: 봄
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: 로그인 화면으로 이동
+    timeout: 10000
+- assertVisible: '로그인이 만료됐어요.*'
+- tapOn: 로그인 화면으로 이동
+- extendedWaitUntil:
+    visible: 이메일로 가입하기
+    timeout: 10000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Back reaches the protected board, which redirects while signed out, not the old detail.
+      - back
+      - extendedWaitUntil:
+          visible: 이메일로 가입하기
+          timeout: 10000
+      - assertNotVisible: 상품 상세

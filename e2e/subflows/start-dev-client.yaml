@@ -2,5 +2,5 @@
 appId: com.ject.ziper
 ---
 - stopApp
-- openLink: exp+ziper-mobile://?__expo_url=http%3A%2F%2Flocalhost%3A8081&__expo_disable_fab=1&__expo_disable_auto_launch=1&__expo_disable_onboarding=1
+- openLink: exp+ziper-mobile://?__expo_url=http%3A%2F%2Flocalhost%3A${METRO_PORT}&__expo_disable_fab=1&__expo_disable_auto_launch=1&__expo_disable_onboarding=1
 - runFlow: confirm-link.yaml

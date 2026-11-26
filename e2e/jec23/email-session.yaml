@@ -1,0 +1,21 @@
+# Before running: POST /_reset?auth=email on the loopback fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- runFlow: subflows/sign-in.yaml
+# Opening a new WebView needs the refresh cookie, not the first WebView's in-memory token.
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fboards%2F1
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 오버핏 울 블렌드 니트 가디건
+- tapOn: 상품 관리
+- tapOn: 구매 완료
+- tapOn: 이동하기
+- extendedWaitUntil:
+    visible: 구매 완료 목록
+    timeout: 15000
+- assertVisible: 오버핏 울 블렌드 니트 가디건

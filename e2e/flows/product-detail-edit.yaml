@@ -1,0 +1,35 @@
+# JEC-23 상품 수정: 상품 관리 바텀시트 → 수정 시트 → 저장 후 상세로 복귀.
+# When using the JEC-23 fixture: POST /_reset?expiredSession=1 before this signed-out preview.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: '이메일로 가입하기|내 보드'
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F1%3Fpreview%3Dnormal
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: '+직접 추가'
+      - inputText: Travel
+      - tapOn: 태그 추가
+- tapOn: 수정 완료
+- assertVisible: 원본 쇼핑몰로 이동
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: Travel
+- assertNotVisible: 수정 완료

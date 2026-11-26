@@ -1,0 +1,63 @@
+# Reset the local fixture before running with VITE_JEC23_MOCK=1.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- tapOn: ^보드$
+- extendedWaitUntil:
+    visible: ^3개$
+    timeout: 15000
+- tapOn: ^기본 보드$
+- extendedWaitUntil:
+    visible: 오래된 순
+    timeout: 10000
+- tapOn: 오래된 순
+- tapOn: 오버핏 울 블렌드 니트 가디건
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- swipe:
+    start: 55%,76%
+    end: 55%,35%
+    duration: 450
+- tapOn: '^기본 보드(\s*3개)?$'
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: 담긴 보드 · 1개
+    timeout: 10000
+- tapOn: 뒤로 가기
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 10000
+- assertNotVisible: 오버핏 울 블렌드 니트 가디건
+- tapOn: 뒤로 가기
+- extendedWaitUntil:
+    visible: ^가을 코디$
+    timeout: 10000
+- tapOn: ^가을 코디$
+- extendedWaitUntil:
+    visible: 오버핏 울 블렌드 니트 가디건
+    timeout: 10000
+- tapOn: 오버핏 울 블렌드 니트 가디건
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- swipe:
+    start: 55%,76%
+    end: 55%,35%
+    duration: 450
+- tapOn: '^기본 보드(\s*2개)?$'
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: 담긴 보드 · 2개
+    timeout: 10000
+- tapOn: 뒤로 가기
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 10000

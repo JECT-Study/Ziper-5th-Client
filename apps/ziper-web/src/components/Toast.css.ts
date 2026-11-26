@@ -17,10 +17,24 @@ export const toast = style({
   wordBreak: 'keep-all',
 });
 
+export const compact = style({
+  selectors: {
+    '&&': {
+      ...typography.body2Medium,
+      width: 'fit-content',
+      maxWidth: '100%',
+      padding: vars.space[12],
+      backgroundColor: vars.palette.gray900,
+    },
+  },
+});
+
 // Sonner 가 좌우 16px 를 띄운 칸을 준다. 그 안을 채우고, 넓은 화면에서는 앱 폭(480 - 32)에 맞춘다.
 export const slot = style({
   display: 'flex',
-  justifyContent: 'center',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: vars.space[12],
   width: '100%',
   maxWidth: 448,
   margin: '0 auto',
@@ -30,4 +44,8 @@ export const item = style({
   left: 0,
   right: 0,
   width: '100%',
+  // Informational only: the toast can briefly overlap a button after navigation.
+  pointerEvents: 'none',
+  // Sonner fades older entries out; hide them immediately so their text cannot overlap the front toast.
+  selectors: { '&[data-visible="false"]': { visibility: 'hidden' } },
 });

@@ -4,7 +4,7 @@ import type { FallbackIcon } from './product-fields';
 /** Client-facing types; the web adapter maps the deployed HTTP contract to this shape. */
 export type ProductStatus = 'PLANNED' | 'PURCHASED';
 export type ProductLinkStatus = 'AVAILABLE' | 'SOLD_OUT' | 'REMOVED' | 'UNKNOWN';
-export type ProductBoard = { id: string; name: string };
+export type ProductBoard = { id: string; name: string; productCount?: number };
 
 export type ProductDetail = {
   cardId: string;
@@ -16,6 +16,7 @@ export type ProductDetail = {
   imageUrl: string | null;
   imageFileId: string | null;
   imageFileUrl: string | null;
+  imageStatus: 'NONE' | 'PENDING' | 'READY' | 'FAILED';
   fallbackIcon: FallbackIcon | null;
   status: ProductStatus;
   linkStatus: ProductLinkStatus;
@@ -30,7 +31,13 @@ export type ProductUpdate = Pick<
 
 export class ProductDetailError extends Error {
   constructor(
-    public readonly code: 'auth-required' | 'forbidden' | 'not-found' | 'failed',
+    public readonly code:
+      | 'auth-required'
+      | 'forbidden'
+      | 'not-found'
+      | 'board-not-found'
+      | 'image-unusable'
+      | 'failed',
     public readonly detail?: string,
   ) {
     super(detail ?? code);
@@ -44,15 +51,38 @@ export type ProductMutation<T> = Outcome<T, ProductDetailError['code']>;
 export interface ProductDetailApi {
   get(cardId: string, signal: AbortSignal): Promise<ProductDetail>;
   listBoards(signal: AbortSignal): Promise<readonly ProductBoard[]>;
+  createBoard(name: string): Promise<ProductBoard>;
   update(cardId: string, input: ProductUpdate): Promise<ProductMutation<ProductDetail>>;
-  openOriginal(cardId: string): Promise<void>;
-  // The deployed API does not offer purchases yet. Only the dev preview supplies these.
+  openOriginal(cardId: string, signal?: AbortSignal): Promise<void>;
+  // The deployed API does not offer purchases yet. The dev fixture and previews supply these.
   purchases?: ProductPurchases;
 }
+
+export type PurchaseSort = 'RECENT' | 'OLDEST' | 'PRICE_ASC' | 'PRICE_DESC';
+
+export type PurchasedProduct = Pick<
+  ProductDetail,
+  | 'cardId'
+  | 'productTitle'
+  | 'shop'
+  | 'price'
+  | 'imageFileUrl'
+  | 'imageUrl'
+  | 'fallbackIcon'
+  | 'tags'
+  | 'productUrl'
+  | 'linkStatus'
+>;
+
+// Client-facing page shape; the wire DTO still needs to be confirmed in JEC-79.
+export type PurchasedPage = {
+  items: readonly PurchasedProduct[];
+  nextCursor: string | null;
+};
 
 export interface ProductPurchases {
   complete(
     cardId: string,
   ): Promise<ProductMutation<{ cardId: string; status: 'PURCHASED'; affectedBoardCount: number }>>;
-  list(signal: AbortSignal): Promise<readonly ProductDetail[]>;
+  list(sort: PurchaseSort, signal: AbortSignal, cursor?: string): Promise<PurchasedPage>;
 }

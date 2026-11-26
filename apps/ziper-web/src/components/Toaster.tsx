@@ -3,18 +3,29 @@ import { Toast } from './Toast';
 import * as styles from './Toast.css';
 
 const DURATION_MS = 2500;
-const OFFSET = { bottom: 'calc(env(safe-area-inset-bottom) + 94px)', left: 16, right: 16 };
+const OFFSET = {
+  bottom: 'calc(env(safe-area-inset-bottom) + var(--ziper-toast-offset, 94px))',
+  left: 16,
+  right: 16,
+};
 
 /** 화면 아래에서 올라오는 토스트를 띄운다. 쌓기·애니메이션·사라지기는 Sonner 가 맡고, 모양은 Toast 를 쓴다. */
-export function showToast(message: string) {
-  toast.custom(
+export function showToast(
+  message: string,
+  { compact, after }: { compact?: boolean; after?: { id: string | number; message: string } } = {},
+) {
+  const previous = after && toast.getToasts().at(-1)?.id === after.id ? after : undefined;
+  const className = compact ? styles.compact : undefined;
+  const id = toast.custom(
     () => (
       <div className={styles.slot}>
-        <Toast>{message}</Toast>
+        {previous && <Toast className={className}>{previous.message}</Toast>}
+        <Toast className={className}>{message}</Toast>
       </div>
     ),
-    { duration: DURATION_MS },
+    { id: previous?.id, duration: DURATION_MS },
   );
+  return { id, message };
 }
 
 /** 앱 루트에 한 번만 둔다. */

@@ -1,0 +1,46 @@
+# Reset with duplicateBoardOnCreate=1 or boardCreateReply=wrong-board.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F8
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- swipe:
+    start: 55%,76%
+    end: 55%,35%
+    duration: 450
+- tapOn: 새 보드 만들기
+- tapOn:
+    text: '^보드 이름$'
+    optional: true
+- inputText: Travel
+- tapOn: '^완료$'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: '이미 있는 보드예요.*'
+    direction: DOWN
+    timeout: 10000
+- assertVisible: 상품 수정
+- assertVisible: 닫기
+- tapOn: '^Travel(\s*0개)?$'
+- extendedWaitUntil:
+    visible: 새 보드 만들기
+    timeout: 10000
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: '담긴 보드 · 3개'
+    timeout: 10000
+- assertVisible: Travel

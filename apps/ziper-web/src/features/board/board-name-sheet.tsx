@@ -1,7 +1,13 @@
+import { codePointLength } from '@ziper/api/product-fields';
 import { useState, type FormEvent } from 'react';
 import { BottomSheet, Button, TextField } from '../../components';
 import { useBackLayer } from '../../shared/use-back-layer';
-import { BOARD_NAME_MAX, checkBoardName } from './board-name';
+import {
+  BOARD_NAME_MAX,
+  INVALID_BOARD_NAME_MESSAGE,
+  checkBoardName,
+  normalizeBoardName,
+} from './board-name';
 import * as styles from './board.css';
 
 const DUPLICATE = '이미 사용 중인 보드 이름이에요';
@@ -46,13 +52,13 @@ function BoardNameSheetContent({
   const [rejected, setRejected] = useState<string[]>([]);
 
   const check = checkBoardName(value, [...takenNames, ...rejected]);
-  const unchanged = initialName !== '' && value.trim() === initialName;
+  const name = normalizeBoardName(value);
+  const unchanged = initialName !== '' && name === initialName;
   const canSubmit = check === 'ok' && !unchanged && !submitting;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
-    const name = value.trim();
     setSubmitting(true);
     try {
       const result = await onSubmit(name);
@@ -78,16 +84,22 @@ function BoardNameSheetContent({
       <form id="board-name-form" onSubmit={submit} className={styles.sheetBody}>
         <TextField
           variant="box"
+          id="board-name"
           aria-label="보드 이름"
           placeholder="보드 이름을 입력해 주세요"
           value={value}
-          maxLength={BOARD_NAME_MAX}
-          showCounter
+          counter={`${codePointLength(name)}/${BOARD_NAME_MAX}`}
           autoFocus
           enterKeyHint="done"
           onChange={(event) => setValue(event.target.value)}
           onClear={() => setValue('')}
-          error={check === 'duplicate' ? DUPLICATE : undefined}
+          error={
+            check === 'duplicate'
+              ? DUPLICATE
+              : check === 'invalid'
+                ? INVALID_BOARD_NAME_MESSAGE
+                : undefined
+          }
           success={check === 'ok' && !unchanged}
           helperText={check === 'ok' && !unchanged ? '사용가능한 이름이에요' : undefined}
         />

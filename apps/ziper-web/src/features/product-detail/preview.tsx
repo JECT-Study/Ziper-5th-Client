@@ -18,6 +18,7 @@ export const sampleProduct: ProductDetail = {
   imageUrl: null,
   imageFileId: null,
   imageFileUrl: null,
+  imageStatus: 'NONE',
   fallbackIcon: 'TOP',
   status: 'PLANNED',
   linkStatus: 'AVAILABLE',
@@ -42,6 +43,7 @@ export function createPreviewApi(mode: string): ProductDetailApi & { purchases: 
       imageUrl: 'https://invalid.example/image.png',
       fallbackIcon: null,
     };
+  let boards = [...sampleProduct.boards];
   return {
     async get(_id, signal) {
       signal.throwIfAborted();
@@ -52,7 +54,12 @@ export function createPreviewApi(mode: string): ProductDetailApi & { purchases: 
     },
     async listBoards(signal) {
       signal.throwIfAborted();
-      return sampleProduct.boards;
+      return boards;
+    },
+    async createBoard(name) {
+      const board = { id: String(boards.length + 1), name };
+      boards = [board, ...boards];
+      return board;
     },
     async update(_id, input) {
       if (mode === 'failed') return rejected('failed');
@@ -61,7 +68,7 @@ export function createPreviewApi(mode: string): ProductDetailApi & { purchases: 
       product = {
         ...product,
         ...fields,
-        boards: sampleProduct.boards.filter((board) => boardIds.includes(board.id)),
+        boards: boards.filter((board) => boardIds.includes(board.id)),
       };
       return done(product);
     },
@@ -76,9 +83,25 @@ export function createPreviewApi(mode: string): ProductDetailApi & { purchases: 
           affectedBoardCount: product.boards.length,
         });
       },
-      async list(signal) {
+      async list(sort, signal, cursor) {
         signal.throwIfAborted();
-        return product.status === 'PURCHASED' ? [product] : [];
+        const items = product.status === 'PURCHASED' ? [product] : [];
+        if (mode === 'purchased') {
+          items.push(
+            { ...product, cardId: '2', productTitle: '리넨 블라우스', price: 29000 },
+            { ...product, cardId: '3', productTitle: '스트라이프 티셔츠', price: 49000 },
+          );
+        }
+        if (sort === 'OLDEST') items.reverse();
+        if (sort === 'PRICE_ASC' || sort === 'PRICE_DESC') {
+          const direction = sort === 'PRICE_ASC' ? 1 : -1;
+          items.sort((a, b) => ((a.price ?? 0) - (b.price ?? 0)) * direction);
+        }
+        const start = cursor === '2' ? 2 : 0;
+        return {
+          items: items.slice(start, start + 2),
+          nextCursor: items.length > start + 2 ? '2' : null,
+        };
       },
     },
     async openOriginal() {},

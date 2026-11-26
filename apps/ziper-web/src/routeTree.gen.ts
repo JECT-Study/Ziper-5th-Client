@@ -19,6 +19,7 @@ import { Route as BoardsBoardIdRouteImport } from './routes/boards.$boardId'
 import { Route as LoginIndexRouteImport } from './routes/login/index'
 import { Route as LoginEmailRouteImport } from './routes/login/email'
 import { Route as ProductsCardIdRouteImport } from './routes/products.$cardId'
+import { Route as ProductsPurchasedRouteImport } from './routes/products.purchased'
 import { Route as SignupIndexRouteImport } from './routes/signup/index'
 import { Route as SignupCompleteRouteImport } from './routes/signup/complete'
 import { Route as SignupTermsRouteImport } from './routes/signup/terms'
@@ -74,6 +75,11 @@ const ProductsCardIdRoute = ProductsCardIdRouteImport.update({
   path: '/products/$cardId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductsPurchasedRoute = ProductsPurchasedRouteImport.update({
+  id: '/products/purchased',
+  path: '/products/purchased',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupIndexRoute = SignupIndexRouteImport.update({
   id: '/signup/',
   path: '/signup/',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
   '/products/$cardId': typeof ProductsCardIdRoute
+  '/products/purchased': typeof ProductsPurchasedRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
   '/boards/': typeof BoardsIndexRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
   '/products/$cardId': typeof ProductsCardIdRoute
+  '/products/purchased': typeof ProductsPurchasedRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
   '/boards': typeof BoardsIndexRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/boards/$boardId': typeof BoardsBoardIdRoute
   '/login/email': typeof LoginEmailRoute
   '/products/$cardId': typeof ProductsCardIdRoute
+  '/products/purchased': typeof ProductsPurchasedRoute
   '/signup/complete': typeof SignupCompleteRoute
   '/signup/terms': typeof SignupTermsRoute
   '/boards/': typeof BoardsIndexRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/boards/$boardId'
     | '/login/email'
     | '/products/$cardId'
+    | '/products/purchased'
     | '/signup/complete'
     | '/signup/terms'
     | '/boards/'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/boards/$boardId'
     | '/login/email'
     | '/products/$cardId'
+    | '/products/purchased'
     | '/signup/complete'
     | '/signup/terms'
     | '/boards'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/boards/$boardId'
     | '/login/email'
     | '/products/$cardId'
+    | '/products/purchased'
     | '/signup/complete'
     | '/signup/terms'
     | '/boards/'
@@ -204,6 +216,7 @@ export interface RootRouteChildren {
   BoardsBoardIdRoute: typeof BoardsBoardIdRoute
   LoginEmailRoute: typeof LoginEmailRoute
   ProductsCardIdRoute: typeof ProductsCardIdRoute
+  ProductsPurchasedRoute: typeof ProductsPurchasedRoute
   SignupCompleteRoute: typeof SignupCompleteRoute
   SignupTermsRoute: typeof SignupTermsRoute
   BoardsIndexRoute: typeof BoardsIndexRoute
@@ -284,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductsCardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/products/purchased': {
+      id: '/products/purchased'
+      path: '/products/purchased'
+      fullPath: '/products/purchased'
+      preLoaderRoute: typeof ProductsPurchasedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup/': {
       id: '/signup/'
       path: '/signup'
@@ -324,6 +344,7 @@ const rootRouteChildren: RootRouteChildren = {
   BoardsBoardIdRoute: BoardsBoardIdRoute,
   LoginEmailRoute: LoginEmailRoute,
   ProductsCardIdRoute: ProductsCardIdRoute,
+  ProductsPurchasedRoute: ProductsPurchasedRoute,
   SignupCompleteRoute: SignupCompleteRoute,
   SignupTermsRoute: SignupTermsRoute,
   BoardsIndexRoute: BoardsIndexRoute,

@@ -22,11 +22,17 @@ import {
 } from '../../components';
 import {
   codePointLength,
+  hasUnsupportedTagCharacters,
+  invalidTagCharactersMessage,
+  isValidTag,
+  normalizeProductMemo,
+  normalizeProductTitle,
   normalizeTag,
   parseWholeWon,
   priceRangeMessage,
   productLimits,
   seasonTags,
+  tagInputHint,
   titleLengthMessage,
   type FallbackIcon,
 } from '@ziper/api/product-fields';
@@ -264,7 +270,7 @@ function ProductForm({
   const boardList = useRef<HTMLUListElement>(null);
   const focusTrigger = useRef<'tag' | 'board' | null>(null);
   const busy = useRef(false);
-  const tagName = tag === null ? undefined : normalizeTag(tag);
+  const tagName = tag !== null && isValidTag(tag) ? normalizeTag(tag) : undefined;
   const newBoardName = boardName?.trim();
   const canAddTag = Boolean(tagName && !tags.includes(tagName));
   const canCreateBoard = Boolean(
@@ -274,9 +280,10 @@ function ProductForm({
   );
   const numericPrice = parseWholeWon(price);
   const invalidPrice = numericPrice === null;
-  const invalidName = codePointLength(name.trim()) > productLimits.titleLength;
+  const normalizedName = normalizeProductTitle(name);
+  const invalidName = codePointLength(normalizedName) > productLimits.titleLength;
   const canSave = Boolean(
-    name.trim() &&
+    normalizedName &&
     !invalidName &&
     !invalidPrice &&
     image &&
@@ -347,12 +354,12 @@ function ProductForm({
           url,
           sharedUrl: sourceURL === url ? null : sourceURL,
           shop,
-          name: name.trim(),
+          name: normalizedName,
           price: numericPrice,
           metadataSource: product ? 'CLIENT' : 'MANUAL',
           image,
           tags: selectedTags,
-          memo: memo.trim(),
+          memo: normalizeProductMemo(memo),
           boardIds: selectedBoards,
         }),
       );
@@ -515,7 +522,8 @@ function ProductForm({
               <InlineEntry
                 label="새 해시태그"
                 value={tag}
-                maxLength={productLimits.tagLength}
+                helperText={tagInputHint}
+                error={hasUnsupportedTagCharacters(tag) ? invalidTagCharactersMessage : undefined}
                 action="추가"
                 disabled={!canAddTag}
                 onChange={setTag}

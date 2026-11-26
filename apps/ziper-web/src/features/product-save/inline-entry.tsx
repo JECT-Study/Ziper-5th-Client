@@ -5,6 +5,7 @@ export function InlineEntry({
   label,
   value,
   maxLength,
+  counter,
   onChange,
   onConfirm,
   onCancel,
@@ -12,12 +13,14 @@ export function InlineEntry({
   disabled,
   loading,
   helperText,
+  error,
   placeholder,
   variant,
 }: {
   label: string;
   value: string;
-  maxLength: number;
+  maxLength?: number;
+  counter?: string;
   onChange: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -25,6 +28,7 @@ export function InlineEntry({
   disabled: boolean;
   loading?: boolean;
   helperText?: string;
+  error?: string;
   placeholder?: string;
   variant?: 'primary' | 'secondary';
 }) {
@@ -49,8 +53,10 @@ export function InlineEntry({
         autoFocus
         value={value}
         maxLength={maxLength}
-        showCounter
+        showCounter={maxLength !== undefined}
+        counter={counter}
         helperText={helperText}
+        error={error}
         placeholder={placeholder}
         disabled={loading}
         onChange={(event) => onChange(event.target.value)}

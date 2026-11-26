@@ -1,0 +1,37 @@
+# Reset with expireSessionOnEdit=1 or deleteBoardOnEdit=1&expireOnBoardChoicesRefresh=1.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F8
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- tapOn: 봄
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: 로그인 화면으로 이동
+    timeout: 10000
+- assertVisible: '로그인이 만료됐어요.*'
+- assertNotVisible: '선택한 보드가 바뀌었어요.*'
+- assertNotVisible: 수정 완료
+- assertNotVisible: 현재 상태 확인
+- tapOn: 상세에서 확인
+- extendedWaitUntil:
+    visible: 로그인한 뒤 상품을 확인해 주세요.
+    timeout: 10000
+- assertNotVisible: 원본 쇼핑몰로 이동
+- tapOn: 로그인 화면으로 이동
+- extendedWaitUntil:
+    visible: 이메일로 가입하기
+    timeout: 10000

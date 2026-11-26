@@ -1,0 +1,34 @@
+# Before running: POST /_reset?removeCardOnEdit=1 on the fixture.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2Fpurchased%3Fsort%3DOLDEST
+- extendedWaitUntil:
+    visible: 구매한 셔츠 상품 관리
+    timeout: 15000
+- tapOn: 구매한 셔츠 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 수정 완료
+    timeout: 10000
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: 상세에서 확인
+    timeout: 10000
+- tapOn: 상세에서 확인
+- extendedWaitUntil:
+    visible: 구매 완료 목록 보기
+    timeout: 10000
+- assertNotVisible: 다시 확인
+- tapOn: 구매 완료 목록 보기
+- extendedWaitUntil:
+    visible: 구매한 바지 상품 관리
+    timeout: 10000
+- assertVisible: 오래된 순
+- assertNotVisible: 구매한 셔츠 상품 관리

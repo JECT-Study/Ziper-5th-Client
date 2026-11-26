@@ -1,0 +1,27 @@
+# Reset the local HTTP fixture before each run.
+appId: com.ject.ziper
+---
+- runFlow: ../subflows/start-dev-client.yaml
+- extendedWaitUntil:
+    visible: 내 보드
+    timeout: 90000
+- runFlow:
+    file: ../subflows/open-link.yaml
+    env:
+      LINK: ziper://web?path=%2Fproducts%2F8
+- extendedWaitUntil:
+    visible: 린넨 블라우스
+    timeout: 15000
+- tapOn: 상품 관리
+- tapOn: 상품 수정
+- extendedWaitUntil:
+    visible: 가격 지우기
+    timeout: 10000
+- tapOn: 가격 지우기
+- inputText: '45900'
+- hideKeyboard
+- tapOn: 수정 완료
+- extendedWaitUntil:
+    visible: ^45,900원$
+    timeout: 10000
+- assertNotVisible: 수정 완료
