@@ -22,7 +22,7 @@ export function LoginPage() {
       const status = await login(provider);
       // 처음 온 사람은 약관 동의 → 가입 완료 화면으로 간다.
       if (status === 'signupRequired') navigate({ to: '/signup/terms' });
-      else if (status === 'signedIn') navigate({ to: '/' });
+      else if (status === 'signedIn') navigate({ to: '/', replace: true });
     } catch (error) {
       const notReady = error instanceof BridgeError && NOT_READY.includes(error.code);
       showToast(

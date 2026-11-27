@@ -17,7 +17,8 @@ export function SignupCompletePage() {
         <h1 className={styles.title}>회원가입이 완료되었어요.</h1>
       </main>
       <Footer className={styles.footer}>
-        <Button onClick={() => navigate({ to: '/' })}>시작하기</Button>
+        {/* 완료 화면을 기록에서 지워, 홈에서 뒤로 가도 완료 화면으로 돌아오지 않게 한다. */}
+        <Button onClick={() => navigate({ to: '/', replace: true })}>시작하기</Button>
       </Footer>
     </div>
   );
