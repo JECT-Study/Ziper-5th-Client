@@ -23,6 +23,7 @@ import { useMobileServices } from '../bridge/services';
 import { SheetSessions, type SheetSnapshot } from '../bridge/sheets';
 import { WebView } from '../bridge/webview';
 import { NativeActionSheet } from './native-action-sheet';
+import { useSplashDone } from './splash';
 import { WebLoadError } from './web-load-error';
 import { useProductExtraction } from '../product-extraction/use-product-extraction';
 
@@ -68,6 +69,10 @@ export function WebScreen({
   const uri = serviceURL(config, path);
   const openedShare = useRef(share ? shareInbox.read() : null);
   const blocked = uri !== null && blockedURI === uri;
+  const splashDone = useSplashDone();
+  useEffect(() => {
+    if (!uri || blocked) splashDone();
+  }, [uri, blocked, splashDone]);
   const live = useRef({
     config,
     auth,
@@ -277,6 +282,8 @@ export function WebScreen({
           style={{ flex: 1 }}
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={(request) => allowedDocument(config, request.url)}
+          // 불러오기에 실패해도 불린다. 그때는 오류 화면이 보이도록 스플래시를 걷는다.
+          onLoadEnd={splashDone}
           renderError={() => <WebLoadError onRetry={() => web.current?.reload()} />}
           onOpenWindow={(event) => {
             // 새 창은 막는다. 랜딩 약관 페이지만 기기 브라우저로 연다.
@@ -298,7 +305,9 @@ export function WebScreen({
           }}
           javaScriptCanOpenWindowsAutomatically={false}
           setSupportMultipleWindows
-          allowsBackForwardNavigationGestures={false}
+          // WebView 안에서만 넘어간 화면(웹 history 가 쌓인 화면)은 네이티브 스와이프가 꺼져 있다(intercept).
+          // 그때는 WebView 의 스와이프로 웹 history 를 되돌린다. 시트가 떠 있을 때와 첫 화면에서는 끈다.
+          allowsBackForwardNavigationGestures={depth > 0 && sheet === null}
           mixedContentMode="never"
           allowFileAccess={false}
           allowFileAccessFromFileURLs={false}
