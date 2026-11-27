@@ -7,6 +7,8 @@ const naverUrlScheme = process.env.EXPO_PUBLIC_NAVER_URL_SCHEME ?? '';
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...(config as ExpoConfig),
   ios: { ...config.ios, usesAppleSignIn: true },
+  // 빌드 번호는 app.json 의 ios.buildNumber 한 곳에서만 올리고, Android 는 같은 값을 따른다.
+  android: { ...config.android, versionCode: Number(config.ios?.buildNumber) },
   plugins: [
     ...(config.plugins ?? []),
     [
