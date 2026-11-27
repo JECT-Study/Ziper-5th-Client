@@ -144,7 +144,7 @@ export function PurchasedScreen({
           </div>
         )}
       </div>
-      <div className={purchasedScroll} data-scroll-restoration-id="purchased-products">
+      <div className={purchasedScroll}>
         {accessError === 'auth-required' ? null : accessError ? (
           <PurchasedListError ref={accessNotice} forbidden />
         ) : entryError ? (
