@@ -12,19 +12,11 @@ export const page = style({
   margin: '0 auto',
   background: vars.color.background,
 });
-// Keep the list scrollable without letting long grids push the navigation out of reach.
-export const purchasedPage = style([
-  page,
-  {
-    height: viewportHeight,
-    display: 'grid',
-    gridTemplateRows: 'auto minmax(0, 1fr) auto',
-  },
-]);
+// 하단 네비는 스스로 화면 아래에 붙는다(BottomNavigation.css.ts). 목록은 문서 스크롤을 그대로 쓴다.
+export const purchasedPage = page;
 export const purchasedScroll = style({
-  overflowY: 'auto',
+  flex: 1,
   paddingBottom: 16, // Keep the final control clear of the raised add button.
-  scrollPaddingBottom: 16,
 });
 export const body = style({ display: 'grid', gap: 12, padding: 16 });
 globalStyle(`${body} p, ${body} h2`, { margin: 0 });

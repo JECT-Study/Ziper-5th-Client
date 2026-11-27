@@ -6,6 +6,15 @@
     "plugins": [
       "expo-router",
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#abf61c",
+          "image": "./assets/splash-logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ],
+      [
         "expo-sharing",
         {
           "ios": {
@@ -23,7 +32,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ject.ziper"
+      "bundleIdentifier": "com.ject.ziper",
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.ject.ziper",
@@ -34,6 +44,12 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6ee20063-0dde-4921-b2c9-742a684df9b3"
+      }
+    },
+    "owner": "spbabos-team"
   }
 }

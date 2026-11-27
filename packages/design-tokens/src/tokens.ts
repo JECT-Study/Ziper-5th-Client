@@ -8,6 +8,7 @@ export const palette = {
   gray400: '#c2c2c2',
   gray900: '#222222',
   gray950: '#111111',
+  lime100: '#e8fec4',
   lime300: '#abf61c',
   lime400: '#81e900',
   lime600: '#41a700',

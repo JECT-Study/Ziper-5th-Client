@@ -30,7 +30,6 @@ export function SocialTermsPage() {
 
   const form = useForm({
     defaultValues: { agreements: noAgreements },
-    validators: { onMount: termsSchema, onChange: termsSchema },
     onSubmit: ({ value }) => agree(value.agreements.marketing),
   });
 
@@ -67,7 +66,9 @@ export function SocialTermsPage() {
       title="약관에 동의해주세요"
       description="Ziper 를 시작하려면 아래 약관에 동의가 필요해요"
       actions={
-        <form.Subscribe selector={(state) => state.canSubmit}>
+        // 폼 검사(onMount)는 오류를 agreements.service 같은 하위 필드에 붙여, 체크해도 지워지지 않는다.
+        // 그래서 이메일 가입(SignupPage)처럼 값으로 직접 판단한다.
+        <form.Subscribe selector={(state) => v.is(termsSchema, state.values)}>
           {(canSubmit) => (
             <Button
               disabled={!canSubmit}

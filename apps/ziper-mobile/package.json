@@ -7,6 +7,10 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
+    "build:ios": "eas build -p ios --profile production --local --output dist/ziper.ipa",
+    "build:android": "eas build -p android --profile production --local --output dist/ziper.aab",
+    "submit:ios": "eas submit -p ios --profile production --path dist/ziper.ipa",
+    "submit:android": "eas submit -p android --profile production --path dist/ziper.aab",
     "typecheck": "tsc --noEmit",
     "test": "vp test run"
   },
@@ -25,6 +29,7 @@
     "expo-dev-client": "~58.0.18",
     "expo-router": "~58.0.30",
     "expo-sharing": "~58.0.23",
+    "expo-splash-screen": "~58.0.15",
     "expo-status-bar": "~58.0.4",
     "react": "19.3.0",
     "react-native": "0.88.1",
@@ -38,6 +43,7 @@
     "@testing-library/react-native": "14.1.0",
     "@types/react": "~19.3.0",
     "babel-preset-expo": "~58.0.24",
+    "eas-cli": "^27.11.0",
     "test-renderer": "1.3.1",
     "typescript": "~6.0.3",
     "vitest-native": "0.15.1"
